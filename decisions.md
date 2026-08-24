@@ -2,6 +2,17 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-08-24 — Supabase region: Ireland (eu-west-1), not London/Frankfurt as originally planned
+**Decision:** Supabase project created in EU West (Ireland, `eu-west-1`), not London or Frankfurt as originally specified in `SECURITY.md`.
+**Why:** Ireland was Supabase's own recommended region at project creation, likely reflecting AWS region maturity and/or proximity, not a compliance factor. No compliance difference either way, Ireland is EU/EEA the same as Frankfurt or London, covers UK, France, and Switzerland identically per the adequacy reasoning already documented.
+**Supersedes:** The "London or Frankfurt" wording in the 2026-08-21 compliance-scope entry below. `SECURITY.md` and `ARCHITECTURE.md` have been updated to name Ireland as what was actually built.
+
+## 2026-08-21 — Testing scope: US added concurrently, not phased
+**Decision:** Beta testing now includes nurses in the US alongside the UK, France, and Switzerland, all concurrently, rather than the originally planned sequencing of US testing 3-6 months after the others.
+**Why:** Founder already has US nurse contacts available now. No reason to delay given the beta stays synthetic-data-only regardless of tester location.
+**What doesn't change:** The synthetic-data-only rule applies identically across all four regions (see `SECURITY.md`). Concurrent testing does not mean concurrent compliance readiness for real patient data, the US path (signed BAA, HIPAA-ready API configuration) is exactly as deferred as the UK/France/Switzerland paths, it's simply no longer sequenced after them.
+**Supersedes:** `project.md`'s earlier framing of US expansion as a distinct "later" phase, now folded into the same concurrent beta as the other three regions.
+
 ## 2026-08-21 — Multi-tenancy: facility-scoped data, relaxed RLS for beta
 **Decision:** Add an `facilities` table as the top-level tenant boundary. At signup, a nurse creates a new facility or selects an existing one from a list. Patients, tasks, and notes are scoped to `facility_id`, so every nurse at the same facility sees the same shared test patients.
 **Why:** Testers are grouped by clinic/nursing home, and testing needs shared visibility within that group, nurse A and B at clinic XX see the same `Patient_Test` records, not just individually-assigned ones.
