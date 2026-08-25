@@ -2,6 +2,11 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-08-25 — Patient location: synthetic label, not real room/bed number
+**Decision:** Added an optional `location_label` field to patients (e.g. "Test Room A"), instead of real room/bed number fields as originally considered.
+**Why:** Real room/bed numbers are explicitly prohibited as patient identifiers in `SECURITY.md` and `CLAUDE.md`, they double as the hospital's own lookup key. A synthetic label gives the same organizational usability nurses actually want without the re-identification risk, following the same pattern as the `Patient_Test_N` label itself.
+**Also this session:** `allergies` and `admission_date` restored to `patients`, present in the original demo schema, dropped when `0001_init.sql` was written, no identifier conflict since both are clinical context, not identifying.
+
 ## 2026-08-24 — Supabase region: Ireland (eu-west-1), not London/Frankfurt as originally planned
 **Decision:** Supabase project created in EU West (Ireland, `eu-west-1`), not London or Frankfurt as originally specified in `SECURITY.md`.
 **Why:** Ireland was Supabase's own recommended region at project creation, likely reflecting AWS region maturity and/or proximity, not a compliance factor. No compliance difference either way, Ireland is EU/EEA the same as Frankfurt or London, covers UK, France, and Switzerland identically per the adequacy reasoning already documented.

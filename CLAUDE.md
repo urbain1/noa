@@ -13,7 +13,7 @@ React 19 + Vite (web, not native) + Tailwind. Supabase for auth/db/realtime. Cla
 - Don't change RLS policies without discussion, security-critical.
 - Don't change patient matching logic (fuzzy match + disambiguation) without discussion, tuned from real nurse feedback on the demo.
 - No native/Expo code paths. Web only until `decisions.md` says otherwise.
-- Patient identifiers must always use the `Patient_Test_N` convention (app-generated), never a real room, bed, or hospital ID number. See `SECURITY.md`.
+- Patient identifiers must always use the `Patient_Test_N` convention (app-generated), never a real room, bed, or hospital ID number. See `SECURITY.md`. This also applies to the optional location label field, must be synthetic, never a real room, bed, or ward.
 - Every query touching patients, tasks, or notes must be scoped to the current user's `facility_id`. No exceptions, no debug/admin bypass. Treat a cross-facility leak the same severity as a real PHI leak.
 
 ## Conventions

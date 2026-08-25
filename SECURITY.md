@@ -35,6 +35,7 @@ Practical implications:
 - Labels: `Patient_Test_1`, `Patient_Test_2`, etc., app-generated. Never a real room, bed, or hospital ID number, those double as the hospital's own lookup key and aren't meaningfully de-identified.
 - Labels persist across sessions and days for the life of one ongoing test case, needed for continuity across shift handoffs.
 - If the real patient a tester has in mind changes, the label must be retired, not reused. See `scenarios.md` SC-10 for the unenforced edge case this creates today.
+- Optional location label (e.g. "Test Room A"): same rule applies. Must be a made-up spatial reference for the test scenario, never a real room, bed, or ward number from the actual facility.
 
 ## Known gaps, deferred until real data is in scope
 
