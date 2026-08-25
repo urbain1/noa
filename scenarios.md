@@ -58,3 +58,7 @@ Expected: currently unhandled. Interim mitigation: a search-as-you-type list at 
 **SC-13: Open self-serve facility join**
 Any signing-up nurse can create a new facility or join any existing one from the list, with no verification of actual affiliation.
 Expected: acceptable at current scale (every tester personally known to the founder), not acceptable once testers extend beyond that circle. Flagged in `SECURITY.md` as a known gap, not solved here.
+
+**SC-14: Numeric label collision in matching**
+Since every synthetic label shares the words "Patient" and "Test", searching for a genuinely nonexistent patient number, or a bare location-label phrase, tends to surface as an ambiguous "pick from everyone" disambiguation rather than a true zero-match.
+Expected: safe failure mode, requires explicit nurse selection, never auto-fires on the wrong patient. Not yet solved, would need to touch the "any shared word matches" fallback rule itself, its own discussion.

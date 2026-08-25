@@ -7,6 +7,12 @@ Newest first. Superseded decisions are kept, marked, not deleted, so the reasoni
 **Why:** Real room/bed numbers are explicitly prohibited as patient identifiers in `SECURITY.md` and `CLAUDE.md`, they double as the hospital's own lookup key. A synthetic label gives the same organizational usability nurses actually want without the re-identification risk, following the same pattern as the `Patient_Test_N` label itself.
 **Also this session:** `allergies` and `admission_date` restored to `patients`, present in the original demo schema, dropped when `0001_init.sql` was written, no identifier conflict since both are clinical context, not identifying.
 
+## 2026-08-25 — Patient matching: numeric labels require exact match, not fuzzy
+**Decision:** Approved Claude Code's fix to `roomMatcher.js`'s typo-tolerance: purely-numeric label words (the "1" in `Patient_Test_1`) now require exact equality, no longer subject to the 1-edit-distance tolerance originally built for name typos.
+**Why:** The fuzzy matcher was tuned for real names ("Sara"/"Sarah"), where a 1-character tolerance catches genuine transcription errors. Applied to `Patient_Test_N` labels, it meant any two single-digit numbers were treated as interchangeable, so `Patient_Test_1`, `_2`, `_3` could silently fuzzy-match each other and return the wrong patient with no disambiguation shown. A real patient-safety-relevant bug: silent misroute, not a visible failure.
+**Scope:** Exempted numeric tokens only, alphabetic typo-tolerance is untouched, per `CLAUDE.md`'s rule not to change patient matching without discussion, this was flagged and approved before implementation.
+**Also this session:** `roomMatcher.js` now matches against real patient fields (`label`, `location_label`) instead of a mock name/room shim. "+Add Task" from a known patient's card now skips matching entirely rather than running the full facility-wide match.
+
 ## 2026-08-25 — Day 3 complete: Claude API fully behind the Supabase Edge Function
 **Confirmed:** `api/claude.js` and its `vercel.json` routing removed entirely. `claudeAPI.js` now calls the `claude-proxy` Edge Function exclusively, no direct-to-Anthropic path remains anywhere in client code. Verified end-to-end: a task created through the app came back with AI-expanded medical terminology and a computed deadline, confirmed via browser Network tab (`claude-proxy` 200, no requests to `api.anthropic.com`) and console output.
 

@@ -74,6 +74,17 @@ function extractNameAndRoom(input) {
 }
 
 /**
+ * Normalize a patient label or spoken/typed search string for name matching.
+ * Patient labels use the `Patient_Test_N` convention (underscores), while
+ * spoken/typed input naturally uses spaces ("Patient Test 1") -- without this,
+ * the word-splitting comparisons below never line up since the label reads
+ * as one unbroken token.
+ */
+function normalizeLabel(str) {
+  return str.toLowerCase().trim().replace(/_/g, " ");
+}
+
+/**
  * Calculate simple similarity between two strings (0 to 1).
  * Uses a combination of includes-check and character-level comparison.
  */
@@ -139,6 +150,13 @@ function levenshtein(a, b) {
  */
 function fuzzyWordMatch(a, b) {
   if (a === b) return true;
+  // Purely numeric words (e.g. the trailing N in "Patient Test N") are
+  // identifiers, not typo-prone names -- require exact equality instead of
+  // edit-distance tolerance, since every single digit is within distance 1
+  // of every other and would otherwise "fuzzy match" every other patient.
+  if (/^\d+$/.test(a) || /^\d+$/.test(b)) {
+    return false;
+  }
   // One is a prefix of the other (min 3 chars)
   if (a.length >= 3 && b.length >= 3) {
     if (a.startsWith(b) || b.startsWith(a)) return true;
@@ -152,15 +170,15 @@ function fuzzyWordMatch(a, b) {
 }
 
 /**
- * Match a search name against a patient's name using fuzzy matching.
+ * Match a search name against a patient's label using fuzzy matching.
  *
  * @param {string} searchName - The name to search for
- * @param {{name: string}} patient - Patient object with a name field
+ * @param {{label: string}} patient - Patient object with a label field (e.g. "Patient_Test_1")
  * @returns {'exact'|'partial'|null} Match quality or null for no match
  */
 function matchByName(searchName, patient) {
-  const normalized = searchName.toLowerCase().trim();
-  const patientName = patient.name.toLowerCase();
+  const normalized = normalizeLabel(searchName);
+  const patientName = normalizeLabel(patient.label);
 
   // Exact match
   if (patientName === normalized) return "exact";
@@ -216,7 +234,9 @@ function matchByName(searchName, patient) {
 }
 
 /**
- * Match rooms using existing room-matching logic.
+ * Match a spoken/typed value against patients' optional location_label
+ * using the room-matching logic (kept for the "in <location>" scenario and
+ * for numeric/short inputs that don't look like a name).
  */
 function matchByRoom(spokenRoom, allPatients) {
   const normalizedSpoken = normalizeRoom(spokenRoom);
@@ -228,7 +248,7 @@ function matchByRoom(spokenRoom, allPatients) {
   const partialMatches = [];
 
   for (const patient of allPatients) {
-    const normalizedPatientRoom = normalizeRoom(patient.room || "");
+    const normalizedPatientRoom = normalizeRoom(patient.location_label || "");
 
     // Exact match — return immediately
     if (normalizedPatientRoom === normalizedSpoken) {
@@ -255,8 +275,8 @@ function matchByRoom(spokenRoom, allPatients) {
 /**
  * Match patient input that can be a room number, patient name, or both.
  *
- * @param {string} input - Room number ("208"), name ("Sarah Johnson"), or both ("Sarah in 208")
- * @param {Array<{room: string, name: string}>} allPatients - Patient list
+ * @param {string} input - Location label ("Test Room A"), patient label ("Patient Test 1"), or both ("Patient Test 1 in Test Room A")
+ * @param {Array<{label: string, location_label?: string}>} allPatients - Patient list, scoped to the current facility
  * @returns {{
  *   exactMatch: object|null,
  *   partialMatches: object[],
@@ -362,5 +382,3 @@ export function findMatchingPatients(input, allPatients) {
   };
 }
 
-// Backward-compatible alias
-export { findMatchingPatients as findMatchingRooms };

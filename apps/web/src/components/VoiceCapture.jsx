@@ -87,7 +87,7 @@ function parseTranscriptFallback(text) {
   };
 }
 
-export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
+export default function VoiceCapture({ onClose, onTaskCreated, allPatients, knownPatient }) {
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
@@ -195,7 +195,20 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
       // original transcript alongside the parsed fields.
       parsedTask.rawTranscript = transcript.trim();
 
-      // Step 2: Handle patient matching (by room OR name)
+      // Opened from a specific patient's card ("+ Add Task") -- the patient
+      // is already known, so skip matching entirely rather than re-resolving
+      // it against every patient in the facility.
+      if (knownPatient) {
+        onTaskCreated({
+          ...parsedTask,
+          room: knownPatient.location_label,
+          patientName: knownPatient.label,
+        });
+        onClose();
+        return;
+      }
+
+      // Step 2: Handle patient matching (by location label OR patient label)
       const searchInput = parsedTask.patientName || (parsedTask.room && parsedTask.room !== "000" ? parsedTask.room : null);
 
       if (searchInput) {
@@ -204,16 +217,16 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
         if (matches.matchType === "exact") {
           onTaskCreated({
             ...parsedTask,
-            room: matches.exactMatch.room,
-            patientName: matches.exactMatch.name,
+            room: matches.exactMatch.location_label,
+            patientName: matches.exactMatch.label,
           });
           onClose();
         } else if (matches.matchType === "partial") {
           if (matches.partialMatches.length === 1) {
             onTaskCreated({
               ...parsedTask,
-              room: matches.partialMatches[0].room,
-              patientName: matches.partialMatches[0].name,
+              room: matches.partialMatches[0].location_label,
+              patientName: matches.partialMatches[0].label,
             });
             onClose();
           } else {
@@ -242,57 +255,18 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
 
   const handleRoomSelected = (patient) => {
     if (parsedTaskDraft) {
-      onTaskCreated({ ...parsedTaskDraft, room: patient.room, patientName: patient.name });
+      onTaskCreated({ ...parsedTaskDraft, room: patient.location_label, patientName: patient.label });
       onClose();
     }
   };
 
-  const handleManualRoomConfirm = (roomData) => {
+  // Manual entry always resolves to a real, already-selected patient (or is
+  // cancelled) -- no re-matching needed, and no local-only "new patient"
+  // path since patient creation must go through the Add Patient dialog to
+  // keep the Patient_Test_N labeling convention.
+  const handleManualRoomConfirm = (patient) => {
     if (parsedTaskDraft) {
-      // If user entered searchName or room, try to find matching patient
-      if (!roomData.isNewPatient && (roomData.searchName || roomData.room)) {
-        const searchInput = roomData.searchName || roomData.room;
-        const matches = findMatchingPatients(searchInput, allPatients);
-
-        if (matches.exactMatch) {
-          onTaskCreated({
-            ...parsedTaskDraft,
-            room: matches.exactMatch.room,
-            patientName: matches.exactMatch.name,
-          });
-          onClose();
-          return;
-        } else if (matches.partialMatches.length === 1) {
-          onTaskCreated({
-            ...parsedTaskDraft,
-            room: matches.partialMatches[0].room,
-            patientName: matches.partialMatches[0].name,
-          });
-          onClose();
-          return;
-        } else if (matches.partialMatches.length > 1) {
-          setRoomMatches(matches);
-          setShowManualRoomEntry(false);
-          setShowRoomDisambiguation(true);
-          return;
-        }
-      }
-
-      // If new patient or no matches, create accordingly
-      if (roomData.isNewPatient) {
-        onTaskCreated({
-          ...parsedTaskDraft,
-          room: roomData.room,
-          isNewPatient: true,
-          patientName: roomData.patientName,
-          patientAge: roomData.patientAge,
-        });
-      } else {
-        onTaskCreated({
-          ...parsedTaskDraft,
-          room: roomData.room || "Unknown",
-        });
-      }
+      onTaskCreated({ ...parsedTaskDraft, room: patient.location_label, patientName: patient.label });
       onClose();
     }
   };
@@ -323,7 +297,9 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
             <path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
           </svg>
         </button>
-        <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">Voice Capture</h1>
+        <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">
+          {knownPatient ? `Add Task — ${knownPatient.label}` : "Voice Capture"}
+        </h1>
       </header>
 
       {/* Content */}
@@ -351,7 +327,9 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
             {isRecording ? "Listening..." : "Tap to record a new task"}
           </p>
           <p className="text-sm text-gray-400 italic mt-2">
-            Try: &quot;Order a CBC stat for Maria Santos due tomorrow&quot;
+            {knownPatient
+              ? 'Try: "Order a CBC stat due tomorrow"'
+              : 'Try: "Order a CBC stat for Patient Test 1 due tomorrow"'}
           </p>
         </div>
 
@@ -434,7 +412,6 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
         <RoomDisambiguationDialog
           spokenRoom={parsedTaskDraft?.patientName || parsedTaskDraft?.room || ""}
           matchingRooms={roomMatches.partialMatches}
-          matchedBy={roomMatches.matchedBy}
           onSelect={handleRoomSelected}
           onManualEntry={() => {
             setShowRoomDisambiguation(false);
@@ -446,7 +423,6 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
 
       {showManualRoomEntry && (
         <ManualRoomEntry
-          defaultRoom={parsedTaskDraft?.room || ""}
           onConfirm={handleManualRoomConfirm}
           onCancel={handleDisambiguationCancel}
           allPatients={allPatients}

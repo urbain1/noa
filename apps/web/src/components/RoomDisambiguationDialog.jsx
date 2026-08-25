@@ -1,16 +1,16 @@
 import { useState } from 'react';
 
-export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, onSelect, onManualEntry, onCancel, matchedBy }) {
+export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, onSelect, onManualEntry, onCancel }) {
   const [searchFilter, setSearchFilter] = useState('');
 
   const filteredRooms = matchingRooms.filter(patient => {
     if (!searchFilter.trim()) return true;
 
     const filter = searchFilter.toLowerCase().trim();
-    const roomMatch = patient.room.toLowerCase().includes(filter);
-    const nameMatch = patient.name.toLowerCase().includes(filter);
+    const locationMatch = (patient.location_label || '').toLowerCase().includes(filter);
+    const labelMatch = patient.label.toLowerCase().includes(filter);
 
-    return roomMatch || nameMatch;
+    return locationMatch || labelMatch;
   });
 
   return (
@@ -21,15 +21,6 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
         <p className="text-gray-600 mb-2">
           Found {matchingRooms.length} patients matching &lsquo;{spokenRoom}&rsquo;.
         </p>
-        {matchedBy === 'name' && (
-          <p className="mt-1 text-gray-600">Multiple patients match &lsquo;{spokenRoom}&rsquo;.</p>
-        )}
-        {matchedBy === 'name+room' && (
-          <p className="mt-1 text-gray-600">Multiple patients match your description.</p>
-        )}
-        {(!matchedBy || matchedBy === 'room') && (
-          <p className="mt-1 text-gray-600">Multiple rooms match &lsquo;{spokenRoom}&rsquo;.</p>
-        )}
 
         {/* Search Input */}
         <div className="mb-4">
@@ -40,7 +31,7 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Type patient name or room number..."
+            placeholder="Type patient label or location..."
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             autoFocus
           />
@@ -60,9 +51,13 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-2xl font-bold text-blue-600">{patient.room}</p>
-                    <p className="text-lg text-gray-900 mt-1">{patient.name}</p>
-                    <p className="text-sm text-gray-600">Age: {patient.age}</p>
+                    <p className="text-2xl font-bold text-blue-600">{patient.label}</p>
+                    {patient.location_label && (
+                      <p className="text-lg text-gray-900 mt-1">{patient.location_label}</p>
+                    )}
+                    {patient.diagnosis && (
+                      <p className="text-sm text-gray-600">{patient.diagnosis}</p>
+                    )}
                   </div>
                   <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

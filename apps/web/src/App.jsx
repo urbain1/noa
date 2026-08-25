@@ -105,6 +105,10 @@ function App() {
   }, [nurseProfile]);
 
   const [showVoice, setShowVoice] = useState(false);
+  // Set when Voice Capture is opened from a specific patient's "+ Add Task"
+  // button, so matching can be skipped entirely; null for the header/floating
+  // mic button, which still needs to match a spoken/typed patient.
+  const [voiceCapturePatient, setVoiceCapturePatient] = useState(null);
   const [delayedTasks, setDelayedTasks] = useState([]);
   const [selectedPatientForDischarge, setSelectedPatientForDischarge] = useState(null);
   const [showHandoff, setShowHandoff] = useState(false);
@@ -646,9 +650,13 @@ function App() {
   if (showVoice) {
     return (
       <VoiceCapture
-        onClose={() => setShowVoice(false)}
+        onClose={() => {
+          setShowVoice(false);
+          setVoiceCapturePatient(null);
+        }}
         onTaskCreated={handleTaskCreated}
-        allPatients={patients.map((p) => ({ ...p, name: p.label || "", room: p.location_label || "" }))}
+        allPatients={patients}
+        knownPatient={voiceCapturePatient}
       />
     );
   }
@@ -672,14 +680,20 @@ function App() {
       )}
       <Dashboard
         patients={patients}
-        onVoiceClick={() => setShowVoice(true)}
+        onVoiceClick={() => {
+          setVoiceCapturePatient(null);
+          setShowVoice(true);
+        }}
         onGenerateHandoff={handleGenerateShiftHandoff}
         onSwitchToChargeView={handleSwitchToChargeView}
         delayedTasks={delayedTasks}
         onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
         onFollowUp={handleFollowUp}
         onDismissAlert={dismissAlert}
-        onOpenVoiceCapture={() => setShowVoice(true)}
+        onOpenVoiceCapture={(patient) => {
+          setVoiceCapturePatient(patient);
+          setShowVoice(true);
+        }}
         onAddPatient={handleAddPatientClick}
         onEditPatient={handleEditPatientClick}
         onCompleteTask={handleCompleteTask}

@@ -188,7 +188,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); onOpenVoiceCapture(); }}
+            onClick={(e) => { e.stopPropagation(); onOpenVoiceCapture(patient); }}
             className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
           >
             + Add Task
