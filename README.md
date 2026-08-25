@@ -125,10 +125,7 @@ src/
 npm install
 ```
 
-Create a `.env` file:
-```
-VITE_ANTHROPIC_API_KEY=your_api_key_here
-```
+Claude API calls go through a Supabase Edge Function (`supabase/functions/claude-proxy`), not a client-side key. See `apps/web/.env` for the required `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY`, and set `ANTHROPIC_API_KEY` as a Supabase secret on the Edge Function (never a `VITE_`-prefixed var).
 
 Then:
 ```bash
@@ -149,7 +146,7 @@ The app ships with 5 sample patients, each with clinical context (diagnosis, adm
 
 ## Security Note
 
-API calls currently run client-side with `dangerouslyAllowBrowser: true`. For production, route requests through a backend proxy.
+Claude API calls run only from a Supabase Edge Function, authenticated by the caller's Supabase session. The Anthropic API key is never present in client-side code.
 
 ## About
 
