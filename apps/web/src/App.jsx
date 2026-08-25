@@ -3,22 +3,17 @@ import Dashboard from "./components/Dashboard";
 import VoiceCapture from "./components/VoiceCapture";
 import Alert from "./components/Alert";
 import DischargeDialog from "./components/DischargeDialog";
-import TaskEditDialog from "./components/TaskEditDialog";
-import DeleteConfirmModal from "./components/DeleteConfirmModal";
 import HandoffSummary from "./components/HandoffSummary";
 import AddNoteDialog from "./components/AddNoteDialog";
-import EditNoteDialog from "./components/EditNoteDialog";
-import NoteDeleteConfirmModal from "./components/NoteDeleteConfirmModal";
 import SuggestionModal from "./components/SuggestionModal";
-import PatientUpdateSummary from "./components/PatientUpdateSummary";
-import ShareUpdateDialog from "./components/ShareUpdateDialog";
-import ContactsDialog from "./components/ContactsDialog";
+import AddPatientDialog from "./components/AddPatientDialog";
+import EditPatientDialog from "./components/EditPatientDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
 import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import { supabase } from "./lib/supabase";
-import { parseTaskEditCommand, generateHandoffSummary, parseNoteEditCommand, generateSuggestions, generatePatientUpdate, translateText } from "./utils/claudeAPI";
-import { patients as mockPatients } from "./mockData";
+import { fetchPatients, createPatient, updatePatient, completeTask, addNote, createTask } from "./lib/patients";
+import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
 
 function App() {
   // --- Auth state ---
@@ -83,23 +78,39 @@ function App() {
     setNurseProfile(undefined);
   };
 
-  const [patients, setPatients] = useState(mockPatients);
+  // --- Patient data (Supabase-backed) ---
+  const [patients, setPatients] = useState([]);
+  const [patientsLoading, setPatientsLoading] = useState(true);
+  const [patientsError, setPatientsError] = useState(null);
+  const [showAddPatient, setShowAddPatient] = useState(false);
+  const [patientToEdit, setPatientToEdit] = useState(null);
+
+  const loadPatients = async () => {
+    setPatientsLoading(true);
+    setPatientsError(null);
+    try {
+      const data = await fetchPatients();
+      setPatients(data.map((p) => ({ ...p, tasks: p.tasks || [], notes: p.notes || [] })));
+    } catch (err) {
+      console.error('Patient fetch error:', err);
+      setPatientsError('Could not load patients. Please try reloading.');
+    }
+    setPatientsLoading(false);
+  };
+
+  useEffect(() => {
+    if (nurseProfile?.facility_id) {
+      loadPatients();
+    }
+  }, [nurseProfile]);
+
   const [showVoice, setShowVoice] = useState(false);
   const [delayedTasks, setDelayedTasks] = useState([]);
   const [selectedPatientForDischarge, setSelectedPatientForDischarge] = useState(null);
-  const [taskToDelete, setTaskToDelete] = useState(null);
-  const [taskToEdit, setTaskToEdit] = useState(null);
   const [showHandoff, setShowHandoff] = useState(false);
   const [handoffData, setHandoffData] = useState(null);
-  const [handoffLoading, setHandoffLoading] = useState(false);
   const [showAddNote, setShowAddNote] = useState(null); // patientId or null
-  const [noteToEdit, setNoteToEdit] = useState(null); // { note, patientId } or null
-  const [noteToDelete, setNoteToDelete] = useState(null); // { note, patientId } or null
   const [suggestionData, setSuggestionData] = useState(null); // { suggestions, patientId, patientName, triggerSummary } or null
-  const [patientUpdateData, setPatientUpdateData] = useState(null); // { summaryText, patient } or null
-  const [patientUpdateLoading, setPatientUpdateLoading] = useState(false);
-  const [showShareUpdate, setShowShareUpdate] = useState(false);
-  const [showContacts, setShowContacts] = useState(null); // patientId or null
   const [showChargeView, setShowChargeView] = useState(false);
   const [alertHidden, setAlertHidden] = useState(false);
   const [dismissedTaskIds, setDismissedTaskIds] = useState(() => {
@@ -132,7 +143,7 @@ function App() {
     for (const patient of patients) {
       for (const task of patient.tasks) {
         if (task.status === "Delayed" && !dismissedTaskIds.includes(task.id)) {
-          delayed.push({ ...task, patientName: patient.name, patientRoom: patient.room });
+          delayed.push({ ...task, patientName: patient.label, patientRoom: patient.location_label });
         }
       }
     }
@@ -145,11 +156,6 @@ function App() {
       localStorage.setItem("dismissedTasks", JSON.stringify(updated));
       return updated;
     });
-  };
-
-  const clearDismissed = () => {
-    setDismissedTaskIds([]);
-    localStorage.removeItem("dismissedTasks");
   };
 
   const handleFollowUp = (task) => {
@@ -182,7 +188,42 @@ function App() {
     );
   };
 
-  const handleTaskCreated = (taskData) => {
+  const handleTaskCreated = async (taskData) => {
+    // Matching already happened in VoiceCapture (name/room fuzzy match
+    // against the label/location_label-shimmed patient list); a resolved
+    // match always carries the matched patient's exact `label` through as
+    // `patientName`, so look the real Supabase patient up by that.
+    const matchedPatient = !taskData.isNewPatient && taskData.patientName
+      ? patients.find((p) => p.label === taskData.patientName)
+      : null;
+
+    if (matchedPatient) {
+      try {
+        const newTask = await createTask(nurseProfile.facility_id, matchedPatient.id, session.user.id, {
+          description: taskData.description,
+          department: taskData.department,
+          priority: taskData.priority,
+          deadline: taskData.deadline,
+          rawTranscript: taskData.rawTranscript,
+        });
+        setPatients((prev) =>
+          prev.map((p) =>
+            p.id === matchedPatient.id ? { ...p, tasks: [newTask, ...p.tasks] } : p
+          )
+        );
+        triggerSuggestions(matchedPatient.id, { type: "task", data: newTask });
+      } catch (err) {
+        console.error("Task creation error:", err);
+        alert("Failed to save task. Please try again.");
+      }
+      setShowVoice(false);
+      return;
+    }
+
+    // Could not resolve to a real patient (new-patient-via-voice, or no
+    // match found at all). Voice-based patient creation isn't wired to
+    // Supabase -- label must follow the Patient_Test_N convention via the
+    // Add Patient dialog -- so this stays local-only, same as before.
     const newTask = {
       id: Date.now(),
       description: taskData.description,
@@ -190,7 +231,7 @@ function App() {
       status: taskData.status || "Pending",
       priority: taskData.priority || "Routine",
       deadline: taskData.deadline || null,
-      timestamp: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     let targetPatientId = null;
@@ -203,13 +244,13 @@ function App() {
         room: taskData.room,
         name: taskData.patientName || `Patient (Room ${taskData.room})`,
         age: taskData.patientAge || 0,
-        comments: [],
+        notes: [],
         tasks: [newTask],
       };
       setPatients((prev) => [...prev, newPatient]);
       targetPatientId = newPatientId;
     } else {
-      // Case 2: Add task to existing patient
+      // Case 2: Add task to existing (local-only) patient
       const roomExists = patients.find((p) => p.room === taskData.room);
 
       if (roomExists) {
@@ -229,7 +270,7 @@ function App() {
           room: taskData.room,
           name: `Patient (Room ${taskData.room})`,
           age: 0,
-          comments: [],
+          notes: [],
           tasks: [newTask],
         };
         setPatients((prev) => [...prev, newPatient]);
@@ -237,7 +278,7 @@ function App() {
       }
     }
 
-    // Simulate status change after 15 seconds
+    // Simulate status change after 15 seconds (local-only demo path)
     setTimeout(() => {
       simulateStatusChange(newTask.id);
     }, 15000);
@@ -270,11 +311,6 @@ function App() {
         data: newTask,
       });
     }
-  };
-
-  const handleDischargeClick = (patientId) => {
-    const patient = patients.find((p) => p.id === patientId);
-    if (patient) setSelectedPatientForDischarge(patient);
   };
 
   const handleDischargeConfirm = (options) => {
@@ -321,95 +357,7 @@ function App() {
     setSelectedPatientForDischarge(null);
   };
 
-  const handleDeleteClick = (task, patientId) => {
-    setTaskToDelete({ task, patientId });
-  };
-
-  const handleDeleteConfirm = () => {
-    if (!taskToDelete) return;
-
-    setPatients((prevPatients) =>
-      prevPatients.map((patient) => {
-        if (patient.id === taskToDelete.patientId) {
-          return {
-            ...patient,
-            tasks: patient.tasks.filter((t) => t.id !== taskToDelete.task.id),
-          };
-        }
-        return patient;
-      })
-    );
-
-    setTaskToDelete(null);
-  };
-
-  const handleDeleteCancel = () => {
-    setTaskToDelete(null);
-  };
-
-  const handleEditClick = (task, patientId) => {
-    setTaskToEdit({ task, patientId });
-  };
-
-  const handleEditUpdate = async (command, task, patientId) => {
-    try {
-      const result = await parseTaskEditCommand(command, task);
-
-      if (result.action === "delete") {
-        setTaskToEdit(null);
-        setTaskToDelete({ task, patientId });
-        return;
-      }
-
-      if (result.updates) {
-        setPatients((prevPatients) =>
-          prevPatients.map((patient) => {
-            if (patient.id === patientId) {
-              return {
-                ...patient,
-                tasks: patient.tasks.map((t) =>
-                  t.id === task.id ? { ...t, ...result.updates } : t
-                ),
-              };
-            }
-            return patient;
-          })
-        );
-        setTaskToEdit(null);
-      }
-
-      if (result.error) {
-        alert(result.error);
-      }
-    } catch (error) {
-      console.error("Edit error:", error);
-      alert("Error updating task. Please try again.");
-    }
-  };
-
-  const handleManualEditUpdate = (updates, task, patientId) => {
-    setPatients((prevPatients) =>
-      prevPatients.map((patient) => {
-        if (patient.id === patientId) {
-          return {
-            ...patient,
-            tasks: patient.tasks.map((t) =>
-              t.id === task.id ? { ...t, ...updates } : t
-            ),
-          };
-        }
-        return patient;
-      })
-    );
-    setTaskToEdit(null);
-  };
-
-  const handleEditCancel = () => {
-    setTaskToEdit(null);
-  };
-
   const handleGenerateShiftHandoff = async () => {
-    setHandoffLoading(true);
     const result = await generateHandoffSummary(patients);
     if (result) {
       setHandoffData({ summaryText: result, title: "Shift Handoff Report", patientCount: patients.length });
@@ -417,21 +365,6 @@ function App() {
     } else {
       alert("Failed to generate handoff summary. Please try again.");
     }
-    setHandoffLoading(false);
-  };
-
-  const handleGeneratePatientHandoff = async (patientId) => {
-    const patient = patients.find((p) => p.id === patientId);
-    if (!patient) return;
-    setHandoffLoading(true);
-    const result = await generateHandoffSummary([patient]);
-    if (result) {
-      setHandoffData({ summaryText: result, title: `Handoff: ${patient.name}`, patientCount: 1 });
-      setShowHandoff(true);
-    } else {
-      alert("Failed to generate handoff summary. Please try again.");
-    }
-    setHandoffLoading(false);
   };
 
   const handleCloseHandoff = () => {
@@ -439,116 +372,75 @@ function App() {
     setHandoffData(null);
   };
 
-  // --- Note handlers ---
+  // --- Patient handlers (real writes) ---
+
+  const handleAddPatientClick = () => {
+    setShowAddPatient(true);
+  };
+
+  const handleAddPatientSave = async (fields) => {
+    const newPatient = await createPatient(nurseProfile.facility_id, fields);
+    setPatients((prev) => [{ ...newPatient, tasks: [], notes: [] }, ...prev]);
+    setShowAddPatient(false);
+  };
+
+  const handleEditPatientClick = (patient) => {
+    setPatientToEdit(patient);
+  };
+
+  const handleEditPatientSave = async (patientId, fields) => {
+    const updated = await updatePatient(patientId, fields);
+    setPatients((prev) =>
+      prev.map((p) => (p.id === patientId ? { ...p, ...updated } : p))
+    );
+    setPatientToEdit(null);
+  };
+
+  // --- Task handlers (real writes) ---
+
+  const handleCompleteTask = async (task) => {
+    try {
+      const updated = await completeTask(task.id);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === task.patient_id
+            ? { ...p, tasks: p.tasks.map((t) => (t.id === task.id ? updated : t)) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Complete task error:", err);
+      alert("Failed to mark task complete. Please try again.");
+    }
+  };
+
+  // --- Note handlers (real writes) ---
 
   const handleAddNoteClick = (patientId) => {
     setShowAddNote(patientId);
   };
 
-  const handleAddNoteSave = (noteData) => {
+  const handleAddNoteSave = async (noteData) => {
     if (showAddNote === null) return;
     const patientId = showAddNote;
-    const newNote = {
-      id: Date.now(),
-      text: noteData.text,
-      category: noteData.category,
-      timestamp: new Date().toISOString(),
-    };
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === patientId
-          ? { ...p, comments: [...(p.comments || []), newNote] }
-          : p
-      )
-    );
-    setShowAddNote(null);
-
-    // Trigger AI suggestions (async, non-blocking)
-    triggerSuggestions(patientId, {
-      type: "note",
-      data: newNote,
-    });
-  };
-
-  const handleEditNoteClick = (note, patientId) => {
-    setNoteToEdit({ note, patientId });
-  };
-
-  const handleNoteAIUpdate = async (command, note, patientId) => {
     try {
-      const result = await parseNoteEditCommand(command, note);
+      const newNote = await addNote(nurseProfile.facility_id, patientId, session.user.id, noteData.text);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patientId ? { ...p, notes: [newNote, ...p.notes] } : p
+        )
+      );
+      setShowAddNote(null);
 
-      if (result.action === "delete") {
-        setNoteToEdit(null);
-        setNoteToDelete({ note, patientId });
-        return;
-      }
-
-      if (result.updates) {
-        setPatients((prev) =>
-          prev.map((p) => {
-            if (p.id === patientId) {
-              return {
-                ...p,
-                comments: (p.comments || []).map((n) =>
-                  n.id === note.id ? { ...n, ...result.updates } : n
-                ),
-              };
-            }
-            return p;
-          })
-        );
-        setNoteToEdit(null);
-      }
-
-      if (result.error) {
-        alert(result.error);
-      }
-    } catch (error) {
-      console.error("Note edit error:", error);
-      alert("Error updating note. Please try again.");
+      // Trigger AI suggestions (async, non-blocking)
+      triggerSuggestions(patientId, {
+        type: "note",
+        data: newNote,
+      });
+    } catch (err) {
+      console.error("Add note error:", err);
+      alert("Failed to save note. Please try again.");
     }
-  };
-
-  const handleNoteManualUpdate = (updates, note, patientId) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id === patientId) {
-          return {
-            ...p,
-            comments: (p.comments || []).map((n) =>
-              n.id === note.id ? { ...n, ...updates } : n
-            ),
-          };
-        }
-        return p;
-      })
-    );
-    setNoteToEdit(null);
-  };
-
-  const handleDeleteNoteClick = (note, patientId) => {
-    setNoteToDelete({ note, patientId });
-  };
-
-  const handleDeleteNoteConfirm = () => {
-    if (!noteToDelete) return;
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id === noteToDelete.patientId) {
-          return {
-            ...p,
-            comments: (p.comments || []).filter((n) => n.id !== noteToDelete.note.id),
-          };
-        }
-        return p;
-      })
-    );
-    setNoteToDelete(null);
-  };
-
-  const handleDeleteNoteCancel = () => {
-    setNoteToDelete(null);
   };
 
   // --- Suggestion handlers ---
@@ -586,14 +478,13 @@ function App() {
     const details = suggestion.noteDetails || {};
     const newNote = {
       id: Date.now(),
-      text: details.text || suggestion.text,
-      category: details.category || "Recommendation",
-      timestamp: new Date().toISOString(),
+      content: details.text || suggestion.text,
+      created_at: new Date().toISOString(),
     };
     setPatients((prev) =>
       prev.map((p) =>
         p.id === patientId
-          ? { ...p, comments: [...(p.comments || []), newNote] }
+          ? { ...p, notes: [...(p.notes || []), newNote] }
           : p
       )
     );
@@ -601,125 +492,6 @@ function App() {
 
   const handleSuggestionDismissAll = () => {
     setSuggestionData(null);
-  };
-
-  // --- Patient Update handlers ---
-
-  const handleGeneratePatientUpdate = async (patientId) => {
-    const patient = patients.find((p) => p.id === patientId);
-    if (!patient) return;
-    setPatientUpdateLoading(true);
-    try {
-      const result = await generatePatientUpdate(patient, "English");
-      if (result) {
-        setPatientUpdateData({ summaryText: result, patient });
-      } else {
-        alert("Failed to generate patient update. Please try again.");
-      }
-    } catch (err) {
-      console.error("Patient update error:", err);
-      alert("Failed to generate patient update. Please try again.");
-    }
-    setPatientUpdateLoading(false);
-  };
-
-  const handleRegeneratePatientUpdate = async (language, editedText = null) => {
-    if (!patientUpdateData) return;
-    const patient = patients.find((p) => p.id === patientUpdateData.patient.id);
-    if (!patient) return;
-    setPatientUpdateLoading(true);
-    try {
-      let result;
-      if (editedText) {
-        // Nurse made edits: translate the edited text instead of regenerating
-        result = await translateText(editedText, language);
-      } else {
-        // No edits: regenerate from patient data in the new language
-        result = await generatePatientUpdate(patient, language);
-      }
-      if (result) {
-        setPatientUpdateData({ summaryText: result, patient });
-      } else {
-        alert("Failed to regenerate update. Please try again.");
-      }
-    } catch (err) {
-      console.error("Patient update regeneration error:", err);
-      alert("Failed to regenerate update. Please try again.");
-    }
-    setPatientUpdateLoading(false);
-  };
-
-  const handleClosePatientUpdate = () => {
-    setPatientUpdateData(null);
-    setPatientUpdateLoading(false);
-  };
-
-  const handleShareUpdateSend = (recipients) => {
-    // Simulated send
-    setShowShareUpdate(false);
-    // Show success message for each recipient
-    const names = recipients.map((r) => r.contact.name).join(", ");
-    alert(`Update sent to: ${names}`);
-  };
-
-  // --- Contact management handlers ---
-
-  const handleShowContacts = (patientId) => {
-    setShowContacts(patientId);
-  };
-
-  const handleAddContact = (patientId, contactData) => {
-    const newContact = {
-      id: Date.now(),
-      ...contactData,
-    };
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === patientId
-          ? { ...p, contacts: [...(p.contacts || []), newContact] }
-          : p
-      )
-    );
-    // Also update patientUpdateData if it's for this patient
-    if (patientUpdateData && patientUpdateData.patient.id === patientId) {
-      setPatientUpdateData((prev) => ({
-        ...prev,
-        patient: {
-          ...prev.patient,
-          contacts: [...(prev.patient.contacts || []), newContact],
-        },
-      }));
-    }
-  };
-
-  const handleEditContact = (patientId, contactId, contactData) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id === patientId) {
-          return {
-            ...p,
-            contacts: (p.contacts || []).map((c) =>
-              c.id === contactId ? { ...c, ...contactData } : c
-            ),
-          };
-        }
-        return p;
-      })
-    );
-  };
-
-  const handleDeleteContact = (patientId, contactId) => {
-    setPatients((prev) =>
-      prev.map((p) => {
-        if (p.id === patientId) {
-          return {
-            ...p,
-            contacts: (p.contacts || []).filter((c) => c.id !== contactId),
-          };
-        }
-        return p;
-      })
-    );
   };
 
   // --- Charge Nurse Dashboard handlers ---
@@ -777,11 +549,11 @@ function App() {
       if (suggestions && suggestions.length > 0) {
         const triggerSummary = newItem.type === "task"
           ? `New task: ${newItem.data.description}`
-          : `New note: ${newItem.data.text.slice(0, 50)}${newItem.data.text.length > 50 ? "..." : ""}`;
+          : `New note: ${newItem.data.content.slice(0, 50)}${newItem.data.content.length > 50 ? "..." : ""}`;
         setSuggestionData({
           suggestions,
           patientId,
-          patientName: patient.name,
+          patientName: patient.label,
           triggerSummary,
         });
       }
@@ -823,6 +595,15 @@ function App() {
     return <FacilityScreen session={session} onFacilityComplete={handleFacilityComplete} />;
   }
 
+  // Patients still loading for this facility
+  if (patientsLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+
   if (showChargeView) {
     return (
       <>
@@ -851,44 +632,6 @@ function App() {
     );
   }
 
-  if (patientUpdateData && !showShareUpdate) {
-    const currentPatient = patients.find((p) => p.id === patientUpdateData.patient.id) || patientUpdateData.patient;
-    return (
-      <>
-        <PatientUpdateSummary
-          summaryText={patientUpdateData.summaryText}
-          patient={currentPatient}
-          onClose={handleClosePatientUpdate}
-          onRegenerate={handleRegeneratePatientUpdate}
-          onShare={() => setShowShareUpdate(true)}
-          isLoading={patientUpdateLoading}
-        />
-      </>
-    );
-  }
-
-  if (patientUpdateData && showShareUpdate) {
-    const currentPatient = patients.find((p) => p.id === patientUpdateData.patient.id) || patientUpdateData.patient;
-    return (
-      <>
-        <PatientUpdateSummary
-          summaryText={patientUpdateData.summaryText}
-          patient={currentPatient}
-          onClose={handleClosePatientUpdate}
-          onRegenerate={handleRegeneratePatientUpdate}
-          onShare={() => setShowShareUpdate(true)}
-          isLoading={patientUpdateLoading}
-        />
-        <ShareUpdateDialog
-          patient={currentPatient}
-          onCancel={() => setShowShareUpdate(false)}
-          onSend={handleShareUpdateSend}
-          onAddContact={handleAddContact}
-        />
-      </>
-    );
-  }
-
   if (showHandoff && handoffData) {
     return (
       <HandoffSummary
@@ -905,13 +648,18 @@ function App() {
       <VoiceCapture
         onClose={() => setShowVoice(false)}
         onTaskCreated={handleTaskCreated}
-        allPatients={patients}
+        allPatients={patients.map((p) => ({ ...p, name: p.label || "", room: p.location_label || "" }))}
       />
     );
   }
 
   return (
     <>
+      {patientsError && (
+        <div className="bg-red-50 px-4 py-2 text-center text-sm text-red-600">
+          {patientsError}
+        </div>
+      )}
       {delayedTasks.length > 0 && !showVoice && !alertHidden && (
         <Alert
           task={delayedTasks[0]}
@@ -925,26 +673,17 @@ function App() {
       <Dashboard
         patients={patients}
         onVoiceClick={() => setShowVoice(true)}
-        dismissedCount={dismissedTaskIds.length}
-        onClearDismissed={clearDismissed}
-        onDischargeClick={handleDischargeClick}
-        onDeleteTask={handleDeleteClick}
-        onEditTask={handleEditClick}
         onGenerateHandoff={handleGenerateShiftHandoff}
-        onPatientHandoff={handleGeneratePatientHandoff}
-        handoffLoading={handoffLoading}
-        onAddNote={handleAddNoteClick}
-        onEditNote={handleEditNoteClick}
-        onDeleteNote={handleDeleteNoteClick}
-        onGeneratePatientUpdate={handleGeneratePatientUpdate}
-        onShowContacts={handleShowContacts}
-        patientUpdateLoading={patientUpdateLoading}
         onSwitchToChargeView={handleSwitchToChargeView}
         delayedTasks={delayedTasks}
         onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
         onFollowUp={handleFollowUp}
         onDismissAlert={dismissAlert}
         onOpenVoiceCapture={() => setShowVoice(true)}
+        onAddPatient={handleAddPatientClick}
+        onEditPatient={handleEditPatientClick}
+        onCompleteTask={handleCompleteTask}
+        onAddNote={handleAddNoteClick}
       />
       {selectedPatientForDischarge && (
         <DischargeDialog
@@ -953,44 +692,11 @@ function App() {
           onConfirm={handleDischargeConfirm}
         />
       )}
-      {taskToDelete && (
-        <DeleteConfirmModal
-          task={taskToDelete.task}
-          onCancel={handleDeleteCancel}
-          onConfirm={handleDeleteConfirm}
-        />
-      )}
-      {taskToEdit && (
-        <TaskEditDialog
-          task={taskToEdit.task}
-          patientId={taskToEdit.patientId}
-          onCancel={handleEditCancel}
-          onUpdate={handleEditUpdate}
-          onManualUpdate={handleManualEditUpdate}
-          allPatients={patients}
-        />
-      )}
       {showAddNote !== null && (
         <AddNoteDialog
-          patientName={(patients.find((p) => p.id === showAddNote)?.name) || "Patient"}
+          patientName={(patients.find((p) => p.id === showAddNote)?.label) || "Patient"}
           onCancel={() => setShowAddNote(null)}
           onSave={handleAddNoteSave}
-        />
-      )}
-      {noteToEdit && (
-        <EditNoteDialog
-          note={noteToEdit.note}
-          patientId={noteToEdit.patientId}
-          onCancel={() => setNoteToEdit(null)}
-          onAIUpdate={handleNoteAIUpdate}
-          onManualUpdate={handleNoteManualUpdate}
-        />
-      )}
-      {noteToDelete && (
-        <NoteDeleteConfirmModal
-          note={noteToDelete.note}
-          onCancel={handleDeleteNoteCancel}
-          onConfirm={handleDeleteNoteConfirm}
         />
       )}
       {suggestionData && (
@@ -1003,13 +709,17 @@ function App() {
           onDismissAll={handleSuggestionDismissAll}
         />
       )}
-      {showContacts !== null && (
-        <ContactsDialog
-          patient={patients.find((p) => p.id === showContacts) || { id: showContacts, name: "Patient", contacts: [] }}
-          onCancel={() => setShowContacts(null)}
-          onAddContact={handleAddContact}
-          onEditContact={handleEditContact}
-          onDeleteContact={handleDeleteContact}
+      {showAddPatient && (
+        <AddPatientDialog
+          onCancel={() => setShowAddPatient(false)}
+          onSave={handleAddPatientSave}
+        />
+      )}
+      {patientToEdit && (
+        <EditPatientDialog
+          patient={patientToEdit}
+          onCancel={() => setPatientToEdit(null)}
+          onSave={handleEditPatientSave}
         />
       )}
     </>

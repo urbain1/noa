@@ -6,13 +6,12 @@ const SpeechRecognition =
 
 export default function AddNoteDialog({ patientName, onCancel, onSave }) {
   const [isRecording, setIsRecording] = useState(false);
-  const [voiceTranscript, setVoiceTranscript] = useState("");
-  const [textInput, setTextInput] = useState("");
+  const [text, setText] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
-  const finalInput = voiceTranscript.trim() || textInput.trim();
+  const finalInput = text.trim();
 
   useEffect(() => {
     return () => {
@@ -38,11 +37,11 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
     recognition.lang = "en-US";
 
     recognition.onresult = (event) => {
-      let text = "";
+      let spoken = "";
       for (let i = 0; i < event.results.length; i++) {
-        text += event.results[i][0].transcript;
+        spoken += event.results[i][0].transcript;
       }
-      setVoiceTranscript(text);
+      setText(spoken);
     };
 
     recognition.onerror = (event) => {
@@ -123,7 +122,7 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
 
         {/* Body */}
         <div className="flex flex-col gap-4 px-6 pb-2">
-          {/* Voice input */}
+          {/* Mic button */}
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={toggleRecording}
@@ -138,45 +137,18 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
               </svg>
             </button>
             <p className="text-sm font-medium text-gray-500">
-              {isRecording ? "Listening..." : "Tap to speak"}
+              {isRecording ? "Listening..." : "Tap to speak, or type below"}
             </p>
-            {voiceTranscript && (
-              <textarea
-                value={voiceTranscript}
-                onChange={(e) => setVoiceTranscript(e.target.value)}
-                rows={2}
-                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 focus:border-blue-500 focus:outline-none resize-none"
-              />
-            )}
           </div>
 
-          {/* OR divider */}
-          <div className="flex items-center gap-4">
-            <div className="h-px flex-1 bg-gray-200" />
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold uppercase text-gray-400">
-              or
-            </span>
-            <div className="h-px flex-1 bg-gray-200" />
-          </div>
-
-          {/* Text input */}
+          {/* Combined voice + typed input */}
           <textarea
-            value={textInput}
-            onChange={(e) => setTextInput(e.target.value)}
-            placeholder="Type your clinical note..."
-            rows={3}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Your speech will appear here. Tap to write or edit before saving."
+            rows={4}
             className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
           />
-
-          {/* Preview */}
-          {finalInput && (
-            <div className="rounded-lg bg-blue-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-400">
-                Note preview:
-              </p>
-              <p className="mt-1 text-sm text-blue-800">{finalInput}</p>
-            </div>
-          )}
 
           {/* Error */}
           {error && (

@@ -1,7 +1,7 @@
 import PatientCard from "./PatientCard";
 import TopRightMenu from "./TopRightMenu";
 
-export default function Dashboard({ patients, onVoiceClick, dismissedCount, onClearDismissed, onDischargeClick, onDeleteTask, onEditTask, onGenerateHandoff, onPatientHandoff, handoffLoading, onAddNote, onEditNote, onDeleteNote, onGeneratePatientUpdate, onShowContacts, patientUpdateLoading, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture }) {
+export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onAddNote }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Header */}
@@ -23,22 +23,23 @@ export default function Dashboard({ patients, onVoiceClick, dismissedCount, onCl
 
       {/* Patient list */}
       <main className="mx-auto max-w-2xl space-y-4 px-4 pt-4 pb-28 sm:px-6">
+        <button
+          type="button"
+          onClick={onAddPatient}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600"
+        >
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          Add Patient
+        </button>
         {patients.map((patient) => (
           <PatientCard
             key={patient.id}
             patient={patient}
-            patientId={patient.id}
-            onDischargeClick={onDischargeClick}
-            onDeleteTask={onDeleteTask}
-            onEditTask={onEditTask}
-            onPatientHandoff={onPatientHandoff}
-            handoffLoading={handoffLoading}
+            onEditPatient={onEditPatient}
+            onCompleteTask={onCompleteTask}
             onAddNote={onAddNote}
-            onEditNote={onEditNote}
-            onDeleteNote={onDeleteNote}
-            onGeneratePatientUpdate={onGeneratePatientUpdate}
-            onShowContacts={onShowContacts}
-            patientUpdateLoading={patientUpdateLoading}
             onOpenVoiceCapture={onOpenVoiceCapture}
           />
         ))}

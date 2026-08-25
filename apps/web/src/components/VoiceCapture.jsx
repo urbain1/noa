@@ -191,6 +191,10 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients }) {
         return;
       }
 
+      // Carried through to onTaskCreated so the caller can persist the
+      // original transcript alongside the parsed fields.
+      parsedTask.rawTranscript = transcript.trim();
+
       // Step 2: Handle patient matching (by room OR name)
       const searchInput = parsedTask.patientName || (parsedTask.room && parsedTask.room !== "000" ? parsedTask.room : null);
 

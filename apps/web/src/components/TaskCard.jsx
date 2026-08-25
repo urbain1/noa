@@ -63,9 +63,10 @@ function getDeadlineDisplay(deadline) {
   return { text, colorClass };
 }
 
-export default function TaskCard({ task, isNew, onEdit, onDelete }) {
+export default function TaskCard({ task, isNew, onComplete }) {
   const badgeClass = statusStyles[task.status] || "bg-gray-100 text-gray-800";
   const deadlineInfo = getDeadlineDisplay(task.deadline);
+  const isCompleted = task.status === "Completed";
 
   return (
     <div className={`flex items-start justify-between gap-3 rounded-lg border p-3 shadow-sm transition-shadow duration-200 hover:shadow-md ${isNew ? 'bg-blue-50 border-blue-200' : 'border-gray-200 bg-white'}`}>
@@ -74,7 +75,7 @@ export default function TaskCard({ task, isNew, onEdit, onDelete }) {
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
           <span>{task.department}</span>
           <span className="text-gray-300">|</span>
-          <span>{getTimeElapsed(task.timestamp)}</span>
+          <span>{getTimeElapsed(task.created_at)}</span>
           <span className="text-gray-300">|</span>
           <span
             className={`font-semibold ${task.priority === "Stat" ? "text-red-600" : task.priority === "Urgent" ? "text-orange-600" : "text-gray-500"}`}
@@ -97,24 +98,14 @@ export default function TaskCard({ task, isNew, onEdit, onDelete }) {
         >
           {task.status}
         </span>
-        <button
-          onClick={() => onEdit?.(task)}
-          className="rounded p-1 text-gray-400 transition-colors duration-150 hover:text-blue-500"
-          aria-label="Edit task"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </button>
-        <button
-          onClick={() => onDelete?.(task)}
-          className="rounded p-1 text-gray-400 transition-colors duration-150 hover:text-red-500"
-          aria-label="Delete task"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        {!isCompleted && (
+          <button
+            onClick={() => onComplete?.(task)}
+            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+          >
+            Complete
+          </button>
+        )}
       </div>
     </div>
   );

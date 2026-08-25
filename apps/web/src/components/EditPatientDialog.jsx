@@ -1,0 +1,167 @@
+import { useState } from "react";
+
+const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
+
+export default function EditPatientDialog({ patient, onCancel, onSave }) {
+  const [diagnosis, setDiagnosis] = useState(patient.diagnosis || "");
+  const [codeStatus, setCodeStatus] = useState(patient.code_status || "Full Code");
+  const [allergiesInput, setAllergiesInput] = useState((patient.allergies || []).join(", "));
+  const [admissionDate, setAdmissionDate] = useState(patient.admission_date || "");
+  const [locationLabel, setLocationLabel] = useState(patient.location_label || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const allergies = allergiesInput
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      await onSave(patient.id, {
+        diagnosis: diagnosis.trim(),
+        codeStatus,
+        allergies,
+        admissionDate: admissionDate || null,
+        locationLabel: locationLabel.trim(),
+      });
+    } catch (err) {
+      setError(err.message || "Failed to update patient.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
+      onClick={onCancel}
+    >
+      <div
+        className="relative flex w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 pt-6 pb-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Edit Patient</h2>
+            <p className="text-sm text-gray-500">{patient.label}</p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
+            aria-label="Close"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
+            <input
+              type="text"
+              value={patient.label}
+              disabled
+              className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Fixed once set. Retire and create a new patient instead of reusing this label.
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
+            <textarea
+              value={diagnosis}
+              onChange={(e) => setDiagnosis(e.target.value)}
+              rows={2}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Code Status</label>
+            <select
+              value={codeStatus}
+              onChange={(e) => setCodeStatus(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            >
+              {CODE_STATUS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Attending Physician</label>
+            <input
+              type="text"
+              value={patient.attending_physician || "—"}
+              disabled
+              className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
+            <input
+              type="text"
+              value={allergiesInput}
+              onChange={(e) => setAllergiesInput(e.target.value)}
+              placeholder="Comma-separated, e.g. Penicillin, Sulfa"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date</label>
+            <input
+              type="date"
+              value={admissionDate}
+              onChange={(e) => setAdmissionDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Location Label</label>
+            <input
+              type="text"
+              value={locationLabel}
+              onChange={(e) => setLocationLabel(e.target.value)}
+              placeholder="Test Room A"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
+
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-center text-sm text-red-600">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+          <button
+            onClick={onCancel}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save Changes"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
