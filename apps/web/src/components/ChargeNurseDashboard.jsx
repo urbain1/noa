@@ -40,7 +40,7 @@ function getRiskLevel(score) {
 export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert }) {
   const stats = useMemo(() => {
     const allTasks = patients.flatMap((p) => p.tasks || []);
-    const allNotes = patients.flatMap((p) => p.comments || []);
+    const allNotes = patients.flatMap((p) => p.notes || []);
     const now = Date.now();
 
     // Status counts
