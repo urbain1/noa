@@ -29,3 +29,4 @@ dist-ssr
 .env*.local
 dist/
 dist/
+.claude/settings.local.json
