@@ -40,11 +40,11 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
       onClick={onDismissAll}
     >
       <div
-        className="w-full max-w-lg rounded-lg bg-white shadow-xl"
+        className="flex max-h-[90vh] max-h-[90dvh] w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 pt-6 pb-3">
+        <div className="shrink-0 px-6 pt-6 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">💡</span>
             <h2 className="text-xl font-bold text-gray-900">AI Suggested Follow-ups</h2>
@@ -55,7 +55,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
         </div>
 
         {/* Suggestions list */}
-        <div className="max-h-[60vh] overflow-y-auto px-6 pb-2">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-2">
           <div className="flex flex-col gap-3">
             {remainingSuggestions.map((suggestion) => (
               <div
@@ -113,7 +113,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 px-6 py-4">
+        <div className="shrink-0 border-t border-gray-200 px-6 py-4">
           {/* Disclaimer */}
           <div className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2">
             <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
