@@ -10,7 +10,7 @@ Practical implications:
 
 ## What is required now, even without real data
 
-- **Supabase project region: EU (Ireland, `eu-west-1`, Dublin).** Directly covers France and the EU generally. Also covers the UK, whose own post-Brexit data protection framework carried over adequacy for EEA countries including Ireland, so outbound transfers from the UK aren't a problem, and Switzerland, which separately recognizes the EU/EEA as offering adequate protection for cross-border transfers. One EU-hosted region covers all three without needing separate infrastructure per country. Not solving an active problem yet since there's no real data, but free to get right from day one.
+- **Supabase project region: EU West (London, `eu-west-2`).** Directly covers the UK and the EU generally. Also covers France (UK adequacy for EEA transfers runs both directions) and Switzerland, which separately recognizes the EU/EEA as offering adequate protection for cross-border transfers. One region covers all three without needing separate infrastructure per country. Not solving an active problem yet since there's no real data, but free to get right from day one.
 - **No client-side API keys.** Claude calls go through a Supabase Edge Function only.
 - **TLS in transit, encryption at rest.** Supabase defaults cover this, confirm it isn't disabled.
 - **In-app data-entry notice, required acknowledgment before first use:**

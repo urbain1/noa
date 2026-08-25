@@ -7,10 +7,20 @@ Newest first. Superseded decisions are kept, marked, not deleted, so the reasoni
 **Why:** Real room/bed numbers are explicitly prohibited as patient identifiers in `SECURITY.md` and `CLAUDE.md`, they double as the hospital's own lookup key. A synthetic label gives the same organizational usability nurses actually want without the re-identification risk, following the same pattern as the `Patient_Test_N` label itself.
 **Also this session:** `allergies` and `admission_date` restored to `patients`, present in the original demo schema, dropped when `0001_init.sql` was written, no identifier conflict since both are clinical context, not identifying.
 
+## 2026-08-25 — Day 3 complete: Claude API fully behind the Supabase Edge Function
+**Confirmed:** `api/claude.js` and its `vercel.json` routing removed entirely. `claudeAPI.js` now calls the `claude-proxy` Edge Function exclusively, no direct-to-Anthropic path remains anywhere in client code. Verified end-to-end: a task created through the app came back with AI-expanded medical terminology and a computed deadline, confirmed via browser Network tab (`claude-proxy` 200, no requests to `api.anthropic.com`) and console output.
+
+## 2026-08-25 — Supabase region: actually London (eu-west-2), correcting the record
+**Correction:** The prior entry below said the project was created in Ireland (`eu-west-1`). Checked directly with `npx supabase projects list`: the project is actually in **West Europe (London), `eu-west-2`**. The Ireland entry was based on which region was selected as "recommended" in the dashboard at creation time, not what was actually provisioned, an assumption that turned out wrong.
+**Why this doesn't need fixing:** London was one of the two regions `SECURITY.md` named from the start ("London or Frankfurt"), before Ireland was substituted in. Same adequacy reasoning applies identically, UK, France, and Switzerland are all still covered.
+**Also confirmed:** Supabase projects cannot be moved between regions after creation, only by creating an entirely new project and migrating everything over. Since London already satisfies the requirement, no migration is warranted here.
+**Supersedes:** The 2026-08-24 entry below, which incorrectly stated the project was in Ireland. `SECURITY.md` and `ARCHITECTURE.md` have been corrected to name London.
+
 ## 2026-08-24 — Supabase region: Ireland (eu-west-1), not London/Frankfurt as originally planned
 **Decision:** Supabase project created in EU West (Ireland, `eu-west-1`), not London or Frankfurt as originally specified in `SECURITY.md`.
 **Why:** Ireland was Supabase's own recommended region at project creation, likely reflecting AWS region maturity and/or proximity, not a compliance factor. No compliance difference either way, Ireland is EU/EEA the same as Frankfurt or London, covers UK, France, and Switzerland identically per the adequacy reasoning already documented.
 **Supersedes:** The "London or Frankfurt" wording in the 2026-08-21 compliance-scope entry below. `SECURITY.md` and `ARCHITECTURE.md` have been updated to name Ireland as what was actually built.
+**[Corrected 2026-08-25]:** This entry was itself wrong, see the entry above. The project was never actually in Ireland.
 
 ## 2026-08-21 — Testing scope: US added concurrently, not phased
 **Decision:** Beta testing now includes nurses in the US alongside the UK, France, and Switzerland, all concurrently, rather than the originally planned sequencing of US testing 3-6 months after the others.

@@ -5,7 +5,7 @@
 - **Backend:** Supabase (Postgres, Auth, Realtime, Row Level Security). No custom Express/Prisma layer, `apps/api` is not used.
 - **AI:** Claude API (Anthropic), called only from a Supabase Edge Function, never from the client. Prompts carried over from the demo, see `DEMO_TO_MVP_from_noa_demo.md` for the full list. A working reference for the proxy pattern already exists at `api/claude.js` (pre-restructure Vercel serverless function), same idea, key hidden server-side, but it forwards the client's request body unvalidated with no auth check. Use it as a structural template for the Edge Function, not a copy-paste: add a Supabase session check and constrain what the client can send before this pattern handles real facility data.
 - **Voice capture:** Web Speech API. Known limitation: unreliable on iOS Safari, and blocked entirely once the site is installed as a home-screen PWA. Keep the beta as a plain browser link on iOS testers' phones, don't prompt install. Revisit (Speechmatics, or native) only if this proves to be an actual blocker in testing.
-- **Region:** Supabase project set to EU (Ireland, `eu-west-1`, Dublin) from creation.
+- **Region:** Supabase project set to EU West (London, `eu-west-2`) from creation.
 
 ## Data model
 See `SCHEMA_noa_demo.md` for the base Postgres schema (patients, tasks, notes, contacts, handoffs, alerts, audit_log) and RLS policies. Written for Supabase already, reusable close to as-is, with one structural change needed now, below.
