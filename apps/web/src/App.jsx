@@ -14,11 +14,75 @@ import PatientUpdateSummary from "./components/PatientUpdateSummary";
 import ShareUpdateDialog from "./components/ShareUpdateDialog";
 import ContactsDialog from "./components/ContactsDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
-import WelcomeScreen from "./components/WelcomeScreen";
+import AuthScreen from "./components/AuthScreen";
+import FacilityScreen from "./components/FacilityScreen";
+import { supabase } from "./lib/supabase";
 import { parseTaskEditCommand, generateHandoffSummary, parseNoteEditCommand, generateSuggestions, generatePatientUpdate, translateText } from "./utils/claudeAPI";
 import { patients as mockPatients } from "./mockData";
 
 function App() {
+  // --- Auth state ---
+  const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
+  const [nurseProfile, setNurseProfile] = useState(undefined); // undefined = loading, null = needs facility
+  const [authLoading, setAuthLoading] = useState(true);
+
+  // Restore session and listen for auth changes
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      if (currentSession) {
+        fetchNurseProfile(currentSession.user.id);
+      } else {
+        setAuthLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      if (newSession) {
+        fetchNurseProfile(newSession.user.id);
+      } else {
+        setNurseProfile(undefined);
+        setAuthLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchNurseProfile = async (userId) => {
+    const { data, error } = await supabase
+      .from('nurses')
+      .select('id, facility_id')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) {
+      console.error('Nurse profile fetch error:', error);
+      setNurseProfile(null);
+    } else {
+      setNurseProfile(data); // null if no row exists yet
+    }
+    setAuthLoading(false);
+  };
+
+  const handleAuthSuccess = (newSession) => {
+    setSession(newSession);
+    fetchNurseProfile(newSession.user.id);
+  };
+
+  const handleFacilityComplete = () => {
+    // Re-fetch nurse profile now that the row exists
+    if (session) {
+      fetchNurseProfile(session.user.id);
+    }
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setNurseProfile(undefined);
+  };
+
   const [patients, setPatients] = useState(mockPatients);
   const [showVoice, setShowVoice] = useState(false);
   const [delayedTasks, setDelayedTasks] = useState([]);
@@ -37,7 +101,6 @@ function App() {
   const [showShareUpdate, setShowShareUpdate] = useState(false);
   const [showContacts, setShowContacts] = useState(null); // patientId or null
   const [showChargeView, setShowChargeView] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
   const [alertHidden, setAlertHidden] = useState(false);
   const [dismissedTaskIds, setDismissedTaskIds] = useState(() => {
     try {
@@ -728,8 +791,36 @@ function App() {
     }
   };
 
-  if (showWelcome) {
-    return <WelcomeScreen onStart={() => setShowWelcome(false)} />;
+  // --- Auth gates ---
+
+  // Still loading session
+  if (authLoading || session === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (!session) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
+
+  // Logged in but no nurse profile yet (needs facility selection)
+  if (nurseProfile === undefined) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!nurseProfile) {
+    return <FacilityScreen session={session} onFacilityComplete={handleFacilityComplete} />;
   }
 
   if (showChargeView) {
