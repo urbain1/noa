@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import RoomSelector from "./RoomSelector";
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -11,7 +10,7 @@ const statusStyles = {
   Completed: "bg-blue-100 text-blue-800",
 };
 
-export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, onManualUpdate, allPatients }) {
+export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, onManualUpdate }) {
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
@@ -19,20 +18,14 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
   const [editMode, setEditMode] = useState("manual"); // "manual" or "ai"
+  const [isSavingManual, setIsSavingManual] = useState(false);
   const [manualFields, setManualFields] = useState({
     description: task?.description || "",
     status: task?.status || "Pending",
     department: task?.department || "Other",
     priority: task?.priority || "Routine",
-    room: task?.room || "",
     deadline: task?.deadline ? new Date(new Date(task.deadline).getTime() - new Date(task.deadline).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
   });
-
-  const roomOptions = (allPatients || []).map((p) => ({
-    id: p.id,
-    room: p.room,
-    name: p.name,
-  }));
 
   const originalDeadlineLocal = task?.deadline ? new Date(new Date(task.deadline).getTime() - new Date(task.deadline).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
 
@@ -41,7 +34,6 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
     manualFields.status !== (task?.status || "Pending") ||
     manualFields.department !== (task?.department || "Other") ||
     manualFields.priority !== (task?.priority || "Routine") ||
-    manualFields.room !== (task?.room || "") ||
     manualFields.deadline !== originalDeadlineLocal;
 
   const finalCommand = voiceTranscript.trim() || textCommand.trim();
@@ -120,18 +112,24 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
     }
   };
 
-  const handleManualApply = () => {
+  const handleManualApply = async () => {
     if (!hasManualChanges) return;
     const updates = {};
     if (manualFields.description !== (task?.description || "")) updates.description = manualFields.description;
     if (manualFields.status !== (task?.status || "Pending")) updates.status = manualFields.status;
     if (manualFields.department !== (task?.department || "Other")) updates.department = manualFields.department;
     if (manualFields.priority !== (task?.priority || "Routine")) updates.priority = manualFields.priority;
-    if (manualFields.room !== (task?.room || "")) updates.room = manualFields.room;
     if (manualFields.deadline !== originalDeadlineLocal) {
       updates.deadline = manualFields.deadline ? new Date(manualFields.deadline).toISOString() : null;
     }
-    onManualUpdate(updates, task, patientId);
+    setError(null);
+    setIsSavingManual(true);
+    try {
+      await onManualUpdate(updates, task, patientId);
+    } catch (err) {
+      setError(err.message || "Failed to update task.");
+      setIsSavingManual(false);
+    }
   };
 
   return (
@@ -240,19 +238,8 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="Stat">Stat</option>
-                  <option value="Urgent">Urgent</option>
                   <option value="Routine">Routine</option>
                 </select>
-              </div>
-
-              {/* Room selector */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
-                <RoomSelector
-                  value={manualFields.room}
-                  onChange={(val) => setManualFields((prev) => ({ ...prev, room: val }))}
-                  rooms={roomOptions}
-                />
               </div>
 
               {/* Deadline */}
@@ -266,6 +253,12 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                 />
                 <p className="mt-1 text-xs text-gray-400">Leave empty for no deadline</p>
               </div>
+
+              {error && (
+                <div className="rounded-lg bg-red-50 p-3 text-center text-sm text-red-600">
+                  {error}
+                </div>
+              )}
             </div>
           ) : (
             <>
@@ -409,10 +402,10 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
           {editMode === "manual" ? (
             <button
               onClick={handleManualApply}
-              disabled={!hasManualChanges}
+              disabled={!hasManualChanges || isSavingManual}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Save Changes
+              {isSavingManual ? "Saving..." : "Save Changes"}
             </button>
           ) : (
             <button

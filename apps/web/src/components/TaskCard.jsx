@@ -63,7 +63,7 @@ function getDeadlineDisplay(deadline) {
   return { text, colorClass };
 }
 
-export default function TaskCard({ task, isNew, onComplete }) {
+export default function TaskCard({ task, isNew, onComplete, onEdit }) {
   const badgeClass = statusStyles[task.status] || "bg-gray-100 text-gray-800";
   const deadlineInfo = getDeadlineDisplay(task.deadline);
   const isCompleted = task.status === "Completed";
@@ -98,6 +98,12 @@ export default function TaskCard({ task, isNew, onComplete }) {
         >
           {task.status}
         </span>
+        <button
+          onClick={() => onEdit?.(task)}
+          className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+        >
+          Edit
+        </button>
         {!isCompleted && (
           <button
             onClick={() => onComplete?.(task)}

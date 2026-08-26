@@ -92,6 +92,28 @@ export async function completeTask(taskId) {
   return data
 }
 
+// Only fields present in `fields` are sent, so partial edits (e.g. status
+// only) don't clobber unrelated columns. priority is clamped to the DB check
+// constraint ('Routine' | 'Stat'), same reasoning as createTask above.
+export async function updateTask(taskId, fields) {
+  const updates = {}
+  if (fields.description !== undefined) updates.description = fields.description
+  if (fields.department !== undefined) updates.department = fields.department
+  if (fields.priority !== undefined) updates.priority = fields.priority === 'Stat' ? 'Stat' : 'Routine'
+  if (fields.deadline !== undefined) updates.deadline = fields.deadline || null
+  if (fields.status !== undefined) updates.status = fields.status
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update(updates)
+    .eq('id', taskId)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 export async function addNote(facilityId, patientId, nurseId, content) {
   const { data, error } = await supabase
     .from('notes')

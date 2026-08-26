@@ -8,11 +8,12 @@ import AddNoteDialog from "./components/AddNoteDialog";
 import SuggestionModal from "./components/SuggestionModal";
 import AddPatientDialog from "./components/AddPatientDialog";
 import EditPatientDialog from "./components/EditPatientDialog";
+import TaskEditDialog from "./components/TaskEditDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
 import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import { supabase } from "./lib/supabase";
-import { fetchPatients, createPatient, updatePatient, completeTask, addNote, createTask } from "./lib/patients";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
 
 function App() {
@@ -84,6 +85,7 @@ function App() {
   const [patientsError, setPatientsError] = useState(null);
   const [showAddPatient, setShowAddPatient] = useState(false);
   const [patientToEdit, setPatientToEdit] = useState(null);
+  const [taskToEdit, setTaskToEdit] = useState(null);
 
   const loadPatients = async () => {
     setPatientsLoading(true);
@@ -418,6 +420,22 @@ function App() {
     }
   };
 
+  const handleEditTaskClick = (task) => {
+    setTaskToEdit(task);
+  };
+
+  const handleManualUpdateTask = async (updates, task) => {
+    const updated = await updateTask(task.id, updates);
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === task.patient_id
+          ? { ...p, tasks: p.tasks.map((t) => (t.id === task.id ? updated : t)) }
+          : p
+      )
+    );
+    setTaskToEdit(null);
+  };
+
   // --- Note handlers (real writes) ---
 
   const handleAddNoteClick = (patientId) => {
@@ -697,6 +715,7 @@ function App() {
         onAddPatient={handleAddPatientClick}
         onEditPatient={handleEditPatientClick}
         onCompleteTask={handleCompleteTask}
+        onEditTask={handleEditTaskClick}
         onAddNote={handleAddNoteClick}
       />
       {selectedPatientForDischarge && (
@@ -734,6 +753,14 @@ function App() {
           patient={patientToEdit}
           onCancel={() => setPatientToEdit(null)}
           onSave={handleEditPatientSave}
+        />
+      )}
+      {taskToEdit && (
+        <TaskEditDialog
+          task={taskToEdit}
+          patientId={taskToEdit.patient_id}
+          onCancel={() => setTaskToEdit(null)}
+          onManualUpdate={handleManualUpdateTask}
         />
       )}
     </>

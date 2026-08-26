@@ -19,7 +19,7 @@ function formatAdmissionDate(dateStr) {
   });
 }
 
-export default function PatientCard({ patient, onEditPatient, onCompleteTask, onAddNote, onOpenVoiceCapture }) {
+export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onOpenVoiceCapture }) {
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
 
@@ -202,6 +202,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
                 task={task}
                 isNew={newTaskIds.has(task.id)}
                 onComplete={onCompleteTask}
+                onEdit={onEditTask}
               />
             ))}
           </div>
