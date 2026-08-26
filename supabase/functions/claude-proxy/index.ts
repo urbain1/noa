@@ -362,7 +362,7 @@ FORMAT RULES:
 - Clinical notes (comments) should be integrated naturally into their respective SBAR sections, not listed separately. Weave them into the narrative alongside task information.
 
 SBAR SECTIONS:
-S (Situation): One-line summary: [Name], [Age]y/o, Room [X], Day [N] of admission for [diagnosis]. Code status: [X]. Allergies: [X]. Include any clinical notes categorized as "Situation".
+S (Situation): One-line summary: [Name], [Age]y/o, Room [X], Day [N] of admission for [diagnosis]. Code status: [X]. Allergies: [X]. Include any clinical notes categorized as "Situation". If age is null or missing, omit the age entirely (e.g. "[Name], Room [X], ..."), never write "Unknown" or "N/A" in its place.
 B (Background): Attending physician, relevant clinical context based on diagnosis. Keep to 1-2 sentences. Include any clinical notes categorized as "Background".
 A (Assessment): What was accomplished this shift (completed/confirmed tasks). What remains (pending tasks by department, include deadline if present). What is delayed and why department has not responded. Flag any overdue tasks. Include any clinical notes categorized as "Assessment".
 R (Recommendation): Prioritized action items for the incoming nurse. Start with overdue tasks first, then approaching deadlines, then other urgent items. Be specific about what needs follow-up, with which department, and by when. Include any clinical notes categorized as "Recommendation".`,

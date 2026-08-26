@@ -56,18 +56,60 @@ export async function parseTaskEditCommand(command, currentTask) {
 }
 
 /**
+ * Map one patient onto the field names the deployed `claude-proxy` handoff
+ * prompt reads.
+ *
+ * The Edge Function's handoff handler was ported from the demo, where
+ * patients were plain objects with `name`/`room`/`codeStatus`/`comments`.
+ * Supabase rows use `label`/`location_label`/`code_status`/`notes` instead,
+ * so every field the prompt looks up by its demo name arrives empty unless
+ * it is mapped here. Demo-shaped objects still exist at runtime (the
+ * unmatched-voice-task fallback in App.jsx creates local-only patients), so
+ * both spellings are accepted.
+ *
+ * Nothing new is disclosed by this mapping: `label` is the synthetic
+ * Patient_Test_N identifier and `location_label` the synthetic location
+ * label, both already shown on the patient card, per SECURITY.md.
+ */
+function toHandoffPatient(patient) {
+  const notes = patient.notes || patient.comments || [];
+  return {
+    name: patient.label || patient.name || null,
+    age: patient.age,
+    room: patient.location_label || patient.room || null,
+    diagnosis: patient.diagnosis,
+    admissionDate: patient.admission_date || patient.admissionDate || null,
+    codeStatus: patient.code_status || patient.codeStatus || null,
+    allergies: patient.allergies,
+    attendingPhysician:
+      patient.attending_physician || patient.attendingPhysician || null,
+    tasks: patient.tasks || [],
+    comments: notes.map((note) => ({
+      text: note.content || note.text || "",
+      category: note.category,
+    })),
+  };
+}
+
+/**
  * Generate an SBAR-formatted handoff summary for one or more patients.
  *
  * Sends patient data (demographics, diagnosis, tasks, clinical context) to
  * the Claude API and returns a structured shift-change summary using the
  * SBAR framework (Situation, Background, Assessment, Recommendation).
  *
+ * Scope is whatever is passed in: the whole facility roster for the shift
+ * report, or a single-element array for one patient's SBAR. The Edge
+ * Function emits one SBAR block per patient either way, no separate action.
+ *
  * @param {Array<object>} patients - Array of patient objects with tasks, diagnosis, etc.
  * @returns {Promise<string|null>} SBAR-formatted handoff summary text, or null on failure
  */
 export async function generateHandoffSummary(patients) {
   try {
-    return await invokeClaude("generateHandoffSummary", { patients });
+    return await invokeClaude("generateHandoffSummary", {
+      patients: patients.map(toHandoffPatient),
+    });
   } catch (err) {
     console.error("[claudeAPI] generateHandoffSummary failed:", err);
     return null;

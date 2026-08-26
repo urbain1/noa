@@ -28,6 +28,7 @@ export async function createPatient(facilityId, fields) {
       allergies: fields.allergies && fields.allergies.length > 0 ? fields.allergies : null,
       admission_date: fields.admissionDate || null,
       location_label: fields.locationLabel || null,
+      age: fields.age ?? null,
     })
     .select()
     .single()
@@ -47,6 +48,7 @@ export async function updatePatient(patientId, fields) {
       allergies: fields.allergies && fields.allergies.length > 0 ? fields.allergies : null,
       admission_date: fields.admissionDate || null,
       location_label: fields.locationLabel || null,
+      age: fields.age ?? null,
     })
     .eq('id', patientId)
     .select()

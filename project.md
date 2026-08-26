@@ -21,7 +21,7 @@ Replace the ad hoc, unshareable methods nurses currently use to track tasks and 
 - **Direct task handoff:** send a task, with full context, to another nurse's Noa account at shift end, not just a text summary.
 - **All-tasks-by-urgency screen:** cross-patient task list sorted by priority, so a nurse doesn't have to open every patient card to see what's most urgent.
 - **Handover report:** visually highlight incomplete/overdue tasks, not just list them.
-- **Language toggle:** English/French UI switch, for nurse testers in France and Switzerland.
+- **Language toggle:** English/French UI switch, for nurse testers in France and Switzerland. Scope should cover AI-generated content too (SBAR summaries, patient updates), not just static UI chrome, given the first French tester is now confirmed. Full design deferred to its own chat.
 
 ## Success criteria for this beta
 Not yet defined precisely, needs your input. Placeholder: nurse testers use Noa across real shifts without reverting to their prior informal method, and surface at least one workflow problem worth fixing before the next phase.

@@ -4,6 +4,17 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
   const [isOpen, setIsOpen] = useState(false);
   const [showPatientList, setShowPatientList] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
+  const [handoffLoading, setHandoffLoading] = useState(false);
+
+  const handleGenerateHandoff = () => {
+    if (handoffLoading) return;
+    setHandoffLoading(true);
+    Promise.resolve(onGenerateHandoff())
+      .finally(() => {
+        setHandoffLoading(false);
+        closeMenu();
+      });
+  };
 
   const closeMenu = () => {
     setIsOpen(false);
@@ -62,15 +73,13 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
               <>
                 {/* Generate handoff report */}
                 <button
-                  onClick={() => {
-                    onGenerateHandoff();
-                    closeMenu();
-                  }}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3"
+                  onClick={handleGenerateHandoff}
+                  disabled={handoffLoading}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-start gap-3 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <span className="text-lg mt-0.5">📋</span>
                   <div>
-                    <p className="text-sm text-gray-700">Generate handoff report</p>
+                    <p className="text-sm text-gray-700">{handoffLoading ? "Generating..." : "Generate handoff report"}</p>
                     <p className="text-xs text-gray-400">SBAR summary for shift change</p>
                   </div>
                 </button>

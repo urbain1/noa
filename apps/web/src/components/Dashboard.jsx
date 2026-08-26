@@ -1,7 +1,7 @@
 import PatientCard from "./PatientCard";
 import TopRightMenu from "./TopRightMenu";
 
-export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onAddNote }) {
+export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onGenerateSbar }) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Header */}
@@ -42,6 +42,7 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
             onEditTask={onEditTask}
             onAddNote={onAddNote}
             onOpenVoiceCapture={onOpenVoiceCapture}
+            onGenerateSbar={onGenerateSbar}
           />
         ))}
       </main>

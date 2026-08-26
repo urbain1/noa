@@ -4,6 +4,7 @@ const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
 
 export default function EditPatientDialog({ patient, onCancel, onSave }) {
   const [diagnosis, setDiagnosis] = useState(patient.diagnosis || "");
+  const [age, setAge] = useState(patient.age != null ? String(patient.age) : "");
   const [codeStatus, setCodeStatus] = useState(patient.code_status || "Full Code");
   const [allergiesInput, setAllergiesInput] = useState((patient.allergies || []).join(", "));
   const [admissionDate, setAdmissionDate] = useState(patient.admission_date || "");
@@ -21,6 +22,7 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
         .filter(Boolean);
       await onSave(patient.id, {
         diagnosis: diagnosis.trim(),
+        age: age.trim() === "" ? null : parseInt(age, 10),
         codeStatus,
         allergies,
         admissionDate: admissionDate || null,
@@ -80,6 +82,19 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
               onChange={(e) => setDiagnosis(e.target.value)}
               rows={2}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Age <span className="font-normal text-gray-400">(optional)</span></label>
+            <input
+              type="number"
+              min="0"
+              max="130"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              placeholder="e.g. 68"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 

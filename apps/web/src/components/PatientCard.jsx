@@ -19,9 +19,10 @@ function formatAdmissionDate(dateStr) {
   });
 }
 
-export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onOpenVoiceCapture }) {
+export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onOpenVoiceCapture, onGenerateSbar }) {
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
+  const [sbarLoading, setSbarLoading] = useState(false);
 
   const tasks = patient.tasks || [];
   const notes = patient.notes || [];
@@ -94,6 +95,14 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
     }
   };
 
+  // Generation runs in App (it owns the handoff view), but the pending state
+  // stays here so only this card's button shows a spinner.
+  const handleGenerateSbar = () => {
+    if (!onGenerateSbar || sbarLoading) return;
+    setSbarLoading(true);
+    Promise.resolve(onGenerateSbar(patient)).finally(() => setSbarLoading(false));
+  };
+
   const riskScore = computeRiskScore(patient);
   const riskLevel = getRiskLevel(riskScore);
   const admissionDisplay = formatAdmissionDate(patient.admission_date);
@@ -146,6 +155,14 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleGenerateSbar}
+            disabled={sbarLoading}
+            className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {sbarLoading ? "Generating..." : "SBAR Summary"}
+          </button>
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600 ring-1 ring-blue-200">
             {tasks.length}
           </span>

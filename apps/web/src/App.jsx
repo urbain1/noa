@@ -373,6 +373,23 @@ function App() {
     }
   };
 
+  // Same Edge Function, same display component as the unit-wide report --
+  // only the scope differs. A one-element array yields a single SBAR block
+  // for this patient, per TESTING_noa_demo.md HS-3.
+  const handleGeneratePatientHandoff = async (patient) => {
+    const result = await generateHandoffSummary([patient]);
+    if (result) {
+      setHandoffData({
+        summaryText: result,
+        title: `SBAR — ${patient.label}`,
+        patientCount: 1,
+      });
+      setShowHandoff(true);
+    } else {
+      alert("Failed to generate SBAR summary. Please try again.");
+    }
+  };
+
   const handleCloseHandoff = () => {
     setShowHandoff(false);
     setHandoffData(null);
@@ -626,6 +643,21 @@ function App() {
     );
   }
 
+  // Checked before showChargeView: a report generated from Unit View
+  // (three-dot menu is available from both views) must display immediately
+  // regardless of which view triggered it, rather than being masked by the
+  // charge view branch below until the nurse navigates back to My Patients.
+  if (showHandoff && handoffData) {
+    return (
+      <HandoffSummary
+        summaryText={handoffData.summaryText}
+        title={handoffData.title}
+        patientCount={handoffData.patientCount}
+        onClose={handleCloseHandoff}
+      />
+    );
+  }
+
   if (showChargeView) {
     return (
       <>
@@ -651,17 +683,6 @@ function App() {
           />
         )}
       </>
-    );
-  }
-
-  if (showHandoff && handoffData) {
-    return (
-      <HandoffSummary
-        summaryText={handoffData.summaryText}
-        title={handoffData.title}
-        patientCount={handoffData.patientCount}
-        onClose={handleCloseHandoff}
-      />
     );
   }
 
@@ -717,6 +738,7 @@ function App() {
         onCompleteTask={handleCompleteTask}
         onEditTask={handleEditTaskClick}
         onAddNote={handleAddNoteClick}
+        onGenerateSbar={handleGeneratePatientHandoff}
       />
       {selectedPatientForDischarge && (
         <DischargeDialog
