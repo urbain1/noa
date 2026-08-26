@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import PatientCard from "./PatientCard";
 import TopRightMenu from "./TopRightMenu";
 
-export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onGenerateSbar, onLanguageChange }) {
+export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onGenerateSbar, onLanguageChange }) {
   const { t } = useTranslation();
 
   return (
@@ -18,8 +18,8 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
             delayedTasks={delayedTasks || []}
             onGenerateHandoff={onGenerateHandoff}
             onDischargePatient={onDischargePatient}
-            onFollowUp={onFollowUp}
-            onDismissAlert={onDismissAlert}
+            onRepageTask={onRepageTask}
+            onEscalateTask={onEscalateTask}
             onLanguageChange={onLanguageChange}
           />
         </div>
@@ -44,6 +44,8 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
             onEditPatient={onEditPatient}
             onCompleteTask={onCompleteTask}
             onEditTask={onEditTask}
+            onRepageTask={onRepageTask}
+            onEscalateTask={onEscalateTask}
             onAddNote={onAddNote}
             onOpenVoiceCapture={onOpenVoiceCapture}
             onGenerateSbar={onGenerateSbar}

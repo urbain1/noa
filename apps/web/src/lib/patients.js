@@ -116,6 +116,79 @@ export async function updateTask(taskId, fields) {
   return data
 }
 
+// Repage: reset an overdue task back to Pending and log a delay alert.
+// `task` must carry its own `facility_id` (present on every fetched task)
+// so the alerts row lands in the right facility without a separate lookup.
+//
+// Guarded against Completed/Cancelled even though the UI only ever shows
+// the repage button for overdue tasks (which already excludes both) --
+// this is defense against a stale `task` reference, e.g. a second tab or
+// a click that lands after the task was completed elsewhere. A repage or
+// alert against a task with no outstanding work is never useful.
+export async function repageTask(task) {
+  if (task.status === 'Completed' || task.status === 'Cancelled') {
+    throw new Error(`Cannot repage a task with status "${task.status}"`)
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ status: 'Pending', last_repaged_at: new Date().toISOString() })
+    .eq('id', task.id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  const { error: alertError } = await supabase
+    .from('alerts')
+    .insert({
+      task_id: task.id,
+      facility_id: task.facility_id,
+      type: 'delay',
+      triggered_at: new Date().toISOString(),
+    })
+
+  if (alertError) throw alertError
+  return data
+}
+
+// Escalate: bump priority to Stat, stamp escalated_at, log an escalation
+// alert. `escalated_to` is deliberately left unset -- there's no
+// charge-nurse assignment system yet (see CLAUDE.md).
+//
+// Guarded against Completed/Cancelled for the same stale-reference reason
+// as repageTask. Stays clickable indefinitely even once priority is
+// already Stat -- escalated_at and the alert row still update on every
+// click (re-escalating tracks "when was this last flagged as urgent
+// again", not just "has it ever been Stat"), only the priority write
+// itself is skipped since it's already at Stat.
+export async function escalateTask(task) {
+  if (task.status === 'Completed' || task.status === 'Cancelled') {
+    throw new Error(`Cannot escalate a task with status "${task.status}"`)
+  }
+
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ priority: 'Stat', escalated_at: new Date().toISOString() })
+    .eq('id', task.id)
+    .select()
+    .single()
+
+  if (error) throw error
+
+  const { error: alertError } = await supabase
+    .from('alerts')
+    .insert({
+      task_id: task.id,
+      facility_id: task.facility_id,
+      type: 'escalation',
+      triggered_at: new Date().toISOString(),
+    })
+
+  if (alertError) throw alertError
+  return data
+}
+
 export async function addNote(facilityId, patientId, nurseId, content) {
   const { data, error } = await supabase
     .from('notes')

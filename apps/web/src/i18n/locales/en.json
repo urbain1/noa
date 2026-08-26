@@ -22,6 +22,8 @@
     "loadFacilities": "Could not load facilities. Please try again.",
     "saveTask": "Failed to save task. Please try again.",
     "completeTask": "Failed to mark task complete. Please try again.",
+    "repageTask": "Failed to repage task. Please try again.",
+    "escalateTask": "Failed to escalate task. Please try again.",
     "updateTask": "Failed to update task.",
     "saveNote": "Failed to save note. Please try again.",
     "generateHandoff": "Failed to generate handoff summary. Please try again.",
@@ -132,7 +134,13 @@
     "unitHours": "{{count}}h",
     "unitDays": "{{count}}d",
     "edit": "Edit",
-    "complete": "Complete"
+    "complete": "Complete",
+    "repage": "Repage",
+    "escalate": "Escalate",
+    "repagedToday": "Repaged today at {{time}}",
+    "repagedOn": "Repaged on {{date}} at {{time}}",
+    "escalatedToday": "Escalated today at {{time}}",
+    "escalatedOn": "Escalated on {{date}} at {{time}}"
   },
   "noteCard": {
     "justNow": "just now",
@@ -144,19 +152,13 @@
     "generateHandoff": "Generate handoff report",
     "generateHandoffSubtitle": "SBAR summary for shift change",
     "dischargePatient": "Discharge a patient",
-    "delayedTasks": "Delayed tasks",
-    "delayedTasksHeading": "Delayed Tasks ({{count}})",
-    "noDelayedTasks": "No delayed tasks",
-    "followUp": "Follow Up",
+    "delayedTasks": "Needs attention",
+    "delayedTasksHeading": "Needs Attention ({{count}})",
+    "noDelayedTasks": "Nothing needs attention",
+    "repage": "Repage",
+    "escalate": "Escalate",
     "backArrow": "← Back",
     "room": "Room {{room}}"
-  },
-  "alerts": {
-    "taskDelayed": "Task Delayed",
-    "position": "{{current}} of {{total}} delayed tasks",
-    "room": "Room {{room}}",
-    "repage": "Repage Dept",
-    "escalate": "Escalate"
   },
   "voiceCapture": {
     "title": "Voice Capture",

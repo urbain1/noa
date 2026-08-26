@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, normalizeLanguage } from "../i18n";
 import { departmentLabel } from "../i18n/enums";
+import { formatActionTimestamp } from "../utils/actionTimestamp";
 
-export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert, onLanguageChange }) {
+export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange }) {
   const { t, i18n } = useTranslation();
   // Which button reads as selected comes from the one live value, not a
   // separately-passed copy, so the highlight can never disagree with what
@@ -163,32 +164,40 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
               <div className="px-4 py-8 text-center text-gray-400 text-sm">{t("topMenu.noDelayedTasks")}</div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {delayedTasks.map((task) => (
-                  <div key={task.id} className="px-4 py-3">
-                    <p className="text-sm font-medium text-gray-900">{task.description}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {departmentLabel(t, task.department)} · {task.patientName} · {t("topMenu.room", { room: task.patientRoom })}
-                    </p>
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => {
-                          onFollowUp(task);
-                        }}
-                        className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-                      >
-                        {t("topMenu.followUp")}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowBottomSheet(false);
-                        }}
-                        className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
-                      >
-                        {t("common.close")}
-                      </button>
+                {delayedTasks.map((task) => {
+                  const repagedText = formatActionTimestamp(t, i18n.language, task.last_repaged_at, "repaged");
+                  const escalatedText = formatActionTimestamp(t, i18n.language, task.escalated_at, "escalated");
+                  return (
+                    <div key={task.id} className="px-4 py-3">
+                      <p className="text-sm font-medium text-gray-900">{task.description}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {departmentLabel(t, task.department)} · {task.patientName} · {t("topMenu.room", { room: task.patientRoom })}
+                      </p>
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={() => onRepageTask(task)}
+                          title={repagedText || undefined}
+                          className="rounded-lg border-2 border-orange-400 bg-white px-3 py-1.5 text-xs font-semibold text-orange-600 hover:bg-orange-50"
+                        >
+                          {t("topMenu.repage")}
+                        </button>
+                        <button
+                          onClick={() => onEscalateTask(task)}
+                          title={escalatedText || undefined}
+                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"
+                        >
+                          {t("topMenu.escalate")}
+                        </button>
+                      </div>
+                      {(repagedText || escalatedText) && (
+                        <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] text-gray-400">
+                          {repagedText && <span>{repagedText}</span>}
+                          {escalatedText && <span>{escalatedText}</span>}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

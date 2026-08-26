@@ -22,6 +22,8 @@
     "loadFacilities": "Impossible de charger les établissements. Veuillez réessayer.",
     "saveTask": "Échec de l'enregistrement de la tâche. Veuillez réessayer.",
     "completeTask": "Impossible de marquer la tâche comme terminée. Veuillez réessayer.",
+    "repageTask": "Échec du repage de la tâche. Veuillez réessayer.",
+    "escalateTask": "Échec de l'escalade de la tâche. Veuillez réessayer.",
     "updateTask": "Échec de la mise à jour de la tâche.",
     "saveNote": "Échec de l'enregistrement de la note. Veuillez réessayer.",
     "generateHandoff": "Échec de la génération du rapport de transmission. Veuillez réessayer.",
@@ -132,7 +134,13 @@
     "unitHours": "{{count}} h",
     "unitDays": "{{count}} j",
     "edit": "Modifier",
-    "complete": "Terminer"
+    "complete": "Terminer",
+    "repage": "Relancer",
+    "escalate": "Escalader",
+    "repagedToday": "Relancé aujourd'hui à {{time}}",
+    "repagedOn": "Relancé le {{date}} à {{time}}",
+    "escalatedToday": "Escaladé aujourd'hui à {{time}}",
+    "escalatedOn": "Escaladé le {{date}} à {{time}}"
   },
   "noteCard": {
     "justNow": "à l'instant",
@@ -144,19 +152,13 @@
     "generateHandoff": "Générer le compte rendu à transmettre",
     "generateHandoffSubtitle": "Rapport SBAR pour le changement d'équipe",
     "dischargePatient": "Préparer la sortie d'un patient",
-    "delayedTasks": "Tâches en retard",
-    "delayedTasksHeading": "Tâches en retard ({{count}})",
-    "noDelayedTasks": "Aucune tâche en retard",
-    "followUp": "Relancer",
+    "delayedTasks": "Nécessite attention",
+    "delayedTasksHeading": "Nécessite attention ({{count}})",
+    "noDelayedTasks": "Rien ne nécessite d'attention",
+    "repage": "Relancer",
+    "escalate": "Escalader",
     "backArrow": "← Retour",
     "room": "Chambre {{room}}"
-  },
-  "alerts": {
-    "taskDelayed": "Tâche en retard",
-    "position": "{{current}} sur {{total}} tâches en retard",
-    "room": "Chambre {{room}}",
-    "repage": "Relancer le service",
-    "escalate": "Faire remonter"
   },
   "voiceCapture": {
     "title": "Saisie vocale",

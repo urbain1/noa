@@ -2,6 +2,12 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-08-26 — EHR integration and cross-role orchestration: considered, explicitly deferred
+**Decision:** Hospital EHR integration (FHIR/SMART on FHIR, read or write-back) and expansion beyond nurse-to-nurse coordination (porters, pharmacy, transport, bed management) are not in scope for the current beta or the near-term roadmap. Noted here so a future session doesn't treat either as live scope by default.
+**Why:** Both were raised via external research (EHR hosting/integration timelines, and a network-effects argument for cross-role orchestration), not by a tester or a confirmed next-phase plan. `project.md`'s next phase is a single small clinic or nursing home, not a hospital ward with EHR/porter/pharmacy systems, and `ARCHITECTURE.md` confirms no role beyond nurse/charge nurse is modeled yet. Acting on either now would be building ahead of validated demand.
+**What doesn't change:** The existing architecture decisions stay as they are, direct Supabase/RLS access from the client, no backend-for-frontend layer, no Terraform/IaC. The 2026-08-21 "Supabase, not custom Node/Express/Prisma" decision was reasoned specifically to avoid this kind of premature infrastructure, and nothing here overrides that reasoning.
+**Revisit when:** A real facility in a formal pilot specifically requests EHR read/write access (see `SECURITY.md` for what a real pilot requires first), or nurse-tester feedback surfaces genuine cross-role coordination pain that the current nurse-only model can't address.
+
 ## 2026-08-25 — Patient location: synthetic label, not real room/bed number
 **Decision:** Added an optional `location_label` field to patients (e.g. "Test Room A"), instead of real room/bed number fields as originally considered.
 **Why:** Real room/bed numbers are explicitly prohibited as patient identifiers in `SECURITY.md` and `CLAUDE.md`, they double as the hospital's own lookup key. A synthetic label gives the same organizational usability nurses actually want without the re-identification risk, following the same pattern as the `Patient_Test_N` label itself.

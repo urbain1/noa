@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import TopRightMenu from "./TopRightMenu";
 import { departmentLabel } from "../i18n/enums";
+import { isTaskOverdue } from "../utils/taskOverdue";
 
 function computeRiskScore(patient) {
   const now = Date.now();
@@ -12,7 +13,7 @@ function computeRiskScore(patient) {
   score += tasks.filter((t) => t.status === "Delayed").length * 2;
 
   // +2 per overdue deadline
-  score += tasks.filter((t) => t.deadline && new Date(t.deadline).getTime() < now && t.status !== "Completed" && t.status !== "Confirmed").length * 2;
+  score += tasks.filter(isTaskOverdue).length * 2;
 
   // +1 per stat task still pending
   score += tasks.filter((t) => t.priority === "Stat" && t.status === "Pending").length;
@@ -41,7 +42,7 @@ function getRiskLevel(score) {
   return null;
 }
 
-export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert, onLanguageChange }) {
+export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange }) {
   const { t } = useTranslation();
   const stats = useMemo(() => {
     const allTasks = patients.flatMap((p) => p.tasks || []);
@@ -55,9 +56,7 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
     const completed = allTasks.filter((t) => t.status === "Completed").length;
 
     // Overdue deadlines
-    const overdue = allTasks.filter(
-      (t) => t.deadline && new Date(t.deadline).getTime() < now && t.status !== "Completed" && t.status !== "Confirmed"
-    );
+    const overdue = allTasks.filter(isTaskOverdue);
 
     // Department breakdown
     const deptMap = {};
@@ -83,7 +82,7 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
         if (t.priority === "Stat" && t.status === "Pending") {
           attention.push({ type: "stat_pending", patient: p.name, task: t.description, department: t.department, patientId: p.id });
         }
-        if (t.deadline && new Date(t.deadline).getTime() < now && t.status !== "Completed" && t.status !== "Confirmed") {
+        if (isTaskOverdue(t)) {
           const overdueMin = Math.round((now - new Date(t.deadline).getTime()) / 60000);
           attention.push({ type: "overdue", patient: p.name, task: t.description, overdueMin, patientId: p.id });
         }
@@ -127,8 +126,8 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
             delayedTasks={delayedTasks || []}
             onGenerateHandoff={onGenerateHandoff}
             onDischargePatient={onDischargePatient}
-            onFollowUp={onFollowUp}
-            onDismissAlert={onDismissAlert}
+            onRepageTask={onRepageTask}
+            onEscalateTask={onEscalateTask}
             onLanguageChange={onLanguageChange}
           />
         </div>

@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import Dashboard from "./components/Dashboard";
 import VoiceCapture from "./components/VoiceCapture";
-import Alert from "./components/Alert";
 import DischargeDialog from "./components/DischargeDialog";
 import HandoffSummary from "./components/HandoffSummary";
 import AddNoteDialog from "./components/AddNoteDialog";
@@ -15,8 +14,9 @@ import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
 import { supabase } from "./lib/supabase";
-import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask } from "./lib/patients";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
+import { needsAttention } from "./utils/taskOverdue";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
 
 function App() {
@@ -186,70 +186,29 @@ function App() {
   // button, so matching can be skipped entirely; null for the header/floating
   // mic button, which still needs to match a spoken/typed patient.
   const [voiceCapturePatient, setVoiceCapturePatient] = useState(null);
-  const [delayedTasks, setDelayedTasks] = useState([]);
+  // Tasks needing a nurse's attention: overdue (deadline passed, not
+  // Completed/Confirmed) or Stat-priority and still pending -- see
+  // utils/taskOverdue.js. This is what feeds the three-dot menu's badge and
+  // its attention-list bottom sheet, replacing the old demo-only simulated
+  // "Delayed" status.
+  const delayedTasks = useMemo(() => {
+    const delayed = [];
+    for (const patient of patients) {
+      for (const task of patient.tasks) {
+        if (needsAttention(task)) {
+          delayed.push({ ...task, patientName: patient.label, patientRoom: patient.location_label });
+        }
+      }
+    }
+    return delayed;
+  }, [patients]);
+
   const [selectedPatientForDischarge, setSelectedPatientForDischarge] = useState(null);
   const [showHandoff, setShowHandoff] = useState(false);
   const [handoffData, setHandoffData] = useState(null);
   const [showAddNote, setShowAddNote] = useState(null); // patientId or null
   const [suggestionData, setSuggestionData] = useState(null); // { suggestions, patientId, patientName, triggerSummary } or null
   const [showChargeView, setShowChargeView] = useState(false);
-  const [alertHidden, setAlertHidden] = useState(false);
-  const [dismissedTaskIds, setDismissedTaskIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem("dismissedTasks") || "[]");
-    } catch {
-      return [];
-    }
-  });
-
-  // Simulate delayed status on mock tasks after 30 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPatients((prev) =>
-        prev.map((p) => ({
-          ...p,
-          tasks: p.tasks.map((t) =>
-            (t.id === 9001 || t.id === 9002) && t.status === "Pending"
-              ? { ...t, status: "Delayed" }
-              : t
-          ),
-        }))
-      );
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    const delayed = [];
-    for (const patient of patients) {
-      for (const task of patient.tasks) {
-        if (task.status === "Delayed" && !dismissedTaskIds.includes(task.id)) {
-          delayed.push({ ...task, patientName: patient.label, patientRoom: patient.location_label });
-        }
-      }
-    }
-    setDelayedTasks(delayed);
-  }, [patients, dismissedTaskIds]);
-
-  const dismissAlert = (taskId) => {
-    setDismissedTaskIds((prev) => {
-      const updated = [...prev, taskId];
-      localStorage.setItem("dismissedTasks", JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleFollowUp = (task) => {
-    setPatients((prevPatients) =>
-      prevPatients.map((patient) => ({
-        ...patient,
-        tasks: patient.tasks.map((t) =>
-          t.id === task.id ? { ...t, status: "Confirmed" } : t
-        ),
-      }))
-    );
-    dismissAlert(task.id);
-  };
 
   const simulateStatusChange = (taskId) => {
     setPatients((prev) =>
@@ -516,6 +475,38 @@ function App() {
     setTaskToEdit(task);
   };
 
+  const handleRepageTask = async (task) => {
+    try {
+      const updated = await repageTask(task);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === task.patient_id
+            ? { ...p, tasks: p.tasks.map((t) => (t.id === task.id ? updated : t)) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Repage task error:", err);
+      alert(t("errors.repageTask"));
+    }
+  };
+
+  const handleEscalateTask = async (task) => {
+    try {
+      const updated = await escalateTask(task);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === task.patient_id
+            ? { ...p, tasks: p.tasks.map((t) => (t.id === task.id ? updated : t)) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Escalate task error:", err);
+      alert(t("errors.escalateTask"));
+    }
+  };
+
   const handleManualUpdateTask = async (updates, task) => {
     const updated = await updateTask(task.id, updates);
     setPatients((prev) =>
@@ -623,37 +614,6 @@ function App() {
     // Scroll to patient card would happen here in a real app
   };
 
-  // --- Alert escalation handlers ---
-
-  const handleRepageDepartment = (task) => {
-    // Simulate repaging: reset the task's delayed status back to Pending
-    // and restart the status simulation timer
-    setPatients((prev) =>
-      prev.map((p) => ({
-        ...p,
-        tasks: p.tasks.map((t) =>
-          t.id === task.id ? { ...t, status: "Pending" } : t
-        ),
-      }))
-    );
-    // Simulate a new status change after 15 seconds
-    setTimeout(() => {
-      simulateStatusChange(task.id);
-    }, 15000);
-  };
-
-  const handleEscalateToCharge = (task) => {
-    // Escalate: change priority to Stat and add escalated flag
-    setPatients((prev) =>
-      prev.map((p) => ({
-        ...p,
-        tasks: p.tasks.map((t) =>
-          t.id === task.id ? { ...t, priority: "Stat", escalated: true } : t
-        ),
-      }))
-    );
-  };
-
   const triggerSuggestions = async (patientId, newItem) => {
     const patient = patients.find((p) => p.id === patientId);
     if (!patient) return;
@@ -751,30 +711,17 @@ function App() {
 
   if (showChargeView) {
     return (
-      <>
-        <ChargeNurseDashboard
-          onLanguageChange={handleLanguageChange}
-          patients={patients}
-          onSwitchView={handleSwitchToMyPatients}
-          onPatientClick={handleChargePatientClick}
-          delayedTasks={delayedTasks}
-          onGenerateHandoff={handleGenerateShiftHandoff}
-          onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
-          onFollowUp={handleFollowUp}
-          onDismissAlert={dismissAlert}
-        />
-        {/* Keep alert visible on charge view */}
-        {delayedTasks.length > 0 && !alertHidden && (
-          <Alert
-            task={delayedTasks[0]}
-            onRepage={handleRepageDepartment}
-            onEscalate={handleEscalateToCharge}
-            onDismiss={() => setAlertHidden(true)}
-            currentIndex={0}
-            totalCount={delayedTasks.length}
-          />
-        )}
-      </>
+      <ChargeNurseDashboard
+        onLanguageChange={handleLanguageChange}
+        patients={patients}
+        onSwitchView={handleSwitchToMyPatients}
+        onPatientClick={handleChargePatientClick}
+        delayedTasks={delayedTasks}
+        onGenerateHandoff={handleGenerateShiftHandoff}
+        onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
+        onRepageTask={handleRepageTask}
+        onEscalateTask={handleEscalateTask}
+      />
     );
   }
 
@@ -799,16 +746,6 @@ function App() {
           {patientsError}
         </div>
       )}
-      {delayedTasks.length > 0 && !showVoice && !alertHidden && (
-        <Alert
-          task={delayedTasks[0]}
-          onDismiss={() => setAlertHidden(true)}
-          onRepage={handleRepageDepartment}
-          onEscalate={handleEscalateToCharge}
-          currentIndex={0}
-          totalCount={delayedTasks.length}
-        />
-      )}
       <Dashboard
         onLanguageChange={handleLanguageChange}
         patients={patients}
@@ -820,8 +757,6 @@ function App() {
         onSwitchToChargeView={handleSwitchToChargeView}
         delayedTasks={delayedTasks}
         onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
-        onFollowUp={handleFollowUp}
-        onDismissAlert={dismissAlert}
         onOpenVoiceCapture={(patient) => {
           setVoiceCapturePatient(patient);
           setShowVoice(true);
@@ -830,6 +765,8 @@ function App() {
         onEditPatient={handleEditPatientClick}
         onCompleteTask={handleCompleteTask}
         onEditTask={handleEditTaskClick}
+        onRepageTask={handleRepageTask}
+        onEscalateTask={handleEscalateTask}
         onAddNote={handleAddNoteClick}
         onGenerateSbar={handleGeneratePatientHandoff}
       />

@@ -22,7 +22,7 @@ function formatAdmissionDate(dateStr, locale) {
   });
 }
 
-export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onOpenVoiceCapture, onGenerateSbar }) {
+export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar }) {
   const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
@@ -224,6 +224,8 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
                 isNew={newTaskIds.has(task.id)}
                 onComplete={onCompleteTask}
                 onEdit={onEditTask}
+                onRepage={onRepageTask}
+                onEscalate={onEscalateTask}
               />
             ))}
           </div>
