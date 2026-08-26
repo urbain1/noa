@@ -37,6 +37,7 @@
     "passwordsMismatch": "Passwords do not match.",
     "passwordTooShort": "Password must be at least 6 characters.",
     "languagePreference": "Could not save your language preference. Please try again.",
+    "noticeAcknowledgment": "Could not save your acknowledgment. Please try again.",
     "speechUnsupported": "Speech recognition is not supported in this browser.",
     "micDenied": "Microphone access denied. Please allow microphone permissions.",
     "speechError": "Speech recognition error: {{error}}",
@@ -74,6 +75,20 @@
     "confirmationSentPrefix": "We sent a confirmation link to",
     "confirmationSentSuffix": "Click it to activate your account, then come back here to sign in.",
     "backToSignIn": "Back to Sign In"
+  },
+  "notice": {
+    "title": "Before You Continue",
+    "paragraphs": [
+      "Noa uses AI to parse voice input, generate SBAR summaries, and suggest follow-up actions. This content can be incomplete or wrong. Never use AI-generated content for a real clinical decision without independently verifying it yourself.",
+      "Noa is in active development and has not yet completed formal healthcare data protection review for any jurisdiction, including the UK, EU, Switzerland, or US.",
+      "Do not enter any information that could identify a real patient, directly or indirectly. Direct identifiers include names, dates of birth, national or hospital ID numbers, and real room, bed, or ward numbers. Indirect identification is just as much a risk: a specific diagnosis, age, and admission date together, even with no name attached, can be enough for someone who knows the patient to work out who you mean. If a detail isn't needed to test how the app works, leave it out or use a synthetic placeholder instead.",
+      "If you're testing with a real patient in mind, use only a neutral test label such as \"Patient_Test_1\" that has no connection to that patient's actual hospital records, room, or ID, and would not let anyone outside your own memory identify who you mean. If the real patient you had in mind changes, retire that label and start a new one rather than reusing it for someone else.",
+      "Wherever you are practicing, you remain bound by your own professional confidentiality obligations and your local data protection laws. This notice does not change or reduce those obligations, and using Noa does not transfer them to Noa Health Ltd.",
+      "Entering real, identifiable patient information is outside how Noa is intended to be used at this stage, and Noa Health is not responsible for consequences arising from a decision to disregard this instruction, including any professional or regulatory consequences for the person entering the data.",
+      "By continuing, you confirm you understand this and will not enter real, identifiable patient information."
+    ],
+    "builtBy": "Built by Noa Health Ltd.",
+    "confirmButton": "I understand and agree"
   },
   "facility": {
     "subtitle": "Select your facility to get started.",

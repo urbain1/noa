@@ -13,6 +13,7 @@ import TaskEditDialog from "./components/TaskEditDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
 import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
+import NoticeScreen from "./components/NoticeScreen";
 import { supabase } from "./lib/supabase";
 import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
@@ -24,6 +25,12 @@ function App() {
   const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
   const [nurseProfile, setNurseProfile] = useState(undefined); // undefined = loading, null = needs facility
   const [authLoading, setAuthLoading] = useState(true);
+  // Brand-new signups have no nurses row yet, so there's nothing to persist
+  // an acknowledgment to until FacilityScreen creates it. This tracks the
+  // notice gate for that pre-row window only; reset whenever a (possibly
+  // different) nurse's profile is (re-)fetched. Existing nurses use the
+  // durable `nurseProfile.notice_acknowledged_at` instead.
+  const [preRowNoticeAck, setPreRowNoticeAck] = useState(false);
 
   // Restore session and listen for auth changes
   useEffect(() => {
@@ -60,9 +67,10 @@ function App() {
   // choice made on the sign-up form, so facility selection renders in the
   // language the nurse actually picked instead of snapping back to English.
   const fetchNurseProfile = async (user) => {
+    setPreRowNoticeAck(false);
     const { data, error } = await supabase
       .from('nurses')
-      .select('id, facility_id, preferred_language')
+      .select('id, facility_id, preferred_language, notice_acknowledged_at')
       .eq('id', user.id)
       .maybeSingle();
     if (error) {
@@ -122,6 +130,28 @@ function App() {
       applyLanguage(previous);
       alert(t('errors.languagePreference'));
     }
+  };
+
+  // Records the nurse's acknowledgment of the mandatory data-entry notice
+  // (0008_notice_acknowledgment.sql). A nurses row may not exist yet at this
+  // point (brand-new signup, before facility selection) -- there, there's
+  // nothing to write to yet, so this just clears the local gate, and
+  // FacilityScreen stamps `notice_acknowledged_at` itself when it creates the
+  // row. Otherwise this goes through `acknowledge_notice`, a SECURITY
+  // DEFINER function, for the same reason `set_my_language` exists: `nurses`
+  // grants clients no UPDATE. Throws on failure so NoticeScreen can show the
+  // error and let the nurse retry, matching handleLanguageChange's pattern.
+  const handleAcknowledgeNotice = async () => {
+    if (!nurseProfile) {
+      setPreRowNoticeAck(true);
+      return;
+    }
+    const { error } = await supabase.rpc('acknowledge_notice');
+    if (error) {
+      console.error('Notice acknowledgment error:', error);
+      throw new Error(t('errors.noticeAcknowledgment'));
+    }
+    setNurseProfile((prev) => ({ ...prev, notice_acknowledged_at: new Date().toISOString() }));
   };
 
   // --- Patient data (Supabase-backed) ---
@@ -675,6 +705,20 @@ function App() {
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
       </div>
     );
+  }
+
+  // Mandatory data-entry notice: gates everything below it, facility
+  // selection and dashboard included. Existing nurses (row already exists)
+  // are gated on the durable `notice_acknowledged_at` column, null for
+  // every nurse who signed up before this notice existed -- nobody
+  // grandfathered out. Brand-new signups (no row yet) are gated on the
+  // session-only flag above, since there's no row to persist to until
+  // FacilityScreen creates one.
+  const noticeAcknowledged = nurseProfile
+    ? Boolean(nurseProfile.notice_acknowledged_at)
+    : preRowNoticeAck;
+  if (!noticeAcknowledged) {
+    return <NoticeScreen onAcknowledge={handleAcknowledgeNotice} />;
   }
 
   if (!nurseProfile) {

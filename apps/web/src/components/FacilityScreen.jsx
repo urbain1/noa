@@ -48,7 +48,11 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
     setError(null)
     setSelecting(true)
     try {
-      // Create the nurse row linked to this facility
+      // Create the nurse row linked to this facility. `notice_acknowledged_at`
+      // is stamped here rather than via the acknowledge_notice RPC: App.jsx's
+      // notice gate only lets a nurse reach this screen after acknowledging,
+      // but there's no row to write to until now, so this insert is where
+      // that acknowledgment finally becomes durable.
       const { error: insertError } = await supabase.from('nurses').insert({
         id: session.user.id,
         facility_id: facility.id,
@@ -56,6 +60,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         email: session.user.email,
         name: session.user.user_metadata?.full_name || '',
         preferred_language: currentLanguage(),
+        notice_acknowledged_at: new Date().toISOString(),
       })
       if (insertError) throw insertError
       onFacilityComplete(facility)
@@ -87,7 +92,8 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         .single()
       if (createError) throw createError
 
-      // Create the nurse row linked to the new facility
+      // Create the nurse row linked to the new facility. See the comment in
+      // handleSelect above on why notice_acknowledged_at is stamped here.
       const { error: insertError } = await supabase.from('nurses').insert({
         id: session.user.id,
         facility_id: newFacility.id,
@@ -95,6 +101,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         email: session.user.email,
         name: session.user.user_metadata?.full_name || '',
         preferred_language: currentLanguage(),
+        notice_acknowledged_at: new Date().toISOString(),
       })
       if (insertError) throw insertError
 

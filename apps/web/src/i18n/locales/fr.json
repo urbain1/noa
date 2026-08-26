@@ -37,6 +37,7 @@
     "passwordsMismatch": "Les mots de passe ne correspondent pas.",
     "passwordTooShort": "Le mot de passe doit contenir au moins 6 caractères.",
     "languagePreference": "Impossible d'enregistrer votre préférence de langue. Veuillez réessayer.",
+    "noticeAcknowledgment": "Impossible d'enregistrer votre confirmation. Veuillez réessayer.",
     "speechUnsupported": "La reconnaissance vocale n'est pas prise en charge par ce navigateur.",
     "micDenied": "Accès au microphone refusé. Veuillez autoriser l'accès au microphone.",
     "speechError": "Erreur de reconnaissance vocale : {{error}}",
@@ -74,6 +75,20 @@
     "confirmationSentPrefix": "Nous avons envoyé un lien de confirmation à",
     "confirmationSentSuffix": "Cliquez dessus pour activer votre compte, puis revenez ici pour vous connecter.",
     "backToSignIn": "Retour à la connexion"
+  },
+  "notice": {
+    "title": "Avant de continuer",
+    "paragraphs": [
+      "Noa utilise l'IA pour analyser les entrées vocales, générer des résumés SBAR et suggérer des actions de suivi. Ce contenu peut être incomplet ou erroné. N'utilisez jamais de contenu généré par l'IA pour une décision clinique réelle sans le vérifier vous-même de manière indépendante.",
+      "Noa est en développement actif et n'a pas encore fait l'objet d'une évaluation formelle de protection des données de santé, quelle que soit la juridiction, y compris le Royaume-Uni, l'EU, la Suisse ou les États-Unis.",
+      "Ne saisissez aucune information susceptible d'identifier un patient réel, directement ou indirectement. Les identifiants directs comprennent les noms, dates de naissance, numéros d'identification nationaux ou hospitaliers, ainsi que les numéros réels de chambre, de lit ou de service. L'identification indirecte représente un risque tout aussi important : un diagnostic précis, un âge et une date d'admission combinés, même sans nom associé, peuvent suffire à permettre à une personne connaissant le patient de deviner de qui il s'agit. Si un détail n'est pas nécessaire pour tester le fonctionnement de l'application, omettez-le ou utilisez un identifiant synthétique à la place.",
+      "Si vous testez en pensant à un patient réel, utilisez uniquement une étiquette de test neutre telle que « Patient_Test_1 », sans lien avec le dossier, la chambre ou l'identifiant réels de ce patient, et qui ne permettrait à personne, en dehors de votre propre mémoire, de savoir de qui il s'agit. Si le patient réel auquel vous pensiez change, retirez cette étiquette et utilisez-en une nouvelle plutôt que de la réutiliser pour quelqu'un d'autre.",
+      "Quel que soit le lieu où vous exercez, vous restez tenu(e) par vos propres obligations de confidentialité professionnelle et par les lois locales sur la protection des données. Cet avis ne modifie ni ne réduit ces obligations, et l'utilisation de Noa ne les transfère pas à Noa Health Ltd.",
+      "La saisie d'informations réelles permettant d'identifier un patient ne correspond pas à l'usage prévu de Noa à ce stade. Noa Health décline toute responsabilité quant aux conséquences résultant du non-respect de cette consigne, y compris toute conséquence professionnelle ou réglementaire pour la personne ayant saisi les données.",
+      "En continuant, vous confirmez avoir compris cet avis et vous vous engagez à ne saisir aucune information réelle permettant d'identifier un patient."
+    ],
+    "builtBy": "Développé par Noa Health Ltd.",
+    "confirmButton": "J'ai compris et j'accepte"
   },
   "facility": {
     "subtitle": "Sélectionnez votre établissement pour commencer.",
