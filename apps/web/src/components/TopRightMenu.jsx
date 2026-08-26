@@ -1,6 +1,14 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { SUPPORTED_LANGUAGES, normalizeLanguage } from "../i18n";
+import { departmentLabel } from "../i18n/enums";
 
-export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert }) {
+export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert, onLanguageChange }) {
+  const { t, i18n } = useTranslation();
+  // Which button reads as selected comes from the one live value, not a
+  // separately-passed copy, so the highlight can never disagree with what
+  // the rest of the app is using.
+  const activeLanguage = normalizeLanguage(i18n.language);
   const [isOpen, setIsOpen] = useState(false);
   const [showPatientList, setShowPatientList] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
@@ -51,7 +59,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                   onClick={() => setShowPatientList(false)}
                   className="w-full text-left px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 flex items-center gap-1"
                 >
-                  ← Back
+                  {t("topMenu.backArrow")}
                 </button>
                 <div className="border-t border-gray-100">
                   {patients.map((patient) => (
@@ -64,7 +72,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                       className="w-full text-left px-4 py-2 hover:bg-gray-50 cursor-pointer border-t border-gray-100 first:border-t-0"
                     >
                       <p className="text-sm text-gray-700 font-medium">{patient.name}</p>
-                      <p className="text-xs text-gray-400">Room {patient.room}</p>
+                      <p className="text-xs text-gray-400">{t("topMenu.room", { room: patient.room })}</p>
                     </button>
                   ))}
                 </div>
@@ -79,8 +87,8 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                 >
                   <span className="text-lg mt-0.5">📋</span>
                   <div>
-                    <p className="text-sm text-gray-700">{handoffLoading ? "Generating..." : "Generate handoff report"}</p>
-                    <p className="text-xs text-gray-400">SBAR summary for shift change</p>
+                    <p className="text-sm text-gray-700">{handoffLoading ? t("common.generating") : t("topMenu.generateHandoff")}</p>
+                    <p className="text-xs text-gray-400">{t("topMenu.generateHandoffSubtitle")}</p>
                   </div>
                 </button>
 
@@ -91,7 +99,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                 >
                   <span className="text-lg mt-0.5">🏥</span>
                   <div>
-                    <p className="text-sm text-gray-700">Discharge a patient</p>
+                    <p className="text-sm text-gray-700">{t("topMenu.dischargePatient")}</p>
                   </div>
                 </button>
 
@@ -105,7 +113,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                 >
                   <span className="text-lg">⚠️</span>
                   <span className={`text-sm ${delayedTasks.length > 0 ? "text-red-600 font-medium" : "text-gray-700"}`}>
-                    Delayed tasks
+                    {t("topMenu.delayedTasks")}
                   </span>
                   {delayedTasks.length > 0 && (
                     <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
@@ -113,6 +121,29 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                     </span>
                   )}
                 </button>
+
+                {/* Language: applies immediately and is saved to the nurse's
+                    profile, so it survives sign-out and other devices. */}
+                <div className="border-t border-gray-100 px-4 pt-3 pb-2">
+                  <p className="text-sm text-gray-700">{t("language.label")}</p>
+                  <p className="text-xs text-gray-400">{t("language.menuSubtitle")}</p>
+                  <div className="mt-2 flex gap-2">
+                    {SUPPORTED_LANGUAGES.map((code) => (
+                      <button
+                        key={code}
+                        type="button"
+                        onClick={() => onLanguageChange?.(code)}
+                        className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          activeLanguage === code
+                            ? "bg-blue-100 text-blue-700 border border-blue-300"
+                            : "bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200"
+                        }`}
+                      >
+                        {t(`language.${code}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
           </div>
@@ -125,18 +156,18 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
           <div className="fixed inset-0 bg-black/30 z-50" onClick={() => setShowBottomSheet(false)} />
           <div className="fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-xl z-50 max-h-[60vh] overflow-y-auto">
             <div className="px-4 py-3 border-b font-semibold text-gray-900 flex items-center justify-between sticky top-0 bg-white rounded-t-2xl">
-              <span>Delayed Tasks ({delayedTasks.length})</span>
+              <span>{t("topMenu.delayedTasksHeading", { count: delayedTasks.length })}</span>
               <button onClick={() => setShowBottomSheet(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
             </div>
             {delayedTasks.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-400 text-sm">No delayed tasks</div>
+              <div className="px-4 py-8 text-center text-gray-400 text-sm">{t("topMenu.noDelayedTasks")}</div>
             ) : (
               <div className="divide-y divide-gray-100">
                 {delayedTasks.map((task) => (
                   <div key={task.id} className="px-4 py-3">
                     <p className="text-sm font-medium text-gray-900">{task.description}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      {task.department} · {task.patientName} · Room {task.patientRoom}
+                      {departmentLabel(t, task.department)} · {task.patientName} · {t("topMenu.room", { room: task.patientRoom })}
                     </p>
                     <div className="flex gap-2 mt-2">
                       <button
@@ -145,7 +176,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                         }}
                         className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
                       >
-                        Follow Up
+                        {t("topMenu.followUp")}
                       </button>
                       <button
                         onClick={() => {
@@ -153,7 +184,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                         }}
                         className="rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-100"
                       >
-                        Close
+                        {t("common.close")}
                       </button>
                     </div>
                   </div>

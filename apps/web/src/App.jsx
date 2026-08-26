@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import Dashboard from "./components/Dashboard";
 import VoiceCapture from "./components/VoiceCapture";
 import Alert from "./components/Alert";
@@ -15,8 +16,10 @@ import FacilityScreen from "./components/FacilityScreen";
 import { supabase } from "./lib/supabase";
 import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
+import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
 
 function App() {
+  const { t } = useTranslation();
   // --- Auth state ---
   const [session, setSession] = useState(undefined); // undefined = loading, null = logged out
   const [nurseProfile, setNurseProfile] = useState(undefined); // undefined = loading, null = needs facility
@@ -27,7 +30,7 @@ function App() {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       if (currentSession) {
-        fetchNurseProfile(currentSession.user.id);
+        fetchNurseProfile(currentSession.user);
       } else {
         setAuthLoading(false);
       }
@@ -36,7 +39,7 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession) {
-        fetchNurseProfile(newSession.user.id);
+        fetchNurseProfile(newSession.user);
       } else {
         setNurseProfile(undefined);
         setAuthLoading(false);
@@ -46,30 +49,45 @@ function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchNurseProfile = async (userId) => {
+  // Resolves the nurse's language once, on every authenticated load, and hands
+  // it to i18n -- the app's only live copy. `preferred_language` is
+  // deliberately not kept on `nurseProfile`: a second copy is a copy that can
+  // drift from what the toggle just set.
+  //
+  // Order matters. The nurses row is authoritative once it exists. Before it
+  // does -- the window between signing up and picking a facility, which email
+  // confirmation splits across a page load -- `user_metadata` carries the
+  // choice made on the sign-up form, so facility selection renders in the
+  // language the nurse actually picked instead of snapping back to English.
+  const fetchNurseProfile = async (user) => {
     const { data, error } = await supabase
       .from('nurses')
-      .select('id, facility_id')
-      .eq('id', userId)
+      .select('id, facility_id, preferred_language')
+      .eq('id', user.id)
       .maybeSingle();
     if (error) {
       console.error('Nurse profile fetch error:', error);
       setNurseProfile(null);
+    } else if (data) {
+      const { preferred_language, ...profile } = data;
+      applyLanguage(preferred_language);
+      setNurseProfile(profile);
     } else {
-      setNurseProfile(data); // null if no row exists yet
+      applyLanguage(user.user_metadata?.preferred_language);
+      setNurseProfile(null); // no row yet -- facility selection comes next
     }
     setAuthLoading(false);
   };
 
   const handleAuthSuccess = (newSession) => {
     setSession(newSession);
-    fetchNurseProfile(newSession.user.id);
+    fetchNurseProfile(newSession.user);
   };
 
   const handleFacilityComplete = () => {
     // Re-fetch nurse profile now that the row exists
     if (session) {
-      fetchNurseProfile(session.user.id);
+      fetchNurseProfile(session.user);
     }
   };
 
@@ -77,6 +95,33 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setNurseProfile(undefined);
+    // Don't leave the next person on this device in the previous nurse's language.
+    applyLanguage(DEFAULT_LANGUAGE);
+  };
+
+  // The only writer of the active language. Applying it to i18n updates every
+  // consumer at once -- static text, the Claude call sites, and the next
+  // SpeechRecognition instance all read that same value -- so there is nothing
+  // left to go stale. Persisted afterwards; if the write fails the UI is
+  // rolled back rather than left disagreeing with what's stored.
+  //
+  // The write goes through `set_my_language`, a SECURITY DEFINER function that
+  // touches only this column for `auth.uid()`. `nurses` deliberately grants no
+  // UPDATE to clients: a row-level update policy would also let a nurse
+  // rewrite their own `facility_id` and read another facility's patients.
+  // See 0007_nurse_language_rpc.sql.
+  const handleLanguageChange = async (code) => {
+    const previous = currentLanguage();
+    const next = applyLanguage(code);
+    if (next === previous) return;
+
+    const { error } = await supabase.rpc('set_my_language', { new_language: next });
+
+    if (error) {
+      console.error('Language preference update error:', error);
+      applyLanguage(previous);
+      alert(t('errors.languagePreference'));
+    }
   };
 
   // --- Patient data (Supabase-backed) ---
@@ -95,7 +140,7 @@ function App() {
       setPatients(data.map((p) => ({ ...p, tasks: p.tasks || [], notes: p.notes || [] })));
     } catch (err) {
       console.error('Patient fetch error:', err);
-      setPatientsError('Could not load patients. Please try reloading.');
+      setPatientsError(t('errors.loadPatients'));
     }
     setPatientsLoading(false);
   };
@@ -220,7 +265,7 @@ function App() {
         triggerSuggestions(matchedPatient.id, { type: "task", data: newTask });
       } catch (err) {
         console.error("Task creation error:", err);
-        alert("Failed to save task. Please try again.");
+        alert(t("errors.saveTask"));
       }
       setShowVoice(false);
       return;
@@ -326,7 +371,7 @@ function App() {
       newTasks.push({
         id: `discharge-notify-${Date.now()}`,
         description:
-          "Notify patient about discharge plan" +
+          t("discharge.taskNotifyPatient") +
           (options.notes ? ` — ${options.notes}` : ""),
         department: "Nursing",
         priority: "Routine",
@@ -340,7 +385,7 @@ function App() {
       newTasks.push({
         id: `discharge-nh-${Date.now()}`,
         description:
-          "Arrange nursing home placement" +
+          t("discharge.taskArrangeNursingHome") +
           (!options.notifyPatient && options.notes ? ` — ${options.notes}` : ""),
         department: "Social Work",
         priority: "Urgent",
@@ -366,10 +411,10 @@ function App() {
   const handleGenerateShiftHandoff = async () => {
     const result = await generateHandoffSummary(patients);
     if (result) {
-      setHandoffData({ summaryText: result, title: "Shift Handoff Report", patientCount: patients.length });
+      setHandoffData({ summaryText: result, title: t("handoff.shiftReportTitle"), patientCount: patients.length });
       setShowHandoff(true);
     } else {
-      alert("Failed to generate handoff summary. Please try again.");
+      alert(t("errors.generateHandoff"));
     }
   };
 
@@ -381,12 +426,12 @@ function App() {
     if (result) {
       setHandoffData({
         summaryText: result,
-        title: `SBAR — ${patient.label}`,
+        title: t("handoff.patientSbarTitle", { patient: patient.label }),
         patientCount: 1,
       });
       setShowHandoff(true);
     } else {
-      alert("Failed to generate SBAR summary. Please try again.");
+      alert(t("errors.generateSbar"));
     }
   };
 
@@ -433,7 +478,7 @@ function App() {
       );
     } catch (err) {
       console.error("Complete task error:", err);
-      alert("Failed to mark task complete. Please try again.");
+      alert(t("errors.completeTask"));
     }
   };
 
@@ -478,7 +523,7 @@ function App() {
       });
     } catch (err) {
       console.error("Add note error:", err);
-      alert("Failed to save note. Please try again.");
+      alert(t("errors.saveNote"));
     }
   };
 
@@ -587,8 +632,10 @@ function App() {
       const suggestions = await generateSuggestions(patient, newItem);
       if (suggestions && suggestions.length > 0) {
         const triggerSummary = newItem.type === "task"
-          ? `New task: ${newItem.data.description}`
-          : `New note: ${newItem.data.content.slice(0, 50)}${newItem.data.content.length > 50 ? "..." : ""}`;
+          ? t("suggestions.triggerTask", { description: newItem.data.description })
+          : t("suggestions.triggerNote", {
+              content: `${newItem.data.content.slice(0, 50)}${newItem.data.content.length > 50 ? "..." : ""}`,
+            });
         setSuggestionData({
           suggestions,
           patientId,
@@ -610,7 +657,7 @@ function App() {
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-          <p className="text-sm text-gray-500">Loading...</p>
+          <p className="text-sm text-gray-500">{t("common.loading")}</p>
         </div>
       </div>
     );
@@ -662,6 +709,7 @@ function App() {
     return (
       <>
         <ChargeNurseDashboard
+          onLanguageChange={handleLanguageChange}
           patients={patients}
           onSwitchView={handleSwitchToMyPatients}
           onPatientClick={handleChargePatientClick}
@@ -718,6 +766,7 @@ function App() {
         />
       )}
       <Dashboard
+        onLanguageChange={handleLanguageChange}
         patients={patients}
         onVoiceClick={() => {
           setVoiceCapturePatient(null);

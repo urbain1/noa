@@ -1,8 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { codeStatusLabel } from "../i18n/enums";
 
+// Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
 
 export default function EditPatientDialog({ patient, onCancel, onSave }) {
+  const { t } = useTranslation();
   const [diagnosis, setDiagnosis] = useState(patient.diagnosis || "");
   const [age, setAge] = useState(patient.age != null ? String(patient.age) : "");
   const [codeStatus, setCodeStatus] = useState(patient.code_status || "Full Code");
@@ -29,7 +33,7 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
         locationLabel: locationLabel.trim(),
       });
     } catch (err) {
-      setError(err.message || "Failed to update patient.");
+      setError(err.message || t("errors.updatePatient"));
       setSaving(false);
     }
   };
@@ -46,13 +50,13 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Edit Patient</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("patientDialog.editTitle")}</h2>
             <p className="text-sm text-gray-500">{patient.label}</p>
           </div>
           <button
             onClick={onCancel}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
-            aria-label="Close"
+            aria-label={t("patientDialog.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -63,7 +67,7 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
         {/* Body */}
         <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.label")}</label>
             <input
               type="text"
               value={patient.label}
@@ -71,12 +75,12 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
               className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500"
             />
             <p className="mt-1 text-xs text-gray-400">
-              Fixed once set. Retire and create a new patient instead of reusing this label.
+              {t("patientDialog.labelFixedHint")}
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.diagnosis")}</label>
             <textarea
               value={diagnosis}
               onChange={(e) => setDiagnosis(e.target.value)}
@@ -86,33 +90,33 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Age <span className="font-normal text-gray-400">(optional)</span></label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.age")} <span className="font-normal text-gray-400">{t("common.optional")}</span></label>
             <input
               type="number"
               min="0"
               max="130"
               value={age}
               onChange={(e) => setAge(e.target.value)}
-              placeholder="e.g. 68"
+              placeholder={t("patientDialog.agePlaceholder")}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Code Status</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.codeStatus")}</label>
             <select
               value={codeStatus}
               onChange={(e) => setCodeStatus(e.target.value)}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             >
               {CODE_STATUS_OPTIONS.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
+                <option key={opt} value={opt}>{codeStatusLabel(t, opt)}</option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Attending Physician</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.attendingPhysician")}</label>
             <input
               type="text"
               value={patient.attending_physician || "—"}
@@ -122,18 +126,18 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Allergies</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.allergies")}</label>
             <input
               type="text"
               value={allergiesInput}
               onChange={(e) => setAllergiesInput(e.target.value)}
-              placeholder="Comma-separated, e.g. Penicillin, Sulfa"
+              placeholder={t("patientDialog.allergiesPlaceholder")}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.admissionDate")}</label>
             <input
               type="date"
               value={admissionDate}
@@ -143,12 +147,12 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location Label</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.locationLabel")}</label>
             <input
               type="text"
               value={locationLabel}
               onChange={(e) => setLocationLabel(e.target.value)}
-              placeholder="Test Room A"
+              placeholder={t("patientDialog.locationLabelPlaceholder")}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
             />
           </div>
@@ -166,14 +170,14 @@ export default function EditPatientDialog({ patient, onCancel, onSave }) {
             onClick={onCancel}
             className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={saving}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save Changes"}
+            {saving ? t("common.saving") : t("common.saveChanges")}
           </button>
         </div>
       </div>

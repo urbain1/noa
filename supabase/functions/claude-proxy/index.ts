@@ -30,6 +30,59 @@ function stripCodeFence(text: string) {
     .trim();
 }
 
+// ---------------------------------------------------------------------------
+// Output language
+//
+// Per-nurse `preferred_language` (0006_nurse_language_preference.sql) controls
+// the language of FREE TEXT only -- task descriptions, SBAR narrative,
+// suggestion text. JSON field names and every structured/enum value
+// (department, priority, status, category, ISO 8601 deadlines) stay in their
+// canonical English form no matter what: the app matches, filters, and stores
+// against them, and the DB check constraints only accept the English values.
+//
+// English returns an empty directive so the prompt sent for an English nurse
+// is byte-identical to what it was before language support existed.
+// ---------------------------------------------------------------------------
+
+const LANGUAGE_NAMES: Record<string, string> = { en: "English", fr: "French" };
+
+function languageCode(language: unknown): "en" | "fr" {
+  return language === "fr" ? "fr" : "en";
+}
+
+// Input may be in a different language than the requested output (a French
+// nurse generating a handoff over notes an English colleague wrote). Read it
+// as-is; never translate or normalise existing content.
+const READ_INPUT_AS_IS =
+  "- The input content may be written in a different language. Read and understand it as-is: do not translate it, do not normalise it, and do not comment on its language.";
+
+// `body` may use the {{LANG}} token, replaced with the target language name.
+function languageDirective(language: unknown, body: string) {
+  const code = languageCode(language);
+  if (code === "en") return "";
+  const name = LANGUAGE_NAMES[code];
+  return `\n\nOUTPUT LANGUAGE: ${name}\n${body.replaceAll("{{LANG}}", name)}\n${READ_INPUT_AS_IS}`;
+}
+
+// Guards against a structured value coming back translated despite the prompt.
+function canonical<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+const DEPARTMENTS = [
+  "Radiology",
+  "Lab",
+  "Pharmacy",
+  "Nursing",
+  "Physical Therapy",
+  "Social Work",
+  "Transport",
+  "Other",
+] as const;
+const PRIORITIES = ["Stat", "Urgent", "Routine"] as const;
+const TASK_STATUSES = ["Pending", "Confirmed", "Delayed", "Completed"] as const;
+const NOTE_CATEGORIES = ["Situation", "Background", "Assessment", "Recommendation"] as const;
+
 type CallClaude = (args: {
   model: string;
   max_tokens: number;
@@ -43,8 +96,19 @@ type CallClaude = (args: {
 // unchanged; only `callClaude` now hits Anthropic with the server-side key.
 // ---------------------------------------------------------------------------
 
-async function parseVoiceToTask(payload: { transcript: string }, callClaude: CallClaude) {
-  const { transcript } = payload;
+async function parseVoiceToTask(
+  payload: { transcript: string; language?: string },
+  callClaude: CallClaude,
+) {
+  const { transcript, language } = payload;
+
+  const languageBlock = languageDirective(
+    language,
+    [
+      '- Write the "description" value in {{LANG}}, expanding medical abbreviations into full, standard clinical terminology in {{LANG}}.',
+      '- Everything else stays exactly as specified above, unchanged and in English: the JSON field names, "department", "priority", "status", "room", "patientName", and the ISO 8601 "deadline" string. Never translate or reformat those.',
+    ].join("\n"),
+  );
   try {
     const message = await callClaude({
       model: "claude-sonnet-4-5-20250929",
@@ -172,7 +236,7 @@ Output: {"description": "Complete Blood Count with differential", "department": 
 Input: 'Stat MRI brain for Chen due in four days'
 Output: {"description": "MRI brain with and without contrast", "department": "Radiology", "priority": "Stat", "room": null, "patientName": "Chen", "deadline": "${new Date(new Date().setDate(new Date().getDate() + 4)).toISOString().split("T")[0]}T09:00:00.000Z", "status": "Pending"}
 
-Always use complete medical terminology in descriptions, never abbreviations.`,
+Always use complete medical terminology in descriptions, never abbreviations.${languageBlock}`,
       messages: [
         {
           role: "user",
@@ -189,11 +253,12 @@ Always use complete medical terminology in descriptions, never abbreviations.`,
     return {
       id: Date.now(),
       description: parsed.description || transcript.trim(),
-      department: parsed.department || "Other",
-      priority: parsed.priority || "Routine",
+      // Clamped, not just defaulted: a translated enum must never reach the app.
+      department: canonical(parsed.department, DEPARTMENTS, "Other"),
+      priority: canonical(parsed.priority, PRIORITIES, "Routine"),
       room: parsed.room || "000",
       patientName: parsed.patientName || null,
-      status: parsed.status || "Pending",
+      status: canonical(parsed.status, TASK_STATUSES, "Pending"),
       deadline: parsed.deadline || null,
       timestamp: new Date().toISOString(),
     };
@@ -297,8 +362,21 @@ Output: {"deadline": null}`,
   }
 }
 
-async function generateHandoffSummary(payload: { patients: any[] }, callClaude: CallClaude) {
-  const { patients } = payload;
+async function generateHandoffSummary(
+  payload: { patients: any[]; language?: string },
+  callClaude: CallClaude,
+) {
+  const { patients, language } = payload;
+
+  const languageBlock = languageDirective(
+    language,
+    [
+      "- Write the entire SBAR narrative in {{LANG}}, using standard {{LANG}} clinical language.",
+      '- Keep these structural markers exactly as specified above, unchanged and in English: the SBAR section letters and labels (S (Situation), B (Background), A (Assessment), R (Recommendation)), the "---" patient separator, and the bracket flags [DELAYED], [STAT], [DUE in Xh Ym], [OVERDUE by Xh Ym].',
+      "- Patient labels, location labels, department names, physician names, and allergy entries are data. Reproduce them exactly as given, never translated.",
+    ].join("\n"),
+  );
+
   try {
     const patientSummaries = patients.map((p) => {
       const daysSinceAdmission = p.admissionDate
@@ -365,7 +443,7 @@ SBAR SECTIONS:
 S (Situation): One-line summary: [Name], [Age]y/o, Room [X], Day [N] of admission for [diagnosis]. Code status: [X]. Allergies: [X]. Include any clinical notes categorized as "Situation". If age is null or missing, omit the age entirely (e.g. "[Name], Room [X], ..."), never write "Unknown" or "N/A" in its place.
 B (Background): Attending physician, relevant clinical context based on diagnosis. Keep to 1-2 sentences. Include any clinical notes categorized as "Background".
 A (Assessment): What was accomplished this shift (completed/confirmed tasks). What remains (pending tasks by department, include deadline if present). What is delayed and why department has not responded. Flag any overdue tasks. Include any clinical notes categorized as "Assessment".
-R (Recommendation): Prioritized action items for the incoming nurse. Start with overdue tasks first, then approaching deadlines, then other urgent items. Be specific about what needs follow-up, with which department, and by when. Include any clinical notes categorized as "Recommendation".`,
+R (Recommendation): Prioritized action items for the incoming nurse. Start with overdue tasks first, then approaching deadlines, then other urgent items. Be specific about what needs follow-up, with which department, and by when. Include any clinical notes categorized as "Recommendation".${languageBlock}`,
       messages: [
         {
           role: "user",
@@ -505,10 +583,19 @@ Output: {"action": "delete"}`,
 }
 
 async function generateSuggestions(
-  payload: { patient: any; newItem: { type: string; data: any } },
+  payload: { patient: any; newItem: { type: string; data: any }; language?: string },
   callClaude: CallClaude,
 ) {
-  const { patient, newItem } = payload;
+  const { patient, newItem, language } = payload;
+
+  const languageBlock = languageDirective(
+    language,
+    [
+      '- Write these free-text values in {{LANG}}: "text", "taskDetails.description", and "noteDetails.text".',
+      '- These are structured values the app acts on. Keep them exactly as specified above, unchanged and in English: the JSON field names, "type" ("task" or "note"), "taskDetails.department", "taskDetails.priority", the ISO 8601 "taskDetails.deadline", and "noteDetails.category".',
+    ].join("\n"),
+  );
+
   try {
     const daysSinceAdmission = patient.admissionDate
       ? Math.max(1, Math.round((Date.now() - new Date(patient.admissionDate).getTime()) / (24 * 60 * 60 * 1000)))
@@ -604,7 +691,7 @@ OUTPUT FORMAT (JSON array only, no other text):
   }
 ]
 
-Return [] (empty array) if no suggestions are warranted.`,
+Return [] (empty array) if no suggestions are warranted.${languageBlock}`,
       messages: [
         {
           role: "user",
@@ -628,17 +715,16 @@ Return [] (empty array) if no suggestions are warranted.`,
       taskDetails: s.taskDetails
         ? {
             description: s.taskDetails.description || s.text,
-            department: s.taskDetails.department || "Nursing",
-            priority: s.taskDetails.priority || "Routine",
+            // Clamped, not just defaulted: a translated enum must never reach the app.
+            department: canonical(s.taskDetails.department, DEPARTMENTS, "Nursing"),
+            priority: canonical(s.taskDetails.priority, PRIORITIES, "Routine"),
             deadline: s.taskDetails.deadline || null,
           }
         : null,
       noteDetails: s.noteDetails
         ? {
             text: s.noteDetails.text || s.text,
-            category: ["Situation", "Background", "Assessment", "Recommendation"].includes(s.noteDetails?.category)
-              ? s.noteDetails.category
-              : "Recommendation",
+            category: canonical(s.noteDetails.category, NOTE_CATEGORIES, "Recommendation"),
           }
         : null,
     }));

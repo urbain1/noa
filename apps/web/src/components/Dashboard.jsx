@@ -1,15 +1,18 @@
+import { useTranslation } from "react-i18next";
 import PatientCard from "./PatientCard";
 import TopRightMenu from "./TopRightMenu";
 
-export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onGenerateSbar }) {
+export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, onSwitchToChargeView, delayedTasks, onDischargePatient, onFollowUp, onDismissAlert, onOpenVoiceCapture, onAddPatient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onGenerateSbar, onLanguageChange }) {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       {/* Header */}
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm">
         <h1 className="text-xl font-bold text-black">noa</h1>
         <div className="flex items-center gap-4">
-          <button className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white">My Patients</button>
-          <button onClick={onSwitchToChargeView} className="px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100">Unit View</button>
+          <button className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white">{t("dashboard.myPatients")}</button>
+          <button onClick={onSwitchToChargeView} className="px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100">{t("dashboard.unitView")}</button>
           <TopRightMenu
             patients={patients}
             delayedTasks={delayedTasks || []}
@@ -17,6 +20,7 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
             onDischargePatient={onDischargePatient}
             onFollowUp={onFollowUp}
             onDismissAlert={onDismissAlert}
+            onLanguageChange={onLanguageChange}
           />
         </div>
       </header>
@@ -31,7 +35,7 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          Add Patient
+          {t("dashboard.addPatient")}
         </button>
         {patients.map((patient) => (
           <PatientCard
@@ -51,7 +55,7 @@ export default function Dashboard({ patients, onVoiceClick, onGenerateHandoff, o
       <button
         onClick={onVoiceClick}
         className="fixed bottom-6 right-6 flex h-16 w-16 items-center justify-center rounded-full border-none bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/20 transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl hover:ring-blue-700/20 active:scale-95"
-        aria-label="Voice input"
+        aria-label={t("dashboard.voiceInputAria")}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

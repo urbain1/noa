@@ -1,5 +1,7 @@
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import TopRightMenu from "./TopRightMenu";
+import { departmentLabel } from "../i18n/enums";
 
 function computeRiskScore(patient) {
   const now = Date.now();
@@ -31,13 +33,16 @@ function computeRiskScore(patient) {
   return score;
 }
 
+// `labelKey` rather than a literal: both consumers (here and PatientCard)
+// render it through t(), so the badge follows the nurse's language.
 function getRiskLevel(score) {
-  if (score >= 4) return { label: "High Risk", color: "text-red-600", bg: "bg-red-100", border: "border-red-200" };
-  if (score >= 2) return { label: "Moderate", color: "text-yellow-700", bg: "bg-yellow-100", border: "border-yellow-200" };
+  if (score >= 4) return { labelKey: "unitView.riskHigh", color: "text-red-600", bg: "bg-red-100", border: "border-red-200" };
+  if (score >= 2) return { labelKey: "unitView.riskModerate", color: "text-yellow-700", bg: "bg-yellow-100", border: "border-yellow-200" };
   return null;
 }
 
-export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert }) {
+export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onFollowUp, onDismissAlert, onLanguageChange }) {
+  const { t } = useTranslation();
   const stats = useMemo(() => {
     const allTasks = patients.flatMap((p) => p.tasks || []);
     const allNotes = patients.flatMap((p) => p.notes || []);
@@ -115,8 +120,8 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
       <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm">
         <h1 className="text-xl font-bold text-black">noa</h1>
         <div className="flex items-center gap-4">
-          <button onClick={onSwitchView} className="px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100">My Patients</button>
-          <button className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white">Unit View</button>
+          <button onClick={onSwitchView} className="px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100">{t("dashboard.myPatients")}</button>
+          <button className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white">{t("dashboard.unitView")}</button>
           <TopRightMenu
             patients={patients}
             delayedTasks={delayedTasks || []}
@@ -124,6 +129,7 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
             onDischargePatient={onDischargePatient}
             onFollowUp={onFollowUp}
             onDismissAlert={onDismissAlert}
+            onLanguageChange={onLanguageChange}
           />
         </div>
       </header>
@@ -133,26 +139,26 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
         <div className="grid grid-cols-4 gap-2">
           <div className="rounded-lg bg-white p-3 text-center shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{stats.patientCount}</p>
-            <p className="text-xs text-gray-500">Patients</p>
+            <p className="text-xs text-gray-500">{t("unitView.patients")}</p>
           </div>
           <div className="rounded-lg bg-white p-3 text-center shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{stats.taskCount}</p>
-            <p className="text-xs text-gray-500">Tasks</p>
+            <p className="text-xs text-gray-500">{t("unitView.tasks")}</p>
           </div>
           <div className="rounded-lg bg-white p-3 text-center shadow-sm">
             <p className="text-2xl font-bold text-gray-900">{stats.noteCount}</p>
-            <p className="text-xs text-gray-500">Notes</p>
+            <p className="text-xs text-gray-500">{t("unitView.notes")}</p>
           </div>
           <div className={`rounded-lg p-3 text-center shadow-sm ${stats.overdueCount > 0 ? "bg-red-50" : "bg-white"}`}>
             <p className={`text-2xl font-bold ${stats.overdueCount > 0 ? "text-red-600" : "text-gray-900"}`}>{stats.overdueCount}</p>
-            <p className="text-xs text-gray-500">Overdue</p>
+            <p className="text-xs text-gray-500">{t("unitView.overdue")}</p>
           </div>
         </div>
 
         {/* Patient safety flags */}
         {stats.flaggedPatients.length > 0 && (
           <div className="rounded-lg bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-900 mb-3">Patient Safety Flags</h2>
+            <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.safetyFlags")}</h2>
             <div className="flex flex-col gap-2">
               {stats.flaggedPatients.map((p) => (
                 <button
@@ -162,10 +168,10 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                    <p className="text-xs text-gray-500">Room {p.room} &middot; {p.diagnosis}</p>
+                    <p className="text-xs text-gray-500">{t("unitView.room", { room: p.room })} &middot; {p.diagnosis}</p>
                   </div>
                   <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${p.risk.bg} ${p.risk.color}`}>
-                    {p.risk.label} ({p.riskScore})
+                    {t("unitView.riskBadge", { label: t(p.risk.labelKey), score: p.riskScore })}
                   </div>
                 </button>
               ))}
@@ -176,7 +182,7 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
         {/* Attention needed */}
         {stats.attention.length > 0 && (
           <div className="rounded-lg bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-900 mb-3">Attention Needed</h2>
+            <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.attentionNeeded")}</h2>
             <div className="flex flex-col gap-2">
               {stats.attention.map((item, i) => (
                 <button
@@ -212,9 +218,13 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
                       {item.task}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {item.type === "delayed" && `${item.department} — delayed, no response`}
-                      {item.type === "stat_pending" && `${item.department} — stat order pending`}
-                      {item.type === "overdue" && `Overdue by ${item.overdueMin < 60 ? `${item.overdueMin}m` : `${Math.floor(item.overdueMin / 60)}h ${item.overdueMin % 60}m`}`}
+                      {item.type === "delayed" && t("unitView.attnDelayed", { department: departmentLabel(t, item.department) })}
+                      {item.type === "stat_pending" && t("unitView.attnStatPending", { department: departmentLabel(t, item.department) })}
+                      {item.type === "overdue" && t("unitView.attnOverdue", {
+                        value: item.overdueMin < 60
+                          ? t("taskCard.unitMinutes", { count: item.overdueMin })
+                          : `${t("taskCard.unitHours", { count: Math.floor(item.overdueMin / 60) })} ${t("taskCard.unitMinutes", { count: item.overdueMin % 60 })}`,
+                      })}
                     </p>
                   </div>
                 </button>
@@ -225,19 +235,19 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
 
         {/* Department bottlenecks */}
         <div className="rounded-lg bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-3">Department Bottlenecks</h2>
+          <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.departmentBottlenecks")}</h2>
           {stats.departments.length === 0 ? (
-            <p className="text-sm text-gray-400 italic">No active tasks</p>
+            <p className="text-sm text-gray-400 italic">{t("unitView.noActiveTasks")}</p>
           ) : (
             <div className="flex flex-col gap-3">
               {stats.departments.map((dept) => (
                 <div key={dept.name}>
                   <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-medium text-gray-700">{dept.name}</p>
+                    <p className="text-sm font-medium text-gray-700">{departmentLabel(t, dept.name)}</p>
                     <p className="text-xs text-gray-500">
-                      {dept.pending > 0 && `${dept.pending} pending`}
+                      {dept.pending > 0 && t("unitView.pendingCount", { count: dept.pending })}
                       {dept.pending > 0 && dept.delayed > 0 && ", "}
-                      {dept.delayed > 0 && <span className="text-red-600 font-medium">{dept.delayed} delayed</span>}
+                      {dept.delayed > 0 && <span className="text-red-600 font-medium">{t("unitView.delayedCount", { count: dept.delayed })}</span>}
                     </p>
                   </div>
                   <div className="h-3 w-full rounded-full bg-gray-100 overflow-hidden">
@@ -268,15 +278,15 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
               <div className="flex gap-4 mt-1">
                 <div className="flex items-center gap-1">
                   <div className="h-2.5 w-2.5 rounded-full bg-blue-400" />
-                  <span className="text-xs text-gray-500">Pending</span>
+                  <span className="text-xs text-gray-500">{t("enums.status.Pending")}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="h-2.5 w-2.5 rounded-full bg-red-400" />
-                  <span className="text-xs text-gray-500">Delayed</span>
+                  <span className="text-xs text-gray-500">{t("enums.status.Delayed")}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <div className="h-2.5 w-2.5 rounded-full bg-green-400" />
-                  <span className="text-xs text-gray-500">Confirmed</span>
+                  <span className="text-xs text-gray-500">{t("enums.status.Confirmed")}</span>
                 </div>
               </div>
             </div>
@@ -285,23 +295,23 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
 
         {/* Task status breakdown */}
         <div className="rounded-lg bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-3">Task Status</h2>
+          <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.taskStatus")}</h2>
           <div className="grid grid-cols-4 gap-2 text-center">
             <div className="rounded-lg bg-blue-50 p-2">
               <p className="text-lg font-bold text-blue-700">{stats.pending}</p>
-              <p className="text-xs text-blue-600">Pending</p>
+              <p className="text-xs text-blue-600">{t("enums.status.Pending")}</p>
             </div>
             <div className="rounded-lg bg-green-50 p-2">
               <p className="text-lg font-bold text-green-700">{stats.confirmed}</p>
-              <p className="text-xs text-green-600">Confirmed</p>
+              <p className="text-xs text-green-600">{t("enums.status.Confirmed")}</p>
             </div>
             <div className="rounded-lg bg-red-50 p-2">
               <p className="text-lg font-bold text-red-700">{stats.delayed}</p>
-              <p className="text-xs text-red-600">Delayed</p>
+              <p className="text-xs text-red-600">{t("enums.status.Delayed")}</p>
             </div>
             <div className="rounded-lg bg-purple-50 p-2">
               <p className="text-lg font-bold text-purple-700">{stats.completed}</p>
-              <p className="text-xs text-purple-600">Completed</p>
+              <p className="text-xs text-purple-600">{t("enums.status.Completed")}</p>
             </div>
           </div>
         </div>

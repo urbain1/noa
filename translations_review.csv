@@ -1,0 +1,265 @@
+Key,English,French
+common.loading,Loading...,Chargement...
+common.cancel,Cancel,Annuler
+common.close,Close,Fermer
+common.back,Back,Retour
+common.edit,Edit,Modifier
+common.save,Save,Enregistrer
+common.saveChanges,Save Changes,Enregistrer les modifications
+common.saving,Saving...,Enregistrement...
+common.processing,Processing...,Traitement...
+common.generating,Generating...,Génération...
+common.listening,Listening...,Écoute en cours...
+common.optional,(optional),(facultatif)
+common.none,None,Aucune
+common.or,or,ou
+common.syntheticDataOnly,Synthetic data only — no real patient information,Données fictives uniquement — aucune information réelle de patient
+common.builtBy,Built by Noa Health,Développé par Noa Health
+errors.loadPatients,Could not load patients. Please try reloading.,Impossible de charger les patients. Veuillez recharger la page.
+errors.loadFacilities,Could not load facilities. Please try again.,Impossible de charger les établissements. Veuillez réessayer.
+errors.saveTask,Failed to save task. Please try again.,Échec de l'enregistrement de la tâche. Veuillez réessayer.
+errors.completeTask,Failed to mark task complete. Please try again.,Impossible de marquer la tâche comme terminée. Veuillez réessayer.
+errors.updateTask,Failed to update task.,Échec de la mise à jour de la tâche.
+errors.saveNote,Failed to save note. Please try again.,Échec de l'enregistrement de la note. Veuillez réessayer.
+errors.generateHandoff,Failed to generate handoff summary. Please try again.,Échec de la génération du rapport de transmission. Veuillez réessayer.
+errors.generateSbar,Failed to generate SBAR summary. Please try again.,Échec de la génération du rapport SBAR. Veuillez réessayer.
+errors.parseTask,Could not parse task. Please try again.,Impossible d'interpréter la tâche. Veuillez réessayer.
+errors.createTask,Error creating task. Please try again.,Erreur lors de la création de la tâche. Veuillez réessayer.
+errors.recordFirst,Please record something first,Veuillez d'abord enregistrer quelque chose
+errors.createPatient,Failed to create patient.,Échec de la création du patient.
+errors.updatePatient,Failed to update patient.,Échec de la mise à jour du patient.
+errors.applyChanges,Failed to apply changes.,Échec de l'application des modifications.
+errors.labelRequired,Label is required.,L'identifiant est obligatoire.
+errors.fullNameRequired,Full name is required.,Le nom complet est obligatoire.
+errors.passwordsMismatch,Passwords do not match.,Les mots de passe ne correspondent pas.
+errors.passwordTooShort,Password must be at least 6 characters.,Le mot de passe doit contenir au moins 6 caractères.
+errors.languagePreference,Could not save your language preference. Please try again.,Impossible d'enregistrer votre préférence de langue. Veuillez réessayer.
+errors.speechUnsupported,Speech recognition is not supported in this browser.,La reconnaissance vocale n'est pas prise en charge par ce navigateur.
+errors.micDenied,Microphone access denied. Please allow microphone permissions.,Accès au microphone refusé. Veuillez autoriser l'accès au microphone.
+errors.speechError,Speech recognition error: {{error}},Erreur de reconnaissance vocale : {{error}}
+errors.speechStartFailed,Failed to start speech recognition.,Impossible de démarrer la reconnaissance vocale.
+language.label,Language,Langue
+language.en,English,English
+language.fr,Français,Français
+language.menuSubtitle,Interface and AI-generated text,Interface et textes générés par l'IA
+language.signupHint,You can change this later from the menu.,Vous pourrez la modifier plus tard depuis le menu.
+auth.taglineLine1,The AI coordination teammate for nurses.,L’assistant IA de coordination des soins pour le personnel infirmier.
+auth.taglineLine2,Speak orders. Track tasks. Handoff safely.,Dictez les consignes. Suivez les tâches. Sécurisez vos transmissions.
+auth.createAccountHeading,Create your account,Créer votre compte
+auth.signInHeading,Sign in,Se connecter
+auth.fullName,Full name,Nom complet
+auth.fullNamePlaceholder,Jane Doe,Marie Dupont
+auth.email,Email,E-mail
+auth.emailPlaceholder,you@example.com,vous@exemple.com
+auth.password,Password,Mot de passe
+auth.passwordPlaceholder,At least 6 characters,Au moins 6 caractères
+auth.confirmPassword,Confirm password,Confirmer le mot de passe
+auth.confirmPasswordPlaceholder,Re-enter your password,Saisissez à nouveau votre mot de passe
+auth.creatingAccount,Creating account...,Création du compte...
+auth.signingIn,Signing in...,Connexion...
+auth.createAccountButton,Create Account,Créer un compte
+auth.signInButton,Sign In,Se connecter
+auth.haveAccount,Already have an account?,Vous avez déjà un compte ?
+auth.noAccount,Don't have an account?,Vous n'avez pas de compte ?
+auth.switchToSignIn,Sign in,Se connecter
+auth.switchToSignUp,Create one,En créer un
+auth.checkEmailHeading,Check your email,Vérifiez votre boîte mail
+auth.confirmationSentPrefix,We sent a confirmation link to,Nous avons envoyé un lien de confirmation à
+auth.confirmationSentSuffix,"Click it to activate your account, then come back here to sign in.","Cliquez dessus pour activer votre compte, puis revenez ici pour vous connecter."
+auth.backToSignIn,Back to Sign In,Retour à la connexion
+facility.subtitle,Select your facility to get started.,Sélectionnez votre établissement pour commencer.
+facility.searchPlaceholder,Search facilities...,Rechercher un établissement...
+facility.noSearchMatch,No facilities match your search.,Aucun établissement ne correspond à votre recherche.
+facility.noneYet,No facilities yet.,Aucun établissement pour le moment.
+facility.createNew,Create a new facility,Créer un nouvel établissement
+facility.newFacilityHeading,New facility,Nouvel établissement
+facility.nameLabel,Facility name,Nom de l'établissement
+facility.namePlaceholder,e.g. Sunrise Care Home,ex. Résidence Les Tilleuls
+facility.creating,Creating...,Création...
+facility.createAndContinue,Create & Continue,Créer et continuer
+facility.backToList,Back to facility list,Retour à la liste des établissements
+dashboard.myPatients,My Patients,Mes patients
+dashboard.unitView,Unit View,Vue du service
+dashboard.addPatient,Add Patient,Ajouter un patient
+dashboard.voiceInputAria,Voice input,Saisie vocale
+patientCard.dischargePlanningBadge,Discharge Planning,Préparation de la sortie
+patientCard.noDiagnosis,No diagnosis on file,Aucun diagnostic enregistré
+patientCard.admitted,Admitted {{date}},Admis le {{date}}
+patientCard.allergies,Allergies: {{list}},Allergies : {{list}}
+patientCard.sbarSummary,SBAR Summary,Rapport SBAR
+patientCard.editPatientAria,Edit patient,Modifier le patient
+patientCard.tasksLabel,Tasks,Tâches
+patientCard.notesLabel,Clinical Notes,Notes cliniques
+patientCard.newCount,+ {{count}} new,+ {{count}} nouvelle(s)
+patientCard.addTask,+ Add Task,+ Ajouter une tâche
+patientCard.addNote,+ Add Note,+ Ajouter une note
+patientCard.noNotes,No clinical notes yet,Aucune note clinique pour le moment
+taskCard.justNow,just now,à l'instant
+taskCard.minAgo,{{count}} min ago,il y a {{count}} min
+taskCard.overdueBy,Overdue by {{value}},En retard de {{value}}
+taskCard.dueIn,Due in {{value}},Échéance dans {{value}}
+taskCard.unitMinutes,{{count}}m,{{count}} min
+taskCard.unitHours,{{count}}h,{{count}} h
+taskCard.unitDays,{{count}}d,{{count}} j
+taskCard.edit,Edit,Modifier
+taskCard.complete,Complete,Terminer
+noteCard.justNow,just now,à l'instant
+noteCard.minutesAgo,{{count}}m ago,il y a {{count}} min
+noteCard.hoursAgo,{{count}}h ago,il y a {{count}} h
+noteCard.daysAgo,{{count}}d ago,il y a {{count}} j
+topMenu.generateHandoff,Generate handoff report,Générer le compte rendu à transmettre
+topMenu.generateHandoffSubtitle,SBAR summary for shift change,Rapport SBAR pour le changement d'équipe
+topMenu.dischargePatient,Discharge a patient,Préparer la sortie d'un patient
+topMenu.delayedTasks,Delayed tasks,Tâches en retard
+topMenu.delayedTasksHeading,Delayed Tasks ({{count}}),Tâches en retard ({{count}})
+topMenu.noDelayedTasks,No delayed tasks,Aucune tâche en retard
+topMenu.followUp,Follow Up,Relancer
+topMenu.backArrow,← Back,← Retour
+topMenu.room,Room {{room}},Chambre {{room}}
+alerts.taskDelayed,Task Delayed,Tâche en retard
+alerts.position,{{current}} of {{total}} delayed tasks,{{current}} sur {{total}} tâches en retard
+alerts.room,Room {{room}},Chambre {{room}}
+alerts.repage,Repage Dept,Relancer le service
+alerts.escalate,Escalate,Faire remonter
+voiceCapture.title,Voice Capture,Saisie vocale
+voiceCapture.titleForPatient,Add Task — {{patient}},Ajouter une tâche — {{patient}}
+voiceCapture.goBackAria,Go back,Retour
+voiceCapture.startRecordingAria,Start recording,Démarrer l'enregistrement
+voiceCapture.stopRecordingAria,Stop recording,Arrêter l'enregistrement
+voiceCapture.tapToRecord,Tap to record a new task,Appuyez pour enregistrer une nouvelle tâche
+voiceCapture.exampleForPatient,"Try: ""Order a CBC stat due tomorrow""",Exemple : « Demander une NFS en urgence pour demain »
+voiceCapture.exampleGeneral,"Try: ""Order a CBC stat for Patient Test 1 due tomorrow""",Exemple : « Demander une NFS en urgence pour Patient Test 1 pour demain »
+voiceCapture.transcriptLabel,Transcript (tap to edit):,Transcription (cliquez pour modifier) :
+voiceCapture.transcriptPlaceholder,Your speech will appear here. Tap to write or edit before creating a task.,Votre transcription apparaîtra ici. Appuyez pour la modifier avant de créer la tâche.
+voiceCapture.createTask,Create Task,Créer la tâche
+patientMatch.multipleFound,Multiple Patients Found,Plusieurs patients trouvés
+patientMatch.foundCount,Found {{count}} patients matching '{{query}}'.,{{count}} patients correspondent à « {{query}} ».
+patientMatch.narrowLabel,Search to narrow results:,Rechercher pour affiner les résultats :
+patientMatch.narrowPlaceholder,Type patient label or location...,Saisissez l'identifiant du patient ou le lieu...
+patientMatch.shownCount,{{shown}} of {{total}} patients shown,{{shown}} patients affichés sur {{total}}
+patientMatch.noneMatchQuery,"No patients match ""{{query}}""",Aucun patient ne correspond à « {{query}} »
+patientMatch.noneMatchHint,"Try a different search or use ""None of these"" below",Essayez une autre recherche ou sélectionnez « Aucun de ces patients » ci-dessous.
+patientMatch.noneOfThese,None of these,Aucun de ceux-ci
+patientMatch.selectPatient,Select Patient,Sélectionner un patient
+patientMatch.selectPatientSubtitle,Search for a patient to assign this task to.,Recherchez le patient auquel attribuer cette tâche.
+patientMatch.selectPlaceholder,Search by patient label or location...,Rechercher par identifiant de patient ou par lieu...
+patientMatch.selectNoMatch,No patients match your search. New patients must be added from the main screen using the Patient_Test_N label convention.,Aucun patient ne correspond à votre recherche. Les nouveaux patients doivent être ajoutés depuis l'écran principal en respectant la convention d'identifiant Patient_Test_N.
+handoff.shiftReportTitle,Shift Handoff Report,Transmission de relève
+handoff.patientSbarTitle,SBAR — {{patient}},SBAR — {{patient}}
+handoff.subtitle,SBAR summary for shift change,Rapport SBAR pour le changement d'équipe
+handoff.generatedAt,Generated {{date}} at {{time}},Généré le {{date}} à {{time}}
+handoff.patientCount_one,{{count}} patient,{{count}} patient
+handoff.patientCount_other,{{count}} patients,{{count}} patients
+handoff.copy,Copy,Copier
+handoff.copied,Copied!,Copié !
+handoff.sendToNurse,Send to Nurse,Envoyer à un(e) autre infirmier(ère)
+handoff.doneEditing,Done Editing,Terminer la modification
+handoff.sentTo,Handoff sent to {{name}},Transmission envoyée à {{name}}
+handoff.send.title,Send Handoff,Envoyer la transmission
+handoff.send.subtitle,Simulate sending this handoff to the incoming nurse,Simuler l'envoi de cette transmission à l'infirmier entrant
+handoff.send.nurseNameLabel,Incoming nurse name,Nom de l'infirmier entrant
+handoff.send.nurseNamePlaceholder,"e.g., Nurse Williams",ex. Infirmier Martin
+handoff.send.viaLabel,Send via,Envoyer par
+handoff.send.methodSecureMessage,Secure Message,Messagerie sécurisée
+handoff.send.methodText,Text,SMS
+handoff.send.methodEmail,Email,E-mail
+handoff.send.sendButton,Send,Envoyer
+suggestions.title,AI Suggested Follow-ups,Suivis suggérés par l'IA
+suggestions.suggestedAs,Suggested as {{type}},Suggéré comme {{type}}
+suggestions.deadline,Deadline: {{value}},Échéance : {{value}}
+suggestions.addAsTask,Add as Task,Ajouter comme tâche
+suggestions.addAsNote,Add as Note,Ajouter comme note
+suggestions.dismiss,Dismiss,Ignorer
+suggestions.dismissAll,Dismiss All,Tout ignorer
+suggestions.disclaimer,AI-generated suggestions may be inaccurate. Always apply clinical judgment and consult the attending physician for treatment decisions.,Les suggestions générées par l'IA peuvent être inexactes. Exercez toujours votre jugement clinique et consultez le médecin référent pour toute décision thérapeutique.
+suggestions.triggerTask,New task: {{description}},Nouvelle tâche : {{description}}
+suggestions.triggerNote,New note: {{content}},Nouvelle note : {{content}}
+noteDialog.title,Add Clinical Note,Ajouter une note clinique
+noteDialog.closeAria,Close,Fermer
+noteDialog.startRecordingAria,Start recording,Démarrer l'enregistrement
+noteDialog.stopRecordingAria,Stop recording,Arrêter l'enregistrement
+noteDialog.tapToSpeak,"Tap to speak, or type below","Appuyez pour dicter, ou saisissez ci-dessous"
+noteDialog.placeholder,Your speech will appear here. Tap to write or edit before saving.,Votre dictée apparaîtra ici. Appuyez pour écrire ou corriger avant d'enregistrer.
+noteDialog.saveNote,Save Note,Enregistrer la note
+taskEdit.title,Edit Task,Modifier la tâche
+taskEdit.closeAria,Close,Fermer
+taskEdit.manualMode,Manual Edit,Modification manuelle
+taskEdit.aiMode,AI Edit,Modification par IA
+taskEdit.description,Description,Description
+taskEdit.status,Status,Statut
+taskEdit.department,Department,Service
+taskEdit.priority,Priority,Priorité
+taskEdit.deadline,Deadline,Échéance
+taskEdit.deadlineHint,Leave empty for no deadline,Laissez vide pour ne pas fixer d'échéance
+taskEdit.currentTask,Current Task,Tâche actuelle
+taskEdit.room,Room,Chambre
+taskEdit.tapToSpeak,Tap to speak,Appuyez pour dicter
+taskEdit.commandPlaceholder,Type your command...,Saisissez votre commande...
+taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, “move to room 405”, “delete”","Exemples : « passer en urgent », « marquer comme terminée », « déplacer en chambre 405 », « supprimer »"
+taskEdit.yourCommand,Your command:,Votre commande :
+taskEdit.deleteWarning,This will delete the task. Confirm in next step.,Cette action supprimera la tâche. Confirmez à l'étape suivante.
+taskEdit.applyChanges,Apply Changes,Appliquer les modifications
+patientDialog.addTitle,Add Patient,Ajouter un patient
+patientDialog.editTitle,Edit Patient,Modifier le patient
+patientDialog.closeAria,Close,Fermer
+patientDialog.label,Label,Identifiant
+patientDialog.labelPlaceholder,Patient_Test_1,Patient_Test_1
+patientDialog.labelFixedHint,Fixed once set. Retire and create a new patient instead of reusing this label.,Définitif une fois enregistré. Retirez l'identifiant et créez un nouveau patient plutôt que de le réutiliser.
+patientDialog.diagnosis,Diagnosis,Diagnostic
+patientDialog.age,Age,Âge
+patientDialog.agePlaceholder,e.g. 68,ex. 68
+patientDialog.codeStatus,Code Status,Directives de réanimation
+patientDialog.attendingPhysician,Attending Physician,Médecin référent
+patientDialog.allergies,Allergies,Allergies
+patientDialog.allergiesPlaceholder,"Comma-separated, e.g. Penicillin, Sulfa","Séparées par des virgules, ex. Pénicilline, Sulfamides"
+patientDialog.admissionDate,Admission Date,Date d'admission
+patientDialog.locationLabel,Location Label,Emplacement
+patientDialog.locationLabelPlaceholder,Test Room A,Chambre Test A
+patientDialog.addButton,Add Patient,Ajouter le patient
+discharge.title,Discharge Planning – Room {{room}},Préparation de la sortie – Chambre {{room}}
+discharge.notifyPatient,Notify patient about discharge,Informer le patient de sa sortie
+discharge.requestNursingHome,Request nursing home placement,Demander un placement en EHPAD
+discharge.notesLabel,Additional notes (optional),Notes complémentaires (facultatif)
+discharge.notesPlaceholder,Enter any additional discharge notes...,Saisissez toute note complémentaire sur la sortie...
+discharge.createTasks,Create Tasks,Créer les tâches
+discharge.taskNotifyPatient,Notify patient about discharge plan,Informer le patient du plan de sortie
+discharge.taskArrangeNursingHome,Arrange nursing home placement,Organiser un placement en EHPAD
+unitView.patients,Patients,Patients
+unitView.tasks,Tasks,Tâches
+unitView.notes,Notes,Notes
+unitView.overdue,Overdue,En retard
+unitView.safetyFlags,Patient Safety Flags,Alertes de sécurité du patient
+unitView.attentionNeeded,Attention Needed,Points d'attention
+unitView.departmentBottlenecks,Department Bottlenecks,Goulots d'étranglement par service
+unitView.noActiveTasks,No active tasks,Aucune tâche en cours
+unitView.taskStatus,Task Status,Statut des tâches
+unitView.room,Room {{room}},Chambre {{room}}
+unitView.riskBadge,{{label}} ({{score}}),{{label}} ({{score}})
+unitView.riskHigh,High Risk,Risque élevé
+unitView.riskModerate,Moderate,Modéré
+unitView.pendingCount,{{count}} pending,{{count}} en attente
+unitView.delayedCount,{{count}} delayed,{{count}} en retard
+unitView.attnDelayed,"{{department}} — delayed, no response","{{department}} — en retard, aucune réponse"
+unitView.attnStatPending,{{department}} — stat order pending,{{department}} — prescription immédiate en attente
+unitView.attnOverdue,Overdue by {{value}},En retard de {{value}}
+enums.department.Radiology,Radiology,Radiologie
+enums.department.Lab,Lab,Laboratoire
+enums.department.Pharmacy,Pharmacy,Pharmacie
+enums.department.Nursing,Nursing,Soins infirmiers
+enums.department.Physical Therapy,Physical Therapy,Physiothérapie
+enums.department.Social Work,Social Work,Service social
+enums.department.Transport,Transport,Transport des patients
+enums.department.Other,Other,Autre
+enums.priority.Stat,Stat,Immédiat
+enums.priority.Urgent,Urgent,Urgent
+enums.priority.Routine,Routine,Routine
+enums.status.Pending,Pending,En attente
+enums.status.Confirmed,Confirmed,Confirmée
+enums.status.Delayed,Delayed,En retard
+enums.status.Completed,Completed,Terminée
+enums.codeStatus.Full Code,Full Code,Réanimation complète
+enums.codeStatus.DNR,DNR,Ne pas réanimer
+enums.codeStatus.DNR/DNI,DNR/DNI,Ne pas réanimer / ne pas intuber
+enums.codeStatus.Comfort Care,Comfort Care,Soins de confort
+enums.suggestionType.task,task,tâche
+enums.suggestionType.note,note,note

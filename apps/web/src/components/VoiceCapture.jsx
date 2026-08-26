@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { parseVoiceToTask } from "../utils/claudeAPI";
+import { localeTag } from "../i18n";
 import { findMatchingPatients } from "../utils/roomMatcher";
 import RoomDisambiguationDialog from "./RoomDisambiguationDialog";
 import ManualRoomEntry from "./ManualRoomEntry";
@@ -88,6 +90,7 @@ function parseTranscriptFallback(text) {
 }
 
 export default function VoiceCapture({ onClose, onTaskCreated, allPatients, knownPatient }) {
+  const { t, i18n } = useTranslation();
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
@@ -108,7 +111,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
 
   const toggleRecording = useCallback(() => {
     if (!SpeechRecognition) {
-      setError("Speech recognition is not supported in this browser.");
+      setError(t("errors.speechUnsupported"));
       return;
     }
 
@@ -121,7 +124,10 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    // fr-FR when the nurse's current language is French, en-US otherwise.
+    // Read at press time from the one live value, so a language changed mid
+    // session applies to the very next recording.
+    recognition.lang = localeTag(i18n.language);
 
     recognition.onresult = (event) => {
       let text = "";
@@ -133,9 +139,9 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
 
     recognition.onerror = (event) => {
       if (event.error === "not-allowed") {
-        setError("Microphone access denied. Please allow microphone permissions.");
+        setError(t("errors.micDenied"));
       } else if (event.error !== "aborted") {
-        setError(`Speech recognition error: ${event.error}`);
+        setError(t("errors.speechError", { error: event.error }));
       }
       setIsRecording(false);
     };
@@ -151,9 +157,9 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
       recognition.start();
       setIsRecording(true);
     } catch {
-      setError("Failed to start speech recognition.");
+      setError(t("errors.speechStartFailed"));
     }
-  }, [isRecording]);
+  }, [isRecording, i18n.language, t]);
 
   const handleCreateTask = async () => {
     // Stop recording if active
@@ -163,7 +169,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
     setIsRecording(false);
 
     if (!transcript.trim()) {
-      alert("Please record something first");
+      alert(t("errors.recordFirst"));
       return;
     }
 
@@ -186,7 +192,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
       }
 
       if (!parsedTask) {
-        alert("Could not parse task. Please try again.");
+        alert(t("errors.parseTask"));
         setIsProcessing(false);
         return;
       }
@@ -248,7 +254,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
       }
     } catch (error) {
       console.error("Task creation error:", error);
-      alert("Error creating task. Please try again.");
+      alert(t("errors.createTask"));
       setIsProcessing(false);
     }
   };
@@ -286,7 +292,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
         <button
           onClick={onClose}
           className="mr-3 flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors duration-150 hover:bg-gray-100 hover:text-gray-900"
-          aria-label="Go back"
+          aria-label={t("voiceCapture.goBackAria")}
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -298,7 +304,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
           </svg>
         </button>
         <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">
-          {knownPatient ? `Add Task — ${knownPatient.label}` : "Voice Capture"}
+          {knownPatient ? t("voiceCapture.titleForPatient", { patient: knownPatient.label }) : t("voiceCapture.title")}
         </h1>
       </header>
 
@@ -311,7 +317,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
             className={`flex h-28 w-28 items-center justify-center rounded-full border-none bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/20 transition-all duration-200 hover:bg-blue-700 active:scale-95 ${
               isRecording ? "animate-pulse" : ""
             }`}
-            aria-label={isRecording ? "Stop recording" : "Start recording"}
+            aria-label={isRecording ? t("voiceCapture.stopRecordingAria") : t("voiceCapture.startRecordingAria")}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -324,12 +330,12 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
             </svg>
           </button>
           <p className="text-sm font-medium text-gray-500">
-            {isRecording ? "Listening..." : "Tap to record a new task"}
+            {isRecording ? t("common.listening") : t("voiceCapture.tapToRecord")}
           </p>
           <p className="text-sm text-gray-400 italic mt-2">
             {knownPatient
-              ? 'Try: "Order a CBC stat due tomorrow"'
-              : 'Try: "Order a CBC stat for Patient Test 1 due tomorrow"'}
+              ? t("voiceCapture.exampleForPatient")
+              : t("voiceCapture.exampleGeneral")}
           </p>
         </div>
 
@@ -343,12 +349,12 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
         {/* Transcript */}
         <div className="w-full rounded-xl bg-white p-4 shadow-md">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Transcript (tap to edit):
+            {t("voiceCapture.transcriptLabel")}
           </label>
           <textarea
             value={transcript}
             onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Your speech will appear here. Tap to write or edit before creating a task."
+            placeholder={t("voiceCapture.transcriptPlaceholder")}
             className="w-full min-h-[120px] p-4 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
           />
         </div>
@@ -366,7 +372,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
             }}
             className="bg-gray-100 text-gray-600 hover:bg-gray-200 px-4 py-2 rounded-lg"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             onClick={handleCreateTask}
@@ -399,10 +405,10 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                   />
                 </svg>
-                Processing...
+                {t("common.processing")}
               </>
             ) : (
-              "Create Task"
+              t("voiceCapture.createTask")
             )}
           </button>
         </div>

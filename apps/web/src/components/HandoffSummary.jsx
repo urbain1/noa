@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import SendHandoffDialog from "./SendHandoffDialog";
+import { localeTag } from "../i18n";
 
 export default function HandoffSummary({ summaryText, title, onClose, patientCount }) {
+  const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(summaryText);
   const [copied, setCopied] = useState(false);
@@ -10,18 +13,19 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
 
   const generatedTimestamp = useMemo(() => {
     const now = new Date();
-    const formattedDate = now.toLocaleDateString("en-US", {
+    const tag = localeTag(i18n.language);
+    const formattedDate = now.toLocaleDateString(tag, {
       weekday: "short",
       month: "short",
       day: "numeric",
       year: "numeric",
     });
-    const formattedTime = now.toLocaleTimeString("en-US", {
+    const formattedTime = now.toLocaleTimeString(tag, {
       hour: "numeric",
       minute: "2-digit",
     });
-    return `Generated ${formattedDate} at ${formattedTime}`;
-  }, []);
+    return t("handoff.generatedAt", { date: formattedDate, time: formattedTime });
+  }, [t, i18n.language]);
 
   useEffect(() => {
     if (sentConfirmation) {
@@ -49,7 +53,7 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
         </button>
         <div>
           <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">{title}</h1>
-          <p className="text-xs text-gray-400 mt-0.5">SBAR summary for shift change</p>
+          <p className="text-xs text-gray-400 mt-0.5">{t("handoff.subtitle")}</p>
         </div>
         <div className="flex-1" />
       </div>
@@ -58,7 +62,7 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
       <div className="flex items-center justify-between bg-gray-50 px-4 py-2">
         <span className="text-xs text-gray-500">{generatedTimestamp}</span>
         <span className="text-xs text-gray-500">
-          {patientCount} patient{patientCount !== 1 ? "s" : ""}
+          {t("handoff.patientCount", { count: patientCount })}
         </span>
       </div>
 
@@ -83,7 +87,7 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
       {sentConfirmation && (
         <div className="fixed bottom-20 left-0 right-0 z-50 mx-auto max-w-md px-4">
           <div className="rounded-lg bg-green-600 p-3 text-center text-sm font-semibold text-white shadow-lg">
-            Handoff sent to {sentConfirmation}
+            {t("handoff.sentTo", { name: sentConfirmation })}
           </div>
         </div>
       )}
@@ -95,19 +99,19 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
             onClick={handleCopy}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97]"
           >
-            {copied ? "Copied!" : "Copy"}
+            {copied ? t("handoff.copied") : t("handoff.copy")}
           </button>
           <button
             onClick={() => setShowSendDialog(true)}
             className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.97]"
           >
-            Send to Nurse
+            {t("handoff.sendToNurse")}
           </button>
           <button
             onClick={() => setIsEditing(!isEditing)}
             className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
           >
-            {isEditing ? "Done Editing" : "Edit"}
+            {isEditing ? t("handoff.doneEditing") : t("common.edit")}
           </button>
         </div>
       </div>

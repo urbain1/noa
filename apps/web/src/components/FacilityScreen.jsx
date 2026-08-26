@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
+import { SUPPORTED_LANGUAGES, applyLanguage, currentLanguage } from '../i18n'
 
 export default function FacilityScreen({ session, onFacilityComplete }) {
+  const { t } = useTranslation()
   const [facilities, setFacilities] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -10,6 +13,13 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [error, setError] = useState(null)
+
+  // The nurses row is created here, not on the auth screen, so this is where
+  // the sign-up language choice finally becomes durable. App.jsx has already
+  // resolved it -- from `user_metadata` when there is no nurses row yet -- and
+  // applied it to i18n, so reading the live value picks up both the sign-up
+  // choice and any change made with the picker below.
+  const language = currentLanguage()  // for the picker highlight only
 
   useEffect(() => {
     fetchFacilities()
@@ -22,7 +32,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
       .select('id, name, created_at')
       .order('name')
     if (fetchError) {
-      setError('Could not load facilities. Please try again.')
+      setError(t('errors.loadFacilities'))
       console.error('Facility fetch error:', fetchError)
     } else {
       setFacilities(data || [])
@@ -45,6 +55,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         role: 'nurse',
         email: session.user.email,
         name: session.user.user_metadata?.full_name || '',
+        preferred_language: currentLanguage(),
       })
       if (insertError) throw insertError
       onFacilityComplete(facility)
@@ -83,6 +94,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         role: 'nurse',
         email: session.user.email,
         name: session.user.user_metadata?.full_name || '',
+        preferred_language: currentLanguage(),
       })
       if (insertError) throw insertError
 
@@ -103,7 +115,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
         </h1>
 
         <p className="mt-4 text-lg text-gray-600 leading-relaxed">
-          Select your facility to get started.
+          {t('facility.subtitle')}
         </p>
 
         {/* Main card */}
@@ -119,7 +131,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search facilities..."
+                  placeholder={t('facility.searchPlaceholder')}
                   className="block w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                 />
               </div>
@@ -132,7 +144,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                   </div>
                 ) : filtered.length === 0 ? (
                   <p className="py-6 text-center text-sm text-gray-500">
-                    {search ? 'No facilities match your search.' : 'No facilities yet.'}
+                    {search ? t('facility.noSearchMatch') : t('facility.noneYet')}
                   </p>
                 ) : (
                   <ul className="space-y-2">
@@ -171,17 +183,17 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                   <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
-                  Create a new facility
+                  {t('facility.createNew')}
                 </button>
               </div>
             </>
           ) : (
             <>
               {/* Create facility form */}
-              <h2 className="font-display text-lg font-semibold text-gray-900">New facility</h2>
+              <h2 className="font-display text-lg font-semibold text-gray-900">{t('facility.newFacilityHeading')}</h2>
               <form onSubmit={handleCreate} className="mt-4 space-y-4">
                 <div>
-                  <label htmlFor="facilityName" className="block text-sm font-medium text-gray-700">Facility name</label>
+                  <label htmlFor="facilityName" className="block text-sm font-medium text-gray-700">{t('facility.nameLabel')}</label>
                   <input
                     id="facilityName"
                     type="text"
@@ -189,7 +201,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     className="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 shadow-sm placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="e.g. Sunrise Care Home"
+                    placeholder={t('facility.namePlaceholder')}
                     autoFocus
                   />
                 </div>
@@ -205,7 +217,7 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                   disabled={creating}
                   className="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-md ring-4 ring-blue-600/10 transition-all duration-200 hover:bg-blue-700 hover:shadow-lg hover:ring-blue-700/20 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {creating ? 'Creating...' : 'Create & Continue'}
+                  {creating ? t('facility.creating') : t('facility.createAndContinue')}
                 </button>
 
                 <button
@@ -213,19 +225,44 @@ export default function FacilityScreen({ session, onFacilityComplete }) {
                   onClick={() => { setShowCreate(false); setError(null); setNewName('') }}
                   className="w-full rounded-xl px-6 py-2.5 text-sm font-medium text-gray-500 transition-colors hover:text-gray-700"
                 >
-                  Back to facility list
+                  {t('facility.backToList')}
                 </button>
               </form>
             </>
           )}
         </div>
 
+        {/* Language. This is the last step of sign-up and the point the
+            choice is written to the nurses row, so it needs to be changeable
+            here -- email confirmation reloads the page between the sign-up
+            form and this screen, and there is no profile menu yet. */}
+        <div className="mt-5 w-full rounded-xl border border-gray-200 bg-white px-6 py-4 text-left shadow-sm">
+          <span className="block text-sm font-medium text-gray-700">{t('language.label')}</span>
+          <div className="mt-2 flex gap-2">
+            {SUPPORTED_LANGUAGES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => applyLanguage(code)}
+                className={`flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  language === code
+                    ? 'bg-blue-100 text-blue-700 border border-blue-300'
+                    : 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200'
+                }`}
+              >
+                {t(`language.${code}`)}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-gray-400">{t('language.signupHint')}</p>
+        </div>
+
         {/* Footer */}
         <p className="mt-12 text-xs text-gray-400">
-          Synthetic data only &mdash; no real patient information
+          {t('common.syntheticDataOnly')}
         </p>
         <p className="mt-1 text-xs text-gray-400">
-          Built by Noa Health
+          {t('common.builtBy')}
         </p>
       </div>
     </div>

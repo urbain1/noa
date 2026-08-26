@@ -62,3 +62,7 @@ Expected: acceptable at current scale (every tester personally known to the foun
 **SC-14: Numeric label collision in matching**
 Since every synthetic label shares the words "Patient" and "Test", searching for a genuinely nonexistent patient number, or a bare location-label phrase, tends to surface as an ambiguous "pick from everyone" disambiguation rather than a true zero-match.
 Expected: safe failure mode, requires explicit nurse selection, never auto-fires on the wrong patient. Not yet solved, would need to touch the "any shared word matches" fallback rule itself, its own discussion.
+
+**SC-15: Mixed-language facility, task/note readability**
+A facility has both English- and French-speaking nurses. A French nurse creates a task or note; the AI-generated description comes back in French. An English-only nurse reading it later may not understand it, or vice versa.
+Expected: currently unsolved. Content is recorded in whatever language it was created in, not translated for other readers. Accepted for now given the beta's small, personally-known tester groups, worth revisiting if a real mixed-language facility pilot happens.

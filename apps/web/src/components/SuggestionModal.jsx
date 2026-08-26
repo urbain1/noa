@@ -1,6 +1,10 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { localeTag } from "../i18n";
+import { suggestionTypeLabel } from "../i18n/enums";
 
 export default function SuggestionModal({ suggestions, patientName, triggerSummary, onAddAsTask, onAddAsNote, onDismissAll }) {
+  const { t, i18n } = useTranslation();
   const [remainingSuggestions, setRemainingSuggestions] = useState(suggestions);
 
   const handleAddAsTask = (suggestion) => {
@@ -47,7 +51,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
         <div className="shrink-0 px-6 pt-6 pb-3">
           <div className="flex items-center gap-2">
             <span className="text-2xl">💡</span>
-            <h2 className="text-xl font-bold text-gray-900">AI Suggested Follow-ups</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t("suggestions.title")}</h2>
           </div>
           <p className="mt-1 text-sm text-gray-500">
             {patientName} &middot; {triggerSummary}
@@ -72,15 +76,17 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
                       ? "bg-blue-100 text-blue-800"
                       : "bg-green-100 text-green-800"
                   }`}>
-                    Suggested as {suggestion.type}
+                    {t("suggestions.suggestedAs", { type: suggestionTypeLabel(t, suggestion.type) })}
                   </span>
                   {suggestion.taskDetails?.deadline && (
                     <span className="ml-2 text-xs text-gray-500">
-                      Deadline: {new Date(suggestion.taskDetails.deadline).toLocaleString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
+                      {t("suggestions.deadline", {
+                        value: new Date(suggestion.taskDetails.deadline).toLocaleString(localeTag(i18n.language), {
+                          month: "short",
+                          day: "numeric",
+                          hour: "numeric",
+                          minute: "2-digit",
+                        }),
                       })}
                     </span>
                   )}
@@ -92,19 +98,19 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
                     onClick={() => handleAddAsTask(suggestion)}
                     className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97]"
                   >
-                    Add as Task
+                    {t("suggestions.addAsTask")}
                   </button>
                   <button
                     onClick={() => handleAddAsNote(suggestion)}
                     className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.97]"
                   >
-                    Add as Note
+                    {t("suggestions.addAsNote")}
                   </button>
                   <button
                     onClick={() => handleDismissOne(suggestion.id)}
                     className="rounded-lg px-3 py-1.5 text-xs font-semibold text-gray-400 transition-colors hover:text-gray-600 active:scale-[0.97]"
                   >
-                    Dismiss
+                    {t("suggestions.dismiss")}
                   </button>
                 </div>
               </div>
@@ -120,7 +126,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <p className="text-xs text-amber-800">
-              AI-generated suggestions may be inaccurate. Always apply clinical judgment and consult the attending physician for treatment decisions.
+              {t("suggestions.disclaimer")}
             </p>
           </div>
 
@@ -128,7 +134,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
             onClick={onDismissAll}
             className="w-full rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
           >
-            Dismiss All
+            {t("suggestions.dismissAll")}
           </button>
         </div>
       </div>

@@ -1,3 +1,6 @@
+import { useTranslation } from "react-i18next";
+import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
+
 const statusStyles = {
   Pending: "bg-yellow-100 text-yellow-800",
   Confirmed: "bg-green-100 text-green-800",
@@ -5,13 +8,33 @@ const statusStyles = {
   Completed: "bg-blue-100 text-blue-800",
 };
 
-function getTimeElapsed(timestamp) {
+function getTimeElapsed(t, timestamp) {
   const diff = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
-  if (diff < 1) return "just now";
-  return `${diff} min ago`;
+  if (diff < 1) return t("taskCard.justNow");
+  return t("taskCard.minAgo", { count: diff });
 }
 
-function getDeadlineDisplay(deadline) {
+// Builds "3h 20m" / "3 h 20 min" from a minute count, using whichever unit
+// suffixes the active locale defines.
+function formatDuration(t, totalMinutes) {
+  if (totalMinutes < 60) {
+    return t("taskCard.unitMinutes", { count: totalMinutes });
+  }
+  if (totalMinutes < 1440) {
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    return mins > 0
+      ? `${t("taskCard.unitHours", { count: hours })} ${t("taskCard.unitMinutes", { count: mins })}`
+      : t("taskCard.unitHours", { count: hours });
+  }
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  return hours > 0
+    ? `${t("taskCard.unitDays", { count: days })} ${t("taskCard.unitHours", { count: hours })}`
+    : t("taskCard.unitDays", { count: days });
+}
+
+function getDeadlineDisplay(t, deadline) {
   if (!deadline) return null;
 
   const now = Date.now();
@@ -25,38 +48,15 @@ function getDeadlineDisplay(deadline) {
 
   if (diffMin < 0) {
     // Overdue
-    if (absDiffMin < 60) {
-      text = `Overdue by ${absDiffMin}m`;
-    } else if (absDiffMin < 1440) {
-      const hours = Math.floor(absDiffMin / 60);
-      const mins = absDiffMin % 60;
-      text = mins > 0 ? `Overdue by ${hours}h ${mins}m` : `Overdue by ${hours}h`;
-    } else {
-      const days = Math.floor(absDiffMin / 1440);
-      text = `Overdue by ${days}d`;
-    }
+    text = t("taskCard.overdueBy", { value: formatDuration(t, absDiffMin) });
     colorClass = "text-red-600";
   } else if (diffMin <= 120) {
     // Approaching (2 hours or less)
-    if (absDiffMin < 60) {
-      text = `Due in ${absDiffMin}m`;
-    } else {
-      const hours = Math.floor(absDiffMin / 60);
-      const mins = absDiffMin % 60;
-      text = mins > 0 ? `Due in ${hours}h ${mins}m` : `Due in ${hours}h`;
-    }
+    text = t("taskCard.dueIn", { value: formatDuration(t, absDiffMin) });
     colorClass = "text-orange-600";
   } else {
     // Plenty of time (more than 2 hours)
-    if (absDiffMin < 1440) {
-      const hours = Math.floor(absDiffMin / 60);
-      const mins = absDiffMin % 60;
-      text = mins > 0 ? `Due in ${hours}h ${mins}m` : `Due in ${hours}h`;
-    } else {
-      const days = Math.floor(absDiffMin / 1440);
-      const hours = Math.floor((absDiffMin % 1440) / 60);
-      text = hours > 0 ? `Due in ${days}d ${hours}h` : `Due in ${days}d`;
-    }
+    text = t("taskCard.dueIn", { value: formatDuration(t, absDiffMin) });
     colorClass = "text-green-600";
   }
 
@@ -64,8 +64,9 @@ function getDeadlineDisplay(deadline) {
 }
 
 export default function TaskCard({ task, isNew, onComplete, onEdit }) {
+  const { t } = useTranslation();
   const badgeClass = statusStyles[task.status] || "bg-gray-100 text-gray-800";
-  const deadlineInfo = getDeadlineDisplay(task.deadline);
+  const deadlineInfo = getDeadlineDisplay(t, task.deadline);
   const isCompleted = task.status === "Completed";
 
   return (
@@ -73,14 +74,14 @@ export default function TaskCard({ task, isNew, onComplete, onEdit }) {
       <div className="min-w-0 flex-1">
         <p className="font-medium text-gray-900 leading-snug">{task.description}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-          <span>{task.department}</span>
+          <span>{departmentLabel(t, task.department)}</span>
           <span className="text-gray-300">|</span>
-          <span>{getTimeElapsed(task.created_at)}</span>
+          <span>{getTimeElapsed(t, task.created_at)}</span>
           <span className="text-gray-300">|</span>
           <span
             className={`font-semibold ${task.priority === "Stat" ? "text-red-600" : task.priority === "Urgent" ? "text-orange-600" : "text-gray-500"}`}
           >
-            {task.priority}
+            {priorityLabel(t, task.priority)}
           </span>
         </div>
         {deadlineInfo && (
@@ -96,20 +97,20 @@ export default function TaskCard({ task, isNew, onComplete, onEdit }) {
         <span
           className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors duration-300 ${badgeClass}`}
         >
-          {task.status}
+          {statusLabel(t, task.status)}
         </span>
         <button
           onClick={() => onEdit?.(task)}
           className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
         >
-          Edit
+          {t("taskCard.edit")}
         </button>
         {!isCompleted && (
           <button
             onClick={() => onComplete?.(task)}
             className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
           >
-            Complete
+            {t("taskCard.complete")}
           </button>
         )}
       </div>

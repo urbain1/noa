@@ -1,4 +1,21 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { localeTag } from "../i18n";
+import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
+
+// Canonical values, stored and matched as-is. Only the <option> label is
+// translated, never the value.
+const STATUS_OPTIONS = ["Pending", "Confirmed", "Delayed", "Completed"];
+const DEPARTMENT_OPTIONS = [
+  "Radiology",
+  "Lab",
+  "Pharmacy",
+  "Nursing",
+  "Physical Therapy",
+  "Social Work",
+  "Other",
+];
+const PRIORITY_OPTIONS = ["Stat", "Routine"];
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -11,6 +28,7 @@ const statusStyles = {
 };
 
 export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, onManualUpdate }) {
+  const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
@@ -48,7 +66,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
 
   const toggleRecording = useCallback(() => {
     if (!SpeechRecognition) {
-      setError("Speech recognition is not supported in this browser.");
+      setError(t("errors.speechUnsupported"));
       return;
     }
 
@@ -61,7 +79,8 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US";
+    // Read at press time from the one live value, never a cached copy.
+    recognition.lang = localeTag(i18n.language);
 
     recognition.onresult = (event) => {
       let text = "";
@@ -73,9 +92,9 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
 
     recognition.onerror = (event) => {
       if (event.error === "not-allowed") {
-        setError("Microphone access denied. Please allow microphone permissions.");
+        setError(t("errors.micDenied"));
       } else if (event.error !== "aborted") {
-        setError(`Speech recognition error: ${event.error}`);
+        setError(t("errors.speechError", { error: event.error }));
       }
       setIsRecording(false);
     };
@@ -91,9 +110,9 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
       recognition.start();
       setIsRecording(true);
     } catch {
-      setError("Failed to start speech recognition.");
+      setError(t("errors.speechStartFailed"));
     }
-  }, [isRecording]);
+  }, [isRecording, i18n.language, t]);
 
   const handleApply = async () => {
     // Stop recording if active
@@ -107,7 +126,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
     try {
       await onUpdate(finalCommand, task, patientId);
     } catch {
-      setError("Failed to apply changes.");
+      setError(t("errors.applyChanges"));
       setIsProcessing(false);
     }
   };
@@ -127,7 +146,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
     try {
       await onManualUpdate(updates, task, patientId);
     } catch (err) {
-      setError(err.message || "Failed to update task.");
+      setError(err.message || t("errors.updateTask"));
       setIsSavingManual(false);
     }
   };
@@ -143,11 +162,11 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
-          <h2 className="text-2xl font-bold text-gray-900">Edit Task</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t("taskEdit.title")}</h2>
           <button
             onClick={onCancel}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
-            aria-label="Close"
+            aria-label={t("taskEdit.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -168,7 +187,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              Manual Edit
+              {t("taskEdit.manualMode")}
             </button>
             <button
               type="button"
@@ -179,7 +198,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   : "text-gray-500 hover:text-gray-700"
               }`}
             >
-              AI Edit
+              {t("taskEdit.aiMode")}
             </button>
           </div>
 
@@ -187,7 +206,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
             <div className="flex flex-col gap-4">
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.description")}</label>
                 <textarea
                   value={manualFields.description}
                   onChange={(e) => setManualFields((prev) => ({ ...prev, description: e.target.value }))}
@@ -198,60 +217,56 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
 
               {/* Status dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.status")}</label>
                 <select
                   value={manualFields.status}
                   onChange={(e) => setManualFields((prev) => ({ ...prev, status: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="Pending">Pending</option>
-                  <option value="Confirmed">Confirmed</option>
-                  <option value="Delayed">Delayed</option>
-                  <option value="Completed">Completed</option>
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{statusLabel(t, opt)}</option>
+                  ))}
                 </select>
               </div>
 
               {/* Department dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.department")}</label>
                 <select
                   value={manualFields.department}
                   onChange={(e) => setManualFields((prev) => ({ ...prev, department: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="Radiology">Radiology</option>
-                  <option value="Lab">Lab</option>
-                  <option value="Pharmacy">Pharmacy</option>
-                  <option value="Nursing">Nursing</option>
-                  <option value="Physical Therapy">Physical Therapy</option>
-                  <option value="Social Work">Social Work</option>
-                  <option value="Other">Other</option>
+                  {DEPARTMENT_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{departmentLabel(t, opt)}</option>
+                  ))}
                 </select>
               </div>
 
               {/* Priority dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.priority")}</label>
                 <select
                   value={manualFields.priority}
                   onChange={(e) => setManualFields((prev) => ({ ...prev, priority: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
-                  <option value="Stat">Stat</option>
-                  <option value="Routine">Routine</option>
+                  {PRIORITY_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>{priorityLabel(t, opt)}</option>
+                  ))}
                 </select>
               </div>
 
               {/* Deadline */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Deadline</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.deadline")}</label>
                 <input
                   type="datetime-local"
                   value={manualFields.deadline}
                   onChange={(e) => setManualFields((prev) => ({ ...prev, deadline: e.target.value }))}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
-                <p className="mt-1 text-xs text-gray-400">Leave empty for no deadline</p>
+                <p className="mt-1 text-xs text-gray-400">{t("taskEdit.deadlineHint")}</p>
               </div>
 
               {error && (
@@ -265,45 +280,45 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
               {/* Current task details - existing read-only block */}
               <div className="rounded-lg bg-gray-100 p-4">
                 <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                  Current Task
+                  {t("taskEdit.currentTask")}
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Description</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.description")}</span>
                     <span className="text-gray-900">{task?.description}</span>
                   </div>
                   <div className="flex items-center">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Status</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.status")}</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${badgeClass}`}>
-                      {task?.status}
+                      {statusLabel(t, task?.status)}
                     </span>
                   </div>
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Department</span>
-                    <span className="text-gray-900">{task?.department}</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.department")}</span>
+                    <span className="text-gray-900">{departmentLabel(t, task?.department)}</span>
                   </div>
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Priority</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.priority")}</span>
                     <span className={`font-semibold ${task?.priority === "Stat" ? "text-red-600" : task?.priority === "Urgent" ? "text-orange-600" : "text-gray-900"}`}>
-                      {task?.priority}
+                      {priorityLabel(t, task?.priority)}
                     </span>
                   </div>
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Room</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.room")}</span>
                     <span className="text-gray-900">{task?.room || "—"}</span>
                   </div>
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">Deadline</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.deadline")}</span>
                     <span className="text-gray-900">
                       {task?.deadline
-                        ? new Date(task.deadline).toLocaleString("en-US", {
+                        ? new Date(task.deadline).toLocaleString(localeTag(i18n.language), {
                             weekday: "short",
                             month: "short",
                             day: "numeric",
                             hour: "numeric",
                             minute: "2-digit",
                           })
-                        : "None"}
+                        : t("common.none")}
                     </span>
                   </div>
                 </div>
@@ -316,7 +331,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   className={`flex h-24 w-24 items-center justify-center rounded-full border-none bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/20 transition-all duration-200 hover:bg-blue-700 active:scale-95 ${
                     isRecording ? "animate-pulse" : ""
                   }`}
-                  aria-label={isRecording ? "Stop recording" : "Start recording"}
+                  aria-label={isRecording ? t("voiceCapture.stopRecordingAria") : t("voiceCapture.startRecordingAria")}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-10 w-10">
                     <path d="M12 1a4 4 0 0 0-4 4v6a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4Z" />
@@ -324,7 +339,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   </svg>
                 </button>
                 <p className="text-sm font-medium text-gray-500">
-                  {isRecording ? "Listening..." : "Tap to speak"}
+                  {isRecording ? t("common.listening") : t("taskEdit.tapToSpeak")}
                 </p>
                 {voiceTranscript && (
                   <p className="mt-1 max-w-full text-center text-sm text-gray-700">
@@ -337,7 +352,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
               <div className="flex items-center gap-4">
                 <div className="h-px flex-1 bg-gray-200" />
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold uppercase text-gray-400">
-                  or
+                  {t("common.or")}
                 </span>
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
@@ -348,14 +363,14 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                   type="text"
                   value={textCommand}
                   onChange={(e) => setTextCommand(e.target.value)}
-                  placeholder="Type your command..."
+                  placeholder={t("taskEdit.commandPlaceholder")}
                   className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && finalCommand) handleApply();
                   }}
                 />
                 <p className="mt-2 text-xs text-gray-400">
-                  Examples: &ldquo;change to stat&rdquo;, &ldquo;mark completed&rdquo;, &ldquo;move to room 405&rdquo;, &ldquo;delete&rdquo;
+                  {t("taskEdit.commandExamples")}
                 </p>
               </div>
 
@@ -363,7 +378,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
               {finalCommand && (
                 <div className="rounded-lg bg-blue-50 px-4 py-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-blue-400">
-                    Your command:
+                    {t("taskEdit.yourCommand")}
                   </p>
                   <p className="mt-1 text-sm text-blue-800">{finalCommand}</p>
                 </div>
@@ -383,7 +398,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <p className="text-sm font-medium text-red-600">
-                    This will delete the task. Confirm in next step.
+                    {t("taskEdit.deleteWarning")}
                   </p>
                 </div>
               )}
@@ -397,7 +412,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
             onClick={onCancel}
             className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           {editMode === "manual" ? (
             <button
@@ -405,7 +420,7 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
               disabled={!hasManualChanges || isSavingManual}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isSavingManual ? "Saving..." : "Save Changes"}
+              {isSavingManual ? t("common.saving") : t("common.saveChanges")}
             </button>
           ) : (
             <button
@@ -419,10 +434,10 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Processing...
+                  {t("common.processing")}
                 </span>
               ) : (
-                "Apply Changes"
+                t("taskEdit.applyChanges")
               )}
             </button>
           )}

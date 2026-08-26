@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import TaskCard from "./TaskCard";
 import NoteCard from "./NoteCard";
 import { computeRiskScore, getRiskLevel } from "./ChargeNurseDashboard";
+import { localeTag } from "../i18n";
+import { codeStatusLabel } from "../i18n/enums";
 
 function showDischargeBadge(tasks) {
   return tasks.some((task) => {
@@ -10,9 +13,9 @@ function showDischargeBadge(tasks) {
   });
 }
 
-function formatAdmissionDate(dateStr) {
+function formatAdmissionDate(dateStr, locale) {
   if (!dateStr) return null;
-  return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
+  return new Date(dateStr + "T00:00:00").toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -20,6 +23,7 @@ function formatAdmissionDate(dateStr) {
 }
 
 export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onAddNote, onOpenVoiceCapture, onGenerateSbar }) {
+  const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [tasksExpanded, setTasksExpanded] = useState(false);
   const [sbarLoading, setSbarLoading] = useState(false);
@@ -105,7 +109,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
 
   const riskScore = computeRiskScore(patient);
   const riskLevel = getRiskLevel(riskScore);
-  const admissionDisplay = formatAdmissionDate(patient.admission_date);
+  const admissionDisplay = formatAdmissionDate(patient.admission_date, localeTag(i18n.language));
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-5">
@@ -116,19 +120,19 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
               {patient.label}
               {riskLevel && (
                 <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${riskLevel.bg} ${riskLevel.color}`}>
-                  {riskLevel.label}
+                  {t(riskLevel.labelKey)}
                 </span>
               )}
             </h2>
             {showDischargeBadge(tasks) && (
               <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
-                Discharge Planning
+                {t("patientCard.dischargePlanningBadge")}
               </span>
             )}
           </div>
-          <p className="text-sm text-gray-700 mt-0.5">{patient.diagnosis || "No diagnosis on file"}</p>
+          <p className="text-sm text-gray-700 mt-0.5">{patient.diagnosis || t("patientCard.noDiagnosis")}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
-            <span className="font-semibold text-gray-600">{patient.code_status || "Full Code"}</span>
+            <span className="font-semibold text-gray-600">{codeStatusLabel(t, patient.code_status || "Full Code")}</span>
             {patient.location_label && (
               <>
                 <span className="text-gray-300">|</span>
@@ -144,13 +148,13 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             {admissionDisplay && (
               <>
                 <span className="text-gray-300">|</span>
-                <span>Admitted {admissionDisplay}</span>
+                <span>{t("patientCard.admitted", { date: admissionDisplay })}</span>
               </>
             )}
           </div>
           {patient.allergies && patient.allergies.length > 0 && (
             <p className="mt-1 text-xs font-medium text-red-600">
-              Allergies: {patient.allergies.join(", ")}
+              {t("patientCard.allergies", { list: patient.allergies.join(", ") })}
             </p>
           )}
         </div>
@@ -161,7 +165,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             disabled={sbarLoading}
             className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {sbarLoading ? "Generating..." : "SBAR Summary"}
+            {sbarLoading ? t("common.generating") : t("patientCard.sbarSummary")}
           </button>
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600 ring-1 ring-blue-200">
             {tasks.length}
@@ -170,7 +174,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             type="button"
             onClick={() => onEditPatient(patient)}
             className="rounded p-1 text-gray-400 transition-colors duration-150 hover:text-blue-500"
-            aria-label="Edit patient"
+            aria-label={t("patientCard.editPatientAria")}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -197,10 +201,10 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             </svg>
             {newTaskCount > 0 ? (
               <span>
-                Tasks ({tasks.length - newTaskCount} <span className="text-red-500 font-semibold">+ {newTaskCount} new</span>)
+                {t("patientCard.tasksLabel")} ({tasks.length - newTaskCount} <span className="text-red-500 font-semibold">{t("patientCard.newCount", { count: newTaskCount })}</span>)
               </span>
             ) : (
-              <span className="text-gray-600">Tasks ({tasks.length})</span>
+              <span className="text-gray-600">{t("patientCard.tasksLabel")} ({tasks.length})</span>
             )}
           </button>
           <button
@@ -208,7 +212,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             onClick={(e) => { e.stopPropagation(); onOpenVoiceCapture(patient); }}
             className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
           >
-            + Add Task
+            {t("patientCard.addTask")}
           </button>
         </div>
         {tasksExpanded && (
@@ -245,10 +249,10 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             </svg>
             {newNoteCount > 0 ? (
               <span>
-                Clinical Notes ({notes.length - newNoteCount} <span className="text-red-500 font-semibold">+ {newNoteCount} new</span>)
+                {t("patientCard.notesLabel")} ({notes.length - newNoteCount} <span className="text-red-500 font-semibold">{t("patientCard.newCount", { count: newNoteCount })}</span>)
               </span>
             ) : (
-              <span className="text-gray-600">Clinical Notes ({notes.length})</span>
+              <span className="text-gray-600">{t("patientCard.notesLabel")} ({notes.length})</span>
             )}
           </button>
           <button
@@ -256,7 +260,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             onClick={(e) => { e.stopPropagation(); onAddNote(patient.id); }}
             className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
           >
-            + Add Note
+            {t("patientCard.addNote")}
           </button>
         </div>
 
@@ -274,7 +278,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
         )}
 
         {notesExpanded && notes.length === 0 && (
-          <p className="mt-2 text-xs text-gray-400 italic">No clinical notes yet</p>
+          <p className="mt-2 text-xs text-gray-400 italic">{t("patientCard.noNotes")}</p>
         )}
       </div>
     </div>

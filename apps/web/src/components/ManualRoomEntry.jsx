@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function ManualRoomEntry({ onConfirm, onCancel, allPatients }) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState("");
 
   const patients = allPatients || [];
@@ -16,8 +18,8 @@ export default function ManualRoomEntry({ onConfirm, onCancel, allPatients }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="text-2xl font-bold text-gray-900">Select Patient</h2>
-        <p className="mt-1 text-sm text-gray-600">Search for a patient to assign this task to.</p>
+        <h2 className="text-2xl font-bold text-gray-900">{t("patientMatch.selectPatient")}</h2>
+        <p className="mt-1 text-sm text-gray-600">{t("patientMatch.selectPatientSubtitle")}</p>
 
         {/* Search Input */}
         <div className="mt-4">
@@ -26,7 +28,7 @@ export default function ManualRoomEntry({ onConfirm, onCancel, allPatients }) {
             autoFocus
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by patient label or location..."
+            placeholder={t("patientMatch.selectPlaceholder")}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -49,8 +51,7 @@ export default function ManualRoomEntry({ onConfirm, onCancel, allPatients }) {
             ))
           ) : (
             <div className="px-3 py-4 text-center text-sm text-gray-500">
-              No patients match your search. New patients must be added from the main
-              screen using the Patient_Test_N label convention.
+              {t("patientMatch.selectNoMatch")}
             </div>
           )}
         </div>
@@ -62,7 +63,7 @@ export default function ManualRoomEntry({ onConfirm, onCancel, allPatients }) {
             onClick={onCancel}
             className="w-full rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-300"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       </div>

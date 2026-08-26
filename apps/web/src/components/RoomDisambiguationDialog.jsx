@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, onSelect, onManualEntry, onCancel }) {
+  const { t } = useTranslation();
   const [searchFilter, setSearchFilter] = useState('');
 
   const filteredRooms = matchingRooms.filter(patient => {
@@ -17,26 +19,26 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
       <div className="w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
         {/* Header */}
-        <h2 className="text-2xl font-bold text-gray-900">Multiple Patients Found</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{t("patientMatch.multipleFound")}</h2>
         <p className="text-gray-600 mb-2">
-          Found {matchingRooms.length} patients matching &lsquo;{spokenRoom}&rsquo;.
+          {t("patientMatch.foundCount", { count: matchingRooms.length, query: spokenRoom })}
         </p>
 
         {/* Search Input */}
         <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Search to narrow results:
+            {t("patientMatch.narrowLabel")}
           </label>
           <input
             type="text"
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Type patient label or location..."
+            placeholder={t("patientMatch.narrowPlaceholder")}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             autoFocus
           />
           <p className="text-xs text-gray-500 mt-1">
-            {filteredRooms.length} of {matchingRooms.length} patients shown
+            {t("patientMatch.shownCount", { shown: filteredRooms.length, total: matchingRooms.length })}
           </p>
         </div>
 
@@ -67,8 +69,8 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
             ))
           ) : (
             <div className="text-center py-8 text-gray-500">
-              <p>No patients match &ldquo;{searchFilter}&rdquo;</p>
-              <p className="text-sm mt-2">Try a different search or use &ldquo;None of these&rdquo; below</p>
+              <p>{t("patientMatch.noneMatchQuery", { query: searchFilter })}</p>
+              <p className="text-sm mt-2">{t("patientMatch.noneMatchHint")}</p>
             </div>
           )}
         </div>
@@ -79,13 +81,13 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
             onClick={onManualEntry}
             className="flex-1 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-300"
           >
-            None of these
+            {t("patientMatch.noneOfThese")}
           </button>
           <button
             onClick={onCancel}
             className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         </div>
       </div>

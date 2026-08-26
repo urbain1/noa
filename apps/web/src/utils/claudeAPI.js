@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { currentLanguage } from "../i18n";
 
 /**
  * Invoke the claude-proxy Supabase Edge Function. Requires an active
@@ -22,13 +23,22 @@ async function invokeClaude(action, payload) {
  * to the Claude API to produce a professional, structured task object with
  * fields like description, department, room, priority, and status.
  *
+ * Output language is read from `currentLanguage()` at call time, never passed
+ * in: there is one live value and no caller can hand this a stale one. It
+ * controls the free-text `description` only -- the department / priority /
+ * status / deadline fields are structured values the app matches and stores
+ * against, and stay in their canonical English form regardless of it.
+ *
  * @param {string} transcript - Raw text from Web Speech API
  * @returns {Promise<object>} Structured task object:
  *   { id, description, department, room, priority, status, createdAt, isDischarge?, needsPlacement? }
  */
 export async function parseVoiceToTask(transcript) {
   try {
-    return await invokeClaude("parseVoiceToTask", { transcript });
+    return await invokeClaude("parseVoiceToTask", {
+      transcript,
+      language: currentLanguage(),
+    });
   } catch (err) {
     console.error("[claudeAPI] parseVoiceToTask failed:", err);
     return null;
@@ -56,14 +66,15 @@ export async function parseTaskEditCommand(command, currentTask) {
 }
 
 /**
- * Map one patient onto the field names the deployed `claude-proxy` handoff
- * prompt reads.
+ * Map one patient onto the field names the deployed `claude-proxy` prompts
+ * read. Shared by every Claude action that takes a full patient object
+ * (`generateHandoffSummary`, `generateSuggestions`).
  *
- * The Edge Function's handoff handler was ported from the demo, where
- * patients were plain objects with `name`/`room`/`codeStatus`/`comments`.
- * Supabase rows use `label`/`location_label`/`code_status`/`notes` instead,
- * so every field the prompt looks up by its demo name arrives empty unless
- * it is mapped here. Demo-shaped objects still exist at runtime (the
+ * Those Edge Function handlers were ported from the demo, where patients
+ * were plain objects with `name`/`room`/`codeStatus`/`comments`. Supabase
+ * rows use `label`/`location_label`/`code_status`/`notes` instead, so every
+ * field the prompt looks up by its demo name arrives empty unless it is
+ * mapped here. Demo-shaped objects still exist at runtime (the
  * unmatched-voice-task fallback in App.jsx creates local-only patients), so
  * both spellings are accepted.
  *
@@ -71,7 +82,7 @@ export async function parseTaskEditCommand(command, currentTask) {
  * Patient_Test_N identifier and `location_label` the synthetic location
  * label, both already shown on the patient card, per SECURITY.md.
  */
-function toHandoffPatient(patient) {
+function toPromptPatient(patient) {
   const notes = patient.notes || patient.comments || [];
   return {
     name: patient.label || patient.name || null,
@@ -102,13 +113,20 @@ function toHandoffPatient(patient) {
  * report, or a single-element array for one patient's SBAR. The Edge
  * Function emits one SBAR block per patient either way, no separate action.
  *
+ * Output language is read from `currentLanguage()` at call time, never passed
+ * in. It controls the narrative language only: section markers, status flags,
+ * and the patient/location labels carried in the data are untouched by it.
+ * Existing tasks and notes are read in whatever language they were written
+ * in; they are not translated (see decisions.md, scenarios.md SC-15).
+ *
  * @param {Array<object>} patients - Array of patient objects with tasks, diagnosis, etc.
  * @returns {Promise<string|null>} SBAR-formatted handoff summary text, or null on failure
  */
 export async function generateHandoffSummary(patients) {
   try {
     return await invokeClaude("generateHandoffSummary", {
-      patients: patients.map(toHandoffPatient),
+      patients: patients.map(toPromptPatient),
+      language: currentLanguage(),
     });
   } catch (err) {
     console.error("[claudeAPI] generateHandoffSummary failed:", err);
@@ -148,6 +166,26 @@ export async function parseNoteEditCommand(command, currentNote) {
 }
 
 /**
+ * Map a newly-created task or note onto the field names the suggestions
+ * prompt reads. Task rows already match (`description`/`department`/
+ * `priority`/`deadline`). Note rows don't: the persisted column is
+ * `content`, not `text`, and `notes` has no `category` column at all -- the
+ * category chosen in AddNoteDialog is UI-only and never reaches the DB row
+ * `generateSuggestions` is triggered with. Same class of mismatch as
+ * `toPromptPatient`, just on the triggering item instead of the patient.
+ */
+function toPromptItem(newItem) {
+  if (newItem.type !== "note") return newItem;
+  return {
+    type: "note",
+    data: {
+      text: newItem.data.text || newItem.data.content,
+      category: newItem.data.category,
+    },
+  };
+}
+
+/**
  * Generate AI follow-up suggestions based on a new task or note in the context
  * of the patient's full clinical picture.
  *
@@ -155,11 +193,20 @@ export async function parseNoteEditCommand(command, currentNote) {
  * @param {object} newItem - The item that was just created
  * @param {string} newItem.type - "task" or "note"
  * @param {object} newItem.data - The task or note object that was just created
+ *
+ * Output language is read from `currentLanguage()` at call time, never passed
+ * in. It controls the suggestion free text only; type/department/priority/
+ * category/deadline stay canonical English so the app can act on them.
+ *
  * @returns {Promise<Array|null>} Array of 0-3 suggestion objects, or null on failure
  */
 export async function generateSuggestions(patient, newItem) {
   try {
-    return await invokeClaude("generateSuggestions", { patient, newItem });
+    return await invokeClaude("generateSuggestions", {
+      patient: toPromptPatient(patient),
+      newItem: toPromptItem(newItem),
+      language: currentLanguage(),
+    });
   } catch (err) {
     console.error("[claudeAPI] generateSuggestions failed:", err);
     return null;

@@ -1,4 +1,9 @@
+import { useTranslation } from "react-i18next";
+import { departmentLabel } from "../i18n/enums";
+
 export default function Alert({ task, onDismiss, onRepage, onEscalate, currentIndex, totalCount }) {
+  const { t } = useTranslation();
+
   return (
     <div className="animate-slide-down fixed top-14 right-0 left-0 z-20 mx-auto max-w-2xl px-4 pt-2 sm:px-6">
       <div className="bg-white border-l-4 border-red-500 shadow-lg rounded-lg p-4">
@@ -16,10 +21,10 @@ export default function Alert({ task, onDismiss, onRepage, onEscalate, currentIn
               clipRule="evenodd"
             />
           </svg>
-          <h2 className="text-lg font-bold text-gray-900">Task Delayed</h2>
+          <h2 className="text-lg font-bold text-gray-900">{t("alerts.taskDelayed")}</h2>
         </div>
         {totalCount > 1 && (
-          <p className="mb-1 text-sm text-gray-500">{currentIndex + 1} of {totalCount} delayed tasks</p>
+          <p className="mb-1 text-sm text-gray-500">{t("alerts.position", { current: currentIndex + 1, total: totalCount })}</p>
         )}
 
         {/* Details */}
@@ -27,7 +32,7 @@ export default function Alert({ task, onDismiss, onRepage, onEscalate, currentIn
           {task.description}
         </p>
         <p className="mb-4 text-sm text-gray-500">
-          {task.patientName && <>{task.patientName} &middot; </>}{task.department} &middot; Room {task.patientRoom || task.room}
+          {task.patientName && <>{task.patientName} &middot; </>}{departmentLabel(t, task.department)} &middot; {t("alerts.room", { room: task.patientRoom || task.room })}
         </p>
 
         {/* Actions */}
@@ -36,20 +41,20 @@ export default function Alert({ task, onDismiss, onRepage, onEscalate, currentIn
             onClick={() => onRepage(task)}
             className="flex-1 rounded-lg border-2 border-orange-400 bg-white px-3 py-2 text-sm font-semibold text-orange-600 transition-colors hover:bg-orange-50 active:scale-[0.97]"
           >
-            Repage Dept
+            {t("alerts.repage")}
           </button>
           <button
             onClick={() => onEscalate(task)}
             className="flex-1 rounded-lg bg-red-500 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 active:scale-[0.97]"
           >
-            Escalate
+            {t("alerts.escalate")}
           </button>
         </div>
         <button
           onClick={onDismiss}
           className="mt-1 w-full text-center text-xs text-gray-400 hover:text-gray-600 transition-colors"
         >
-          Close
+          {t("common.close")}
         </button>
       </div>
     </div>
