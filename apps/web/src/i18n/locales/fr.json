@@ -50,6 +50,8 @@
     "assignUnavailable": "L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.",
     "createDischargeTasks": "Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.",
     "dischargeTasksUntagged": "Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.",
+    "dischargeAlreadyPlanned": "Ce patient a déjà des tâches de préparation de la sortie. Annulez l'ensemble existant avant d'en créer un nouveau.",
+    "cancelDischargePlanning": "Échec de l'annulation de la préparation de la sortie. Veuillez réessayer.",
     "updateName": "Impossible d'enregistrer votre nom. Veuillez réessayer."
   },
   "language": {
@@ -135,7 +137,13 @@
     "addTask": "+ Ajouter une tâche",
     "addNote": "+ Ajouter une note",
     "noNotes": "Aucune note clinique pour le moment",
-    "dischargePlanning": "Préparation de la sortie"
+    "dischargePlanning": "Préparation de la sortie",
+    "dischargePlanned": "Sortie préparée",
+    "dischargePlannedBadge": "Préparée",
+    "dischargePlannedHint_one": "Sortie préparée le {{date}} · {{count}} tâche",
+    "dischargePlannedHint_other": "Sortie préparée le {{date}} · {{count}} tâches",
+    "dischargePlannedAt": "Préparation de la sortie commencée le {{date}}",
+    "cancelDischargePlanning": "Annuler la préparation de la sortie"
   },
   "taskCard": {
     "justNow": "à l'instant",

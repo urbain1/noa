@@ -320,6 +320,27 @@ export async function assignTask(taskId, nurseId) {
 // discharge planning silently failing. The caller is told via the returned
 // `tagged` flag so it can say so.
 export async function createDischargeTasks(facilityId, patientId, createdBy, taskDrafts) {
+  // Re-check against the live table, not whatever `patients` state the
+  // caller happened to be holding -- that copy can be stale (another tab,
+  // another nurse, or a click that lands after an earlier confirm already
+  // went through). A patient with an active (non-cancelled) discharge set
+  // already is not offered a second one; the nurse cancels the existing set
+  // first if they want to redo it.
+  const { data: existing, error: existingError } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('patient_id', patientId)
+    .eq('task_type', 'discharge')
+    .neq('status', 'Cancelled')
+    .limit(1)
+
+  if (existingError && !isMissingColumnError(existingError, 'task_type')) throw existingError
+  if (existing && existing.length > 0) {
+    const err = new Error('DISCHARGE_ALREADY_PLANNED')
+    err.code = 'DISCHARGE_ALREADY_PLANNED'
+    throw err
+  }
+
   const rows = taskDrafts.map((draft) => ({
     facility_id: facilityId,
     patient_id: patientId,
@@ -347,4 +368,21 @@ export async function createDischargeTasks(facilityId, patientId, createdBy, tas
 
   if (error) throw error
   return { tasks: data, tagged: true }
+}
+
+// Cancels a discharge-planning set: sets each of the given tasks to the
+// existing 'Cancelled' status (no new status value needed) and returns the
+// patient to plannable. Every other view already excludes Cancelled from
+// open/active counts (taskSort, taskOverdue, ChargeNurseDashboard), so this
+// is the only write needed -- nothing else has to special-case it.
+export async function cancelDischargeTasks(taskIds) {
+  if (!taskIds || taskIds.length === 0) return []
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ status: 'Cancelled' })
+    .in('id', taskIds)
+    .select()
+
+  if (error) throw error
+  return data
 }

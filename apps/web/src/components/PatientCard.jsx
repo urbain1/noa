@@ -5,7 +5,8 @@ import NoteCard from "./NoteCard";
 import { computeRiskScore, getRiskLevel } from "./ChargeNurseDashboard";
 import { localeTag } from "../i18n";
 import { sortTasks } from "../utils/taskSort";
-import { codeStatusLabel } from "../i18n/enums";
+import { codeStatusLabel, departmentLabel } from "../i18n/enums";
+import { getActiveDischargeTasks } from "../utils/discharge";
 
 // `task_type` (0011) is the reliable marker: it is set only by the
 // discharge-planning workflow. The department/description heuristic below it
@@ -29,7 +30,7 @@ function formatAdmissionDate(dateStr, locale) {
   });
 }
 
-export default function PatientCard({ patient, isFocused, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient }) {
+export default function PatientCard({ patient, isFocused, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient, onCancelDischargePlanning }) {
   const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
   // Opened from the Tasks screen or Unit View: show the task list straight
@@ -37,6 +38,8 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
   const [tasksExpanded, setTasksExpanded] = useState(Boolean(isFocused));
   const [sbarLoading, setSbarLoading] = useState(false);
   const [patientUpdateLoading, setPatientUpdateLoading] = useState(false);
+  const [dischargeDetailOpen, setDischargeDetailOpen] = useState(false);
+  const [cancellingDischarge, setCancellingDischarge] = useState(false);
 
   const tasks = patient.tasks || [];
   const notes = patient.notes || [];
@@ -133,6 +136,32 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
   const riskLevel = getRiskLevel(riskScore);
   const admissionDisplay = formatAdmissionDate(patient.admission_date, localeTag(i18n.language));
 
+  const activeDischargeTasks = useMemo(() => getActiveDischargeTasks(patient.tasks), [patient.tasks]);
+  const dischargePlanned = activeDischargeTasks.length > 0;
+  const dischargePlannedAt = dischargePlanned
+    ? activeDischargeTasks.reduce(
+        (earliest, task) => (task.created_at < earliest ? task.created_at : earliest),
+        activeDischargeTasks[0].created_at
+      )
+    : null;
+  const dischargePlannedAtDisplay = dischargePlannedAt
+    ? new Date(dischargePlannedAt).toLocaleString(localeTag(i18n.language), {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    : null;
+
+  const handleCancelDischargePlanning = () => {
+    if (!onCancelDischargePlanning || cancellingDischarge) return;
+    setCancellingDischarge(true);
+    Promise.resolve(onCancelDischargePlanning(patient, activeDischargeTasks.map((t) => t.id))).finally(() => {
+      setCancellingDischarge(false);
+      setDischargeDetailOpen(false);
+    });
+  };
+
   return (
     <div
       className={`rounded-xl border bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-5 ${
@@ -209,13 +238,32 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           blue-600 for legibility on a phone in ward lighting; colour is
           never the only signal, each button is also labelled. */}
       <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => onDischargePatient?.(patient)}
-          className="whitespace-nowrap rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 transition-colors hover:bg-green-100"
-        >
-          {t("patientCard.dischargePlanning")}
-        </button>
+        {dischargePlanned ? (
+          // Solid/darker green reads as confirmed rather than actionable,
+          // distinct from the other two buttons' light -50 fills. Click
+          // toggles the detail panel below in place -- no dialog, no screen
+          // change -- and title gives the same summary on hover.
+          <button
+            type="button"
+            onClick={() => setDischargeDetailOpen((open) => !open)}
+            title={
+              dischargePlannedAtDisplay
+                ? t("patientCard.dischargePlannedHint", { date: dischargePlannedAtDisplay, count: activeDischargeTasks.length })
+                : undefined
+            }
+            className="whitespace-nowrap rounded-md bg-green-700 px-2.5 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-green-800"
+          >
+            {t("patientCard.dischargePlanned")}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => onDischargePatient?.(patient)}
+            className="whitespace-nowrap rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 transition-colors hover:bg-green-100"
+          >
+            {t("patientCard.dischargePlanning")}
+          </button>
+        )}
         <button
           type="button"
           onClick={handleGenerateSbar}
@@ -233,6 +281,34 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           {patientUpdateLoading ? t("common.generating") : t("patientCard.familyUpdate")}
         </button>
       </div>
+
+      {/* Discharge planning detail -- inline, same screen, toggled by the
+          "Discharge planned" button above. Shows when planning started and
+          which tasks resulted, plus the way back out if it was a mistake. */}
+      {dischargePlanned && dischargeDetailOpen && (
+        <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-3">
+          <p className="text-xs font-semibold text-green-900">
+            {dischargePlannedAtDisplay
+              ? t("patientCard.dischargePlannedAt", { date: dischargePlannedAtDisplay })
+              : t("patientCard.dischargePlanned")}
+          </p>
+          <ul className="mt-1.5 flex flex-col gap-1">
+            {activeDischargeTasks.map((task) => (
+              <li key={task.id} className="text-xs text-green-800">
+                {task.description} <span className="text-green-600">({departmentLabel(t, task.department)})</span>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={handleCancelDischargePlanning}
+            disabled={cancellingDischarge}
+            className="mt-2.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {cancellingDischarge ? t("common.saving") : t("patientCard.cancelDischargePlanning")}
+          </button>
+        </div>
+      )}
 
       {/* Tasks Section - collapsible */}
       <div className="mt-3">

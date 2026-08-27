@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { SUPPORTED_LANGUAGES, normalizeLanguage } from "../i18n";
 import { departmentLabel } from "../i18n/enums";
 import { formatActionTimestamp } from "../utils/actionTimestamp";
+import { isDischargePlanned } from "../utils/discharge";
 
 // Real Supabase patient rows carry `label`, `location_label` and
 // `diagnosis`. The demo-era `name`/`room` fields these lists used to read
@@ -76,19 +77,33 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                   {patients.length === 0 ? (
                     <p className="px-4 py-6 text-center text-sm text-gray-400">{t("topMenu.noPatients")}</p>
                   ) : (
-                    patients.map((patient) => (
-                      <button
-                        key={patient.id}
-                        onClick={() => {
-                          onDischargePatient(patient);
-                          closeMenu();
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-50 cursor-pointer border-t border-gray-100 first:border-t-0"
-                      >
-                        <p className="text-sm text-gray-700 font-medium">{patient.label}</p>
-                        <p className="text-xs text-gray-400">{patientSubtitle(t, patient)}</p>
-                      </button>
-                    ))
+                    patients.map((patient) => {
+                      const planned = isDischargePlanned(patient);
+                      return (
+                        <button
+                          key={patient.id}
+                          onClick={() => {
+                            // Already planned: onDischargePatient (App.jsx)
+                            // routes this to the patient's card instead of
+                            // reopening the create dialog -- same
+                            // confirmation, not a second set.
+                            onDischargePatient(patient);
+                            closeMenu();
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 cursor-pointer border-t border-gray-100 first:border-t-0"
+                        >
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-700 font-medium">{patient.label}</p>
+                            {planned && (
+                              <span className="rounded-full bg-green-700 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                {t("patientCard.dischargePlannedBadge")}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-400">{patientSubtitle(t, patient)}</p>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </>

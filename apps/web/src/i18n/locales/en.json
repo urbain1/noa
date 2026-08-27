@@ -50,6 +50,8 @@
     "assignUnavailable": "Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.",
     "createDischargeTasks": "Failed to create discharge planning tasks. Please try again.",
     "dischargeTasksUntagged": "Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.",
+    "dischargeAlreadyPlanned": "This patient already has discharge planning tasks. Cancel the existing set before creating a new one.",
+    "cancelDischargePlanning": "Failed to cancel discharge planning. Please try again.",
     "updateName": "Could not save your name. Please try again."
   },
   "language": {
@@ -135,7 +137,13 @@
     "addTask": "+ Add Task",
     "addNote": "+ Add Note",
     "noNotes": "No clinical notes yet",
-    "dischargePlanning": "Discharge Planning"
+    "dischargePlanning": "Discharge Planning",
+    "dischargePlanned": "Discharge Planned",
+    "dischargePlannedBadge": "Planned",
+    "dischargePlannedHint_one": "Discharge planned {{date}} · {{count}} task",
+    "dischargePlannedHint_other": "Discharge planned {{date}} · {{count}} tasks",
+    "dischargePlannedAt": "Discharge planning started {{date}}",
+    "cancelDischargePlanning": "Cancel Discharge Planning"
   },
   "taskCard": {
     "justNow": "just now",

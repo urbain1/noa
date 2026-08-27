@@ -12,6 +12,7 @@ export default function Dashboard({
   onGenerateHandoff,
   delayedTasks,
   onDischargePatient,
+  onCancelDischargePlanning,
   onOpenVoiceCapture,
   onAddPatient,
   onAddPatientByVoice,
@@ -66,7 +67,11 @@ export default function Dashboard({
       {/* Back to wherever this patient was opened from. Only shown when the
           nurse actually arrived from another screen, so the home screen
           doesn't grow a back link to itself. */}
-      {patientFocus && (
+      {/* returnView can be "patients" itself now (three-dot "Discharge a
+          patient" list jumping to an already-planned patient while already
+          here) -- that case just scrolls/highlights below, no back link to
+          a screen the nurse never left. */}
+      {patientFocus && patientFocus.returnView !== "patients" && (
         <div className="flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-4 py-2">
           <button
             type="button"
@@ -135,6 +140,7 @@ export default function Dashboard({
                 onGenerateSbar={onGenerateSbar}
                 onGeneratePatientUpdate={onGeneratePatientUpdate}
                 onDischargePatient={onDischargePatient}
+                onCancelDischargePlanning={onCancelDischargePlanning}
               />
             </div>
           );

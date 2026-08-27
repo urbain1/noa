@@ -18,9 +18,10 @@ import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
 import { supabase } from "./lib/supabase";
 import { fetchFacilityNurses } from "./lib/nurses";
-import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks } from "./lib/patients";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions, generatePatientUpdate } from "./utils/claudeAPI";
 import { needsAttention } from "./utils/taskOverdue";
+import { isDischargePlanned } from "./utils/discharge";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
 
 function App() {
@@ -456,12 +457,20 @@ function App() {
 
     if (drafts.length === 0) return;
 
-    const { tasks: newTasks, tagged } = await createDischargeTasks(
-      nurseProfile.facility_id,
-      patient.id,
-      session.user.id,
-      drafts
-    );
+    let newTasks, tagged;
+    try {
+      ({ tasks: newTasks, tagged } = await createDischargeTasks(
+        nurseProfile.facility_id,
+        patient.id,
+        session.user.id,
+        drafts
+      ));
+    } catch (err) {
+      if (err.code === "DISCHARGE_ALREADY_PLANNED") {
+        throw new Error(t("errors.dischargeAlreadyPlanned"));
+      }
+      throw err;
+    }
 
     setPatients((prev) =>
       prev.map((p) => (p.id === patient.id ? { ...p, tasks: [...newTasks, ...p.tasks] } : p))
@@ -474,6 +483,27 @@ function App() {
     }
 
     setSelectedPatientForDischarge(null);
+  };
+
+  // Cancels an active discharge-planning set: sets its tasks to the existing
+  // 'Cancelled' status and returns the patient to plannable. Every open/active
+  // count elsewhere already excludes Cancelled, so no other view needs to
+  // change to reflect this.
+  const handleCancelDischargePlanning = async (patient, taskIds) => {
+    try {
+      const cancelled = await cancelDischargeTasks(taskIds);
+      const cancelledIds = new Set(cancelled.map((t) => t.id));
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patient.id
+            ? { ...p, tasks: p.tasks.map((t) => (cancelledIds.has(t.id) ? { ...t, status: "Cancelled" } : t)) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Cancel discharge planning error:", err);
+      alert(t("errors.cancelDischargePlanning"));
+    }
   };
 
   const handleGenerateShiftHandoff = async () => {
@@ -929,7 +959,20 @@ function App() {
     onSwitchView: handleSwitchView,
     delayedTasks,
     onGenerateHandoff: handleGenerateShiftHandoff,
-    onDischargePatient: (patient) => setSelectedPatientForDischarge(patient),
+    // A patient that already has an active discharge set doesn't get a
+    // second create dialog -- clicking it (from the three-dot "Discharge a
+    // patient" list; PatientCard's own button already renders a distinct
+    // "planned" state for this case and calls onCancelDischargePlanning
+    // instead) jumps to their card, where the planned state and its cancel
+    // action live, same confirmation either way.
+    onDischargePatient: (patient) => {
+      if (isDischargePlanned(patient)) {
+        handleOpenPatient(patient.id, view);
+      } else {
+        setSelectedPatientForDischarge(patient);
+      }
+    },
+    onCancelDischargePlanning: handleCancelDischargePlanning,
     onRepageTask: handleRepageTask,
     onEscalateTask: handleEscalateTask,
     onLanguageChange: handleLanguageChange,
