@@ -125,14 +125,19 @@ export default function ChargeNurseDashboard({ patients, nurses = [], view, onSw
     // Tasks completed before 0011 have no `completed_by`. They are reported
     // as an explicit "unknown" figure rather than being attributed to
     // whoever created them, which was never recorded and would be a guess.
+    //
+    // `assigned` and `unassignedCount` read as current workload, so both
+    // count open tasks only. Created and completed stay historical: they
+    // describe something that happened, not work outstanding.
+    const isOpen = (t) => t.status !== "Completed" && t.status !== "Cancelled";
     const personnel = nurses.map((nurse) => ({
       id: nurse.id,
       name: nurse.name || nurse.email,
       created: allTasks.filter((t) => t.created_by === nurse.id).length,
-      assigned: allTasks.filter((t) => t.assigned_to === nurse.id).length,
+      assigned: allTasks.filter((t) => t.assigned_to === nurse.id && isOpen(t)).length,
       completed: allTasks.filter((t) => t.completed_by === nurse.id).length,
     }));
-    const unassignedCount = allTasks.filter((t) => !t.assigned_to).length;
+    const unassignedCount = allTasks.filter((t) => !t.assigned_to && isOpen(t)).length;
     const completedUnknownCount = allTasks.filter(
       (t) => t.status === "Completed" && !t.completed_by
     ).length;

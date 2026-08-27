@@ -666,7 +666,9 @@ function App() {
   };
 
   const handleManualUpdateTask = async (updates, task) => {
-    const updated = await updateTask(task.id, updates);
+    // The nurse id goes with the edit so that setting status to Completed
+    // here records the same completer as the Complete button (FL1).
+    const updated = await updateTask(task.id, updates, session.user.id);
     setPatients((prev) =>
       prev.map((p) =>
         p.id === task.patient_id

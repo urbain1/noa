@@ -138,13 +138,28 @@ export async function completeTask(taskId, completedBy = null) {
 // Only fields present in `fields` are sent, so partial edits (e.g. status
 // only) don't clobber unrelated columns. priority is clamped to the DB check
 // constraint ('Routine' | 'Stat'), same reasoning as createTask above.
-export async function updateTask(taskId, fields) {
+//
+// `completedBy` mirrors completeTask above: setting status to Completed here
+// is the same event as pressing the Complete button, so it records the same
+// attribution. Moving a task off Completed clears both completion fields --
+// a reopened task carrying a completer would assert a completion that was
+// undone, and Unit View reads those fields as current state.
+export async function updateTask(taskId, fields, completedBy = null) {
   const updates = {}
   if (fields.description !== undefined) updates.description = fields.description
   if (fields.department !== undefined) updates.department = fields.department
   if (fields.priority !== undefined) updates.priority = fields.priority === 'Stat' ? 'Stat' : 'Routine'
   if (fields.deadline !== undefined) updates.deadline = fields.deadline || null
-  if (fields.status !== undefined) updates.status = fields.status
+  if (fields.status !== undefined) {
+    updates.status = fields.status
+    if (fields.status === 'Completed') {
+      updates.completed_at = new Date().toISOString()
+      updates.completed_by = completedBy
+    } else {
+      updates.completed_at = null
+      updates.completed_by = null
+    }
+  }
   // null is a real value here -- it clears the assignee back to unassigned,
   // which stays a valid state for any task (0011).
   if (fields.assignedTo !== undefined) updates.assigned_to = fields.assignedTo
@@ -155,6 +170,21 @@ export async function updateTask(taskId, fields) {
     .eq('id', taskId)
     .select()
     .single()
+
+  if (error && isMissingColumnError(error, 'completed_by')) {
+    // 0011 not applied yet: apply the edit anyway, without attribution.
+    console.warn('[patients] completed_by column missing -- migration 0011 not applied. Updating without attribution.')
+    const withoutCompletedBy = { ...updates }
+    delete withoutCompletedBy.completed_by
+    const retry = await supabase
+      .from('tasks')
+      .update(withoutCompletedBy)
+      .eq('id', taskId)
+      .select()
+      .single()
+    if (retry.error) throw retry.error
+    return retry.data
+  }
 
   if (error) throw error
   return data
