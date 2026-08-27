@@ -3,11 +3,23 @@ import { useTranslation } from "react-i18next";
 import { parseVoiceToTask, parsePatientFromVoice } from "../utils/claudeAPI";
 import { localeTag } from "../i18n";
 import { findMatchingPatients } from "../utils/roomMatcher";
+import { parsePatientTranscriptFallback } from "../utils/patientVoiceParse";
 import RoomDisambiguationDialog from "./RoomDisambiguationDialog";
 import ManualRoomEntry from "./ManualRoomEntry";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
+
+// Concatenate two stretches of speech with exactly one space between them.
+function joinSpeech(a, b) {
+  const left = a.replace(/\s+$/, "");
+  const right = b.replace(/^\s+/, "");
+  if (!left) return right;
+  if (!right) return left;
+  return `${left} ${right}`;
+}
 
 function parseTranscriptFallback(text) {
   const lower = text.toLowerCase();
@@ -89,109 +101,6 @@ function parseTranscriptFallback(text) {
   };
 }
 
-// Fallback for `parsePatientFromVoice`, used when the Edge Function call
-// fails (including when the deployed function predates that action).
-// CLAUDE.md requires a fallback parser for every prompt.
-//
-// Deliberately conservative: it only picks up things stated in a form it can
-// recognise with certainty, and leaves everything else null for the nurse to
-// fill in on the review form. Guessing a diagnosis or an age onto a clinical
-// record is worse than leaving the field empty.
-// Web Speech API commonly transcribes small spoken numbers as words ("four")
-// while multi-digit numbers usually come through as numerals ("12", "35").
-// The label rule (SECURITY.md) is understood to cover both -- the server
-// prompt spells out "patient test three" -> "Patient_Test_3" -- but the
-// digit-only regex below missed the word form entirely, silently failing
-// label extraction for any single-digit Patient_Test_N spoken naturally.
-const NUMBER_WORDS = {
-  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
-  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
-  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
-  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60,
-  seventy: 70, eighty: 80, ninety: 90,
-};
-
-function wordsToNumber(phrase) {
-  const parts = phrase.toLowerCase().split(/[\s-]+/).filter(Boolean);
-  if (parts.length === 0 || parts.length > 2 || !parts.every((p) => p in NUMBER_WORDS)) return null;
-  if (parts.length === 1) return NUMBER_WORDS[parts[0]];
-  const [tens, ones] = parts.map((p) => NUMBER_WORDS[p]);
-  return tens >= 20 && tens % 10 === 0 && ones < 10 ? tens + ones : null;
-}
-
-function parsePatientTranscriptFallback(text) {
-  const lower = text.toLowerCase();
-
-  // Patient_Test_N only. Never a name, a real room/bed number, or an ID --
-  // see SECURITY.md. Anything else leaves the label blank.
-  let label = null;
-  const labelDigitMatch = lower.match(/\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*(\d{1,4})\b/);
-  if (labelDigitMatch) {
-    label = `Patient_Test_${labelDigitMatch[1]}`;
-  } else {
-    const labelWordMatch = lower.match(
-      /\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*((?:[a-z]+[\s-])?[a-z]+)\b/
-    );
-    if (labelWordMatch) {
-      const n = wordsToNumber(labelWordMatch[1]);
-      if (n !== null) label = `Patient_Test_${n}`;
-    }
-  }
-
-  // "68 year old" / "68 ans" / "aged 68"
-  let age = null;
-  const ageMatch =
-    lower.match(/\b(\d{1,3})[\s-]*(?:years?[\s-]*old|y\/?o\b|ans\b)/) ||
-    lower.match(/\b(?:aged|âgé[e]?\s+de)\s+(\d{1,3})\b/);
-  if (ageMatch) {
-    const value = parseInt(ageMatch[1], 10);
-    if (value >= 0 && value <= 130) age = value;
-  }
-
-  // Only an explicit statement sets code status.
-  let codeStatus = null;
-  if (/\bdnr\s*\/?\s*dni\b|\bne pas réanimer\s*\/?\s*ne pas intuber\b/.test(lower)) codeStatus = "DNR/DNI";
-  else if (/\bdnr\b|\bdo not resuscitate\b|\bne pas réanimer\b/.test(lower)) codeStatus = "DNR";
-  else if (/\bcomfort care\b|\bsoins de confort\b/.test(lower)) codeStatus = "Comfort Care";
-  else if (/\bfull code\b|\bréanimation complète\b/.test(lower)) codeStatus = "Full Code";
-
-  // Diagnosis only from an explicit lead-in, never inferred from symptoms
-  // or medications.
-  let diagnosis = null;
-  const diagnosisMatch = text.match(
-    /\b(?:admitted (?:with|for)|diagnosis(?: of| is)?|diagnosed with|presenting with|admis(?:e)? pour|diagnostic(?: de)?)\s+([^.,;]{3,80})/i
-  );
-  if (diagnosisMatch) diagnosis = diagnosisMatch[1].trim();
-
-  // Attending physician, either "attending (physician) is/: Dr X" or
-  // "Dr X is the attending (physician)".
-  let attendingPhysician = null;
-  const physicianLeadInMatch = text.match(
-    /\b(?:attending physician|attending doctor|attending|médecin traitant)\s*(?:is|:)?\s+(Dr\.?\s*[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?|[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?)/
-  );
-  const physicianTrailingMatch = text.match(
-    /\b(Dr\.?\s*[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?)\s+is\s+(?:the\s+)?attending/i
-  );
-  if (physicianLeadInMatch) attendingPhysician = physicianLeadInMatch[1].trim();
-  else if (physicianTrailingMatch) attendingPhysician = physicianTrailingMatch[1].trim();
-
-  // Synthetic location labels only ("Test Room A", "Bay 2").
-  let locationLabel = null;
-  const locationMatch = text.match(/\b(?:test room|bay|chambre test)\s+([A-Za-z0-9]{1,4})\b/i);
-  if (locationMatch) locationLabel = `${locationMatch[0].trim()}`;
-
-  return {
-    label,
-    age,
-    diagnosis,
-    codeStatus,
-    attendingPhysician,
-    allergies: [],
-    admissionDate: null,
-    locationLabel,
-  };
-}
-
 // `mode` selects what this capture produces: a task (default) or a draft
 // patient. Recording, transcription, editing the transcript and the Claude
 // round-trip are identical either way -- only the parse target and what
@@ -201,34 +110,65 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [roomMatches, setRoomMatches] = useState(null);
   const [showRoomDisambiguation, setShowRoomDisambiguation] = useState(false);
   const [showManualRoomEntry, setShowManualRoomEntry] = useState(false);
   const [parsedTaskDraft, setParsedTaskDraft] = useState(null);
+  // One operation per mode, named for what the nurse asked for, so the
+  // button says "Creating task..." / "Reading patient details..." rather
+  // than a generic spinner. Nothing else on this screen may change the
+  // transcript while it runs, so the mic and the textarea are disabled for
+  // its duration -- that is the whole block, no overlay needed.
+  const ops = useOperationStatus();
+  const operationName = mode === "patient" ? "extractPatient" : "createTask";
+  const isProcessing = ops.isRunning(operationName);
   const recognitionRef = useRef(null);
+  // Speech already committed to the transcript, across every recognition
+  // session and any hand edit. See `startRecognition` for why there is more
+  // than one session per recording.
+  const committedRef = useRef("");
+  // Final text the *current* session has produced, and how much of it is
+  // already folded into `committedRef` (which a hand edit does). Final
+  // results only ever grow by appending, so a length is enough to tell the
+  // two apart.
+  const sessionFinalRef = useRef("");
+  const absorbedRef = useRef(0);
+  // Whether the nurse still intends to be recording. The browser ending a
+  // session is not the nurse stopping one.
+  const keepRecordingRef = useRef(false);
+  const restartsRef = useRef({ count: 0, at: 0 });
+  // A session restarts itself from its own `onend`, so it needs a stable
+  // handle on the current starter rather than the one captured when it began.
+  const startRecognitionRef = useRef(null);
   const isPatientMode = mode === "patient";
 
   useEffect(() => {
     return () => {
+      keepRecordingRef.current = false;
       if (recognitionRef.current) {
         recognitionRef.current.abort();
       }
     };
   }, []);
 
-  const toggleRecording = useCallback(() => {
-    if (!SpeechRecognition) {
-      setError(t("errors.speechUnsupported"));
-      return;
-    }
+  // The nurse is done speaking on purpose: stop, and don't auto-resume.
+  const stopRecording = useCallback(() => {
+    keepRecordingRef.current = false;
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+  }, []);
 
-    if (isRecording) {
-      recognitionRef.current?.stop();
-      setIsRecording(false);
-      return;
-    }
-
+  // One recording, however many recognition sessions it takes.
+  //
+  // Chrome ends a Web Speech session on its own after a short silence, even
+  // with `continuous = true`. The nurse hears nothing and sees no change --
+  // they carry on dictating into a microphone that stopped listening, and
+  // everything after the pause is lost. That is what made a spoken diagnosis
+  // and attending physician "not appear": they were never transcribed. So a
+  // session ending while the nurse still intends to record starts a new one,
+  // and text already captured carries across rather than being rebuilt from
+  // the new (empty) result list, which used to wipe it.
+  const startRecognition = useCallback(() => {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -237,16 +177,32 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
     // session applies to the very next recording.
     recognition.lang = localeTag(i18n.language);
 
+    sessionFinalRef.current = "";
+    absorbedRef.current = 0;
+
     recognition.onresult = (event) => {
-      let text = "";
+      restartsRef.current.count = 0;
+      let final = "";
+      let interim = "";
       for (let i = 0; i < event.results.length; i++) {
-        text += event.results[i][0].transcript;
+        const result = event.results[i];
+        // Chrome does not put a separator between results, so two of them
+        // can fuse into one word ("test 12diagnosis") and take the field
+        // either side of the join with them.
+        if (result.isFinal) final = joinSpeech(final, result[0].transcript);
+        else interim = joinSpeech(interim, result[0].transcript);
       }
-      setTranscript(text);
+      sessionFinalRef.current = final;
+      const pending = final.slice(absorbedRef.current);
+      setTranscript(joinSpeech(committedRef.current, joinSpeech(pending, interim)));
     };
 
     recognition.onerror = (event) => {
-      if (event.error === "not-allowed") {
+      // Exactly the silence case above: let `onend` resume.
+      if (event.error === "no-speech") return;
+
+      keepRecordingRef.current = false;
+      if (event.error === "not-allowed" || event.error === "service-not-allowed") {
         setError(t("errors.micDenied"));
       } else if (event.error !== "aborted") {
         setError(t("errors.speechError", { error: event.error }));
@@ -255,168 +211,226 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
     };
 
     recognition.onend = () => {
-      setIsRecording(false);
+      committedRef.current = joinSpeech(
+        committedRef.current,
+        sessionFinalRef.current.slice(absorbedRef.current),
+      );
+      sessionFinalRef.current = "";
+      absorbedRef.current = 0;
+      setTranscript(committedRef.current);
+
+      if (!keepRecordingRef.current) {
+        setIsRecording(false);
+        return;
+      }
+
+      // A session that ends immediately and repeatedly isn't a pause, it's
+      // a microphone that can't run. Give up rather than spin.
+      const now = Date.now();
+      restartsRef.current.count = now - restartsRef.current.at < 1000 ? restartsRef.current.count + 1 : 1;
+      restartsRef.current.at = now;
+      if (restartsRef.current.count > 5) {
+        keepRecordingRef.current = false;
+        setIsRecording(false);
+        return;
+      }
+
+      startRecognitionRef.current?.();
     };
 
     recognitionRef.current = recognition;
-    setError(null);
 
     try {
       recognition.start();
       setIsRecording(true);
     } catch {
+      keepRecordingRef.current = false;
+      setIsRecording(false);
       setError(t("errors.speechStartFailed"));
     }
-  }, [isRecording, i18n.language, t]);
+  }, [i18n.language, t]);
+
+  useEffect(() => {
+    startRecognitionRef.current = startRecognition;
+  }, [startRecognition]);
+
+  const toggleRecording = useCallback(() => {
+    if (!SpeechRecognition) {
+      setError(t("errors.speechUnsupported"));
+      return;
+    }
+
+    if (isRecording) {
+      stopRecording();
+      return;
+    }
+
+    setError(null);
+    restartsRef.current = { count: 0, at: 0 };
+    keepRecordingRef.current = true;
+    startRecognition();
+  }, [isRecording, startRecognition, stopRecording, t]);
 
   // Patient mode: parse the transcript into draft fields and hand them to
   // the review step. Nothing is written here -- the Add Patient form opens
   // pre-filled, and the nurse's confirmation there is what creates the
   // patient. Fields the parser couldn't extract stay blank.
   const handleCapturePatient = async () => {
-    recognitionRef.current?.stop();
-    setIsRecording(false);
+    stopRecording();
 
-    if (!transcript.trim()) {
+    const spoken = transcript.trim();
+    if (!spoken) {
       alert(t("errors.recordFirst"));
       return;
     }
 
-    setIsProcessing(true);
-    setError(null);
-
-    let fields = await parsePatientFromVoice(transcript.trim());
-    if (!fields) {
-      console.warn("[VoiceCapture] parsePatientFromVoice unavailable, falling back");
-      fields = parsePatientTranscriptFallback(transcript.trim());
-    }
-
-    setIsProcessing(false);
-    onPatientParsed(fields);
-  };
-
-  const handleCreateTask = async () => {
-    // Stop recording if active
-    if (recognitionRef.current) {
-      recognitionRef.current.stop();
-    }
-    setIsRecording(false);
-
-    if (!transcript.trim()) {
-      alert(t("errors.recordFirst"));
-      return;
-    }
-
-    setIsProcessing(true);
     setError(null);
 
     try {
-      let parsedTask;
-      try {
-        parsedTask = await parseVoiceToTask(transcript.trim());
-        if (parsedTask) {
-          console.log("[VoiceCapture] Claude API succeeded:", parsedTask);
-        } else {
-          console.warn("[VoiceCapture] Claude API returned null, falling back");
-          parsedTask = parseTranscriptFallback(transcript.trim());
-        }
-      } catch (err) {
-        console.error("[VoiceCapture] Claude API failed, falling back:", err);
-        parsedTask = parseTranscriptFallback(transcript.trim());
-      }
+      await ops.run(
+        "extractPatient",
+        { messageKey: "status.extractingPatient", errorKey: "status.extractFailed", surface: "button" },
+        async () => {
+          let fields = await parsePatientFromVoice(spoken);
+          if (!fields) {
+            console.warn("[VoiceCapture] parsePatientFromVoice unavailable, falling back");
+            fields = parsePatientTranscriptFallback(spoken);
+          }
+          console.log("[VoiceCapture] patient fields extracted:", { transcript: spoken, fields });
+          onPatientParsed(fields);
+        },
+      );
+    } catch (err) {
+      // Neither path is expected to throw (both catch internally), but a
+      // throw here used to leave the button spinning and disabled forever.
+      // The review step still opens, on whatever the offline parser can
+      // read, rather than stranding the nurse on this screen.
+      console.error("[VoiceCapture] patient extraction failed:", err);
+      onPatientParsed(parsePatientTranscriptFallback(spoken));
+    }
+  };
 
-      if (!parsedTask) {
-        alert(t("errors.parseTask"));
-        setIsProcessing(false);
-        return;
-      }
+  const handleCreateTask = async () => {
+    stopRecording();
 
-      // Carried through to onTaskCreated so the caller can persist the
-      // original transcript alongside the parsed fields.
-      parsedTask.rawTranscript = transcript.trim();
+    const spoken = transcript.trim();
+    if (!spoken) {
+      alert(t("errors.recordFirst"));
+      return;
+    }
 
-      // Opened from a specific patient's card ("+ Add Task") -- the patient
-      // is already known, so skip matching entirely rather than re-resolving
-      // it against every patient in the facility.
-      if (knownPatient) {
-        onTaskCreated({
-          ...parsedTask,
-          room: knownPatient.location_label,
-          patientName: knownPatient.label,
-        });
-        onClose();
-        return;
-      }
+    setError(null);
 
-      // Step 2: Handle patient matching (by location label OR patient label)
-      const searchInput = parsedTask.patientName || (parsedTask.room && parsedTask.room !== "000" ? parsedTask.room : null);
+    // The whole operation, not just the parse: the task doesn't exist until
+    // `onTaskCreated` has written it, so the button keeps saying "Creating
+    // task..." until it has. Previously the screen closed the moment the
+    // parse returned and the write happened with nothing on screen at all.
+    try {
+      await ops.run(
+        "createTask",
+        { messageKey: "status.creatingTask", errorKey: "errors.createTask", surface: "button" },
+        async () => {
+          let parsedTask;
+          try {
+            parsedTask = await parseVoiceToTask(spoken);
+            if (parsedTask) {
+              console.log("[VoiceCapture] Claude API succeeded:", parsedTask);
+            } else {
+              console.warn("[VoiceCapture] Claude API returned null, falling back");
+              parsedTask = parseTranscriptFallback(spoken);
+            }
+          } catch (err) {
+            console.error("[VoiceCapture] Claude API failed, falling back:", err);
+            parsedTask = parseTranscriptFallback(spoken);
+          }
 
-      if (searchInput) {
-        const matches = findMatchingPatients(searchInput, allPatients);
+          if (!parsedTask) {
+            alert(t("errors.parseTask"));
+            return;
+          }
 
-        if (matches.matchType === "exact") {
-          onTaskCreated({
-            ...parsedTask,
-            room: matches.exactMatch.location_label,
-            patientName: matches.exactMatch.label,
-          });
-          onClose();
-        } else if (matches.matchType === "partial") {
-          if (matches.partialMatches.length === 1) {
-            onTaskCreated({
+          // Carried through to onTaskCreated so the caller can persist the
+          // original transcript alongside the parsed fields.
+          parsedTask.rawTranscript = spoken;
+
+          // Opened from a specific patient's card ("+ Add Task") -- the patient
+          // is already known, so skip matching entirely rather than re-resolving
+          // it against every patient in the facility.
+          if (knownPatient) {
+            await onTaskCreated({
+              ...parsedTask,
+              room: knownPatient.location_label,
+              patientName: knownPatient.label,
+            });
+            onClose();
+            return;
+          }
+
+          // Step 2: Handle patient matching (by location label OR patient label)
+          const searchInput = parsedTask.patientName || (parsedTask.room && parsedTask.room !== "000" ? parsedTask.room : null);
+          const matches = searchInput ? findMatchingPatients(searchInput, allPatients) : null;
+
+          if (matches && matches.matchType === "exact") {
+            await onTaskCreated({
+              ...parsedTask,
+              room: matches.exactMatch.location_label,
+              patientName: matches.exactMatch.label,
+            });
+            onClose();
+          } else if (matches && matches.matchType === "partial" && matches.partialMatches.length === 1) {
+            await onTaskCreated({
               ...parsedTask,
               room: matches.partialMatches[0].location_label,
               patientName: matches.partialMatches[0].label,
             });
             onClose();
-          } else {
+          } else if (matches && matches.matchType === "partial") {
+            // Handing off to a dialog: the operation is over, the nurse's
+            // choice is what continues it.
             setParsedTaskDraft(parsedTask);
             setRoomMatches(matches);
             setShowRoomDisambiguation(true);
-            setIsProcessing(false);
+          } else {
+            // No patient identifier, or no match found -- manual entry.
+            setParsedTaskDraft(parsedTask);
+            setShowManualRoomEntry(true);
           }
-        } else {
-          setParsedTaskDraft(parsedTask);
-          setShowManualRoomEntry(true);
-          setIsProcessing(false);
-        }
-      } else {
-        // No patient identifier (room or name) - show manual entry
-        setParsedTaskDraft(parsedTask);
-        setShowManualRoomEntry(true);
-        setIsProcessing(false);
-      }
+        },
+      );
     } catch (error) {
       console.error("Task creation error:", error);
       alert(t("errors.createTask"));
-      setIsProcessing(false);
     }
   };
 
-  const handleRoomSelected = (patient) => {
-    if (parsedTaskDraft) {
-      onTaskCreated({ ...parsedTaskDraft, room: patient.location_label, patientName: patient.label });
+  const commitDraftTask = async (patient) => {
+    if (!parsedTaskDraft) return;
+    try {
+      await ops.run(
+        "createTask",
+        { messageKey: "status.creatingTask", errorKey: "errors.createTask", surface: "toast" },
+        () => onTaskCreated({ ...parsedTaskDraft, room: patient.location_label, patientName: patient.label }),
+      );
       onClose();
+    } catch (err) {
+      console.error("Task creation error:", err);
+      alert(t("errors.createTask"));
     }
   };
+
+  const handleRoomSelected = commitDraftTask;
 
   // Manual entry always resolves to a real, already-selected patient (or is
   // cancelled) -- no re-matching needed, and no local-only "new patient"
   // path since patient creation must go through the Add Patient dialog to
   // keep the Patient_Test_N labeling convention.
-  const handleManualRoomConfirm = (patient) => {
-    if (parsedTaskDraft) {
-      onTaskCreated({ ...parsedTaskDraft, room: patient.location_label, patientName: patient.label });
-      onClose();
-    }
-  };
+  const handleManualRoomConfirm = commitDraftTask;
 
   const handleDisambiguationCancel = () => {
     setShowRoomDisambiguation(false);
     setShowManualRoomEntry(false);
     setParsedTaskDraft(null);
     setRoomMatches(null);
-    setIsProcessing(false);
   };
 
   return (
@@ -452,7 +466,8 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
         <div className="flex flex-col items-center gap-3 pt-8">
           <button
             onClick={toggleRecording}
-            className={`flex h-28 w-28 items-center justify-center rounded-full border-none bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/20 transition-all duration-200 hover:bg-blue-700 active:scale-95 ${
+            disabled={isProcessing}
+            className={`flex h-28 w-28 items-center justify-center rounded-full border-none bg-blue-600 text-white shadow-lg ring-4 ring-blue-600/20 transition-all duration-200 hover:bg-blue-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
               isRecording ? "animate-pulse" : ""
             }`}
             aria-label={isRecording ? t("voiceCapture.stopRecordingAria") : t("voiceCapture.startRecordingAria")}
@@ -505,9 +520,18 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
           </label>
           <textarea
             value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
+            onChange={(e) => {
+              // Editing by hand replaces everything captured so far, and
+              // anything the current session has already finalised is
+              // folded in with it, so resuming appends instead of
+              // re-adding what the nurse just deleted.
+              committedRef.current = e.target.value;
+              absorbedRef.current = sessionFinalRef.current.length;
+              setTranscript(e.target.value);
+            }}
             placeholder={t("voiceCapture.transcriptPlaceholder")}
-            className="w-full min-h-[120px] p-4 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+            disabled={isProcessing}
+            className="w-full min-h-[120px] p-4 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none disabled:bg-gray-50 disabled:text-gray-500"
           />
         </div>
 
@@ -515,10 +539,8 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
         <div className="flex w-full gap-2">
           <button
             onClick={() => {
-              if (recognitionRef.current) {
-                recognitionRef.current.stop();
-              }
-              setIsRecording(false);
+              stopRecording();
+              committedRef.current = "";
               setTranscript("");
               onClose();
             }}
@@ -536,29 +558,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
             } disabled:opacity-60`}
           >
             {isProcessing ? (
-              <>
-                <svg
-                  className="h-5 w-5 animate-spin"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  />
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                  />
-                </svg>
-                {t("common.processing")}
-              </>
+              <OperationStatus operations={ops.operations} name={operationName} variant="button" />
             ) : isPatientMode ? (
               t("voiceCapture.reviewPatient")
             ) : (
@@ -567,6 +567,8 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
           </button>
         </div>
       </main>
+
+      <OperationStatus operations={ops.operations} variant="toast" />
 
       {showRoomDisambiguation && roomMatches && (
         <RoomDisambiguationDialog

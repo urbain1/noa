@@ -3,12 +3,14 @@ import { useTranslation } from "react-i18next";
 import { localeTag } from "../i18n";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import AssigneeSelect from "./AssigneeSelect";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
-// How long a field's "Saved" confirmation stays visible after a successful
-// write, and how long description/deadline wait after the last keystroke
-// before saving -- long enough that a fast typist doesn't fire a write per
-// character, short enough that it still reads as "auto".
-const SAVED_FLASH_MS = 1800;
+// How long description/deadline wait after the last keystroke before
+// saving -- long enough that a fast typist doesn't fire a write per
+// character, short enough that it still reads as "auto". How long the
+// "Saved" confirmation then stays up is the shared hook's business
+// (useOperationStatus DONE_FLASH_MS), not this dialog's.
 const DEBOUNCE_MS = 700;
 
 // Canonical values, stored and matched as-is. Only the <option> label is
@@ -52,32 +54,11 @@ function toLocalDatetimeValue(deadline) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-// The brief, per-field confirmation every auto-saved field shows: a quiet
-// "Saving..." while the write is in flight, then a "Saved" flash that fades
-// on its own (SAVED_FLASH_MS). Never both at once.
-function FieldStatus({ t, saving, saved, className = "" }) {
-  if (saving) {
-    return <span className={`ml-2 text-xs font-normal text-gray-400 ${className}`}>{t("common.saving")}</span>;
-  }
-  if (saved) {
-    return (
-      <span className={`ml-2 inline-flex items-center gap-1 text-xs font-normal text-green-600 ${className}`}>
-        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-        </svg>
-        {t("common.saved")}
-      </span>
-    );
-  }
-  return null;
-}
-
 export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, onAssign, onCancel, onUpdate, onManualUpdate }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
   const [editMode, setEditMode] = useState("manual"); // "manual" or "ai"
@@ -89,14 +70,13 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     deadline: toLocalDatetimeValue(task?.deadline),
   });
 
-  // Per-field auto-save state: which fields are mid-write, and which just
-  // finished (drives the brief "Saved" flash). Keyed by the DB column name
-  // (description/status/department/priority/deadline/assigned_to), not the
-  // form field name, so the assignee's own save path can flash the same way.
-  const [savingFields, setSavingFields] = useState({});
-  const [savedFields, setSavedFields] = useState({});
+  // Per-field auto-save state, on the same primitive every other async
+  // operation in the app uses. Operations are keyed by DB column name
+  // (description/status/department/priority/deadline/assigned_to), not by
+  // form field name, so the assignee's own save path reports identically.
+  const ops = useOperationStatus();
+  const isProcessing = ops.isRunning("applyCommand");
   const debounceTimers = useRef({});
-  const savedFlashTimers = useRef({});
   const lastCommitted = useRef({
     description: task?.description || "",
     deadline: task?.deadline || null,
@@ -104,37 +84,35 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
   useEffect(() => {
     const debounceTimersAtMount = debounceTimers.current;
-    const savedFlashTimersAtMount = savedFlashTimers.current;
     return () => {
       Object.values(debounceTimersAtMount).forEach(clearTimeout);
-      Object.values(savedFlashTimersAtMount).forEach(clearTimeout);
     };
   }, []);
 
-  const flashSaved = useCallback((field) => {
-    setSavedFields((prev) => ({ ...prev, [field]: true }));
-    clearTimeout(savedFlashTimers.current[field]);
-    savedFlashTimers.current[field] = setTimeout(() => {
-      setSavedFields((prev) => ({ ...prev, [field]: false }));
-    }, SAVED_FLASH_MS);
-  }, []);
+  const { run } = ops;
 
   // The one place that actually writes a field. `dbValue` is already in the
   // shape the database expects (deadline as ISO, everything else as-is).
   const commitField = useCallback(
     async (field, dbValue) => {
-      setSavingFields((prev) => ({ ...prev, [field]: true }));
       setError(null);
       try {
-        await onManualUpdate({ [field]: dbValue }, task, patientId);
-        setSavingFields((prev) => ({ ...prev, [field]: false }));
-        flashSaved(field);
+        await run(
+          field,
+          {
+            messageKey: "common.saving",
+            doneKey: "common.saved",
+            errorKey: "status.failed",
+            surface: "inline",
+          },
+          () => onManualUpdate({ [field]: dbValue }, task, patientId),
+        );
       } catch (err) {
-        setSavingFields((prev) => ({ ...prev, [field]: false }));
+        // The inline marker says the save failed; the banner says why.
         setError(err.message || t("errors.updateTask"));
       }
     },
-    [onManualUpdate, task, patientId, t, flashSaved]
+    [onManualUpdate, task, patientId, t, run]
   );
 
   // Selects/status/department/priority save the moment they change -- a
@@ -195,24 +173,27 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     onCancel();
   };
 
-  const handleAssigneeChange = async (nurseId) => {
-    await onAssign(task, nurseId);
-    flashSaved("assigned_to");
-  };
-
-  const [assigningToMe, setAssigningToMe] = useState(false);
   // onAssign (App.jsx handleAssignTask) already reports its own failures via
   // alert() and never rejects -- same contract AssigneeSelect relies on --
   // so there's nothing to catch here, only the pending state to track.
-  const handleAssignToMe = async () => {
+  const assignTo = (nurseId) =>
+    ops.run(
+      "assigned_to",
+      {
+        messageKey: "status.assigning",
+        doneKey: "common.saved",
+        errorKey: "status.failed",
+        surface: "inline",
+      },
+      () => onAssign(task, nurseId),
+    );
+
+  const handleAssigneeChange = (nurseId) => assignTo(nurseId);
+
+  const assigningToMe = ops.isRunning("assigned_to");
+  const handleAssignToMe = () => {
     if (!currentNurseId || assigningToMe) return;
-    setAssigningToMe(true);
-    try {
-      await onAssign(task, currentNurseId);
-      flashSaved("assigned_to");
-    } finally {
-      setAssigningToMe(false);
-    }
+    assignTo(currentNurseId);
   };
 
   const finalCommand = voiceTranscript.trim() || textCommand.trim();
@@ -283,12 +264,17 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     setIsRecording(false);
 
     if (!finalCommand) return;
-    setIsProcessing(true);
+    setError(null);
     try {
-      await onUpdate(finalCommand, task, patientId);
+      await ops.run(
+        "applyCommand",
+        { messageKey: "status.applyingChanges", errorKey: "status.failed", surface: "button" },
+        () => onUpdate(finalCommand, task, patientId),
+      );
     } catch {
+      // On success the dialog closes; on failure it stays, un-stuck, with
+      // the reason on screen.
       setError(t("errors.applyChanges"));
-      setIsProcessing(false);
     }
   };
 
@@ -376,7 +362,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               <div>
                 <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
                   {t("taskEdit.description")}
-                  <FieldStatus t={t} saving={savingFields.description} saved={savedFields.description} />
+                  <OperationStatus operations={ops.operations} name="description" />
                 </label>
                 <textarea
                   value={manualFields.description}
@@ -390,7 +376,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               <div>
                 <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
                   {t("taskEdit.status")}
-                  <FieldStatus t={t} saving={savingFields.status} saved={savedFields.status} />
+                  <OperationStatus operations={ops.operations} name="status" />
                 </label>
                 <select
                   value={manualFields.status}
@@ -407,7 +393,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               <div>
                 <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
                   {t("taskEdit.department")}
-                  <FieldStatus t={t} saving={savingFields.department} saved={savedFields.department} />
+                  <OperationStatus operations={ops.operations} name="department" />
                 </label>
                 <select
                   value={manualFields.department}
@@ -424,7 +410,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               <div>
                 <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
                   {t("taskEdit.priority")}
-                  <FieldStatus t={t} saving={savingFields.priority} saved={savedFields.priority} />
+                  <OperationStatus operations={ops.operations} name="priority" />
                 </label>
                 <select
                   value={manualFields.priority}
@@ -441,7 +427,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               <div>
                 <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
                   {t("taskEdit.deadline")}
-                  <FieldStatus t={t} saving={savingFields.deadline} saved={savedFields.deadline} />
+                  <OperationStatus operations={ops.operations} name="deadline" />
                 </label>
                 <input
                   type="datetime-local"
@@ -475,11 +461,11 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                         disabled={assigningToMe}
                         className="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {assigningToMe ? t("common.saving") : t("taskEdit.assignToMe")}
+                        {assigningToMe ? t("status.assigning") : t("taskEdit.assignToMe")}
                       </button>
                     )}
                   </div>
-                  <FieldStatus t={t} saving={false} saved={savedFields.assigned_to} className="mt-1" />
+                  <OperationStatus operations={ops.operations} name="assigned_to" className="mt-1" />
                 </div>
               )}
 
@@ -642,13 +628,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isProcessing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  {t("common.processing")}
-                </span>
+                <OperationStatus operations={ops.operations} name="applyCommand" variant="button" />
               ) : (
                 t("taskEdit.applyChanges")
               )}

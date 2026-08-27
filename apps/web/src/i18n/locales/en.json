@@ -8,8 +8,6 @@
     "save": "Save",
     "saveChanges": "Save Changes",
     "saving": "Saving...",
-    "processing": "Processing...",
-    "generating": "Generating...",
     "listening": "Listening...",
     "optional": "(optional)",
     "none": "None",
@@ -17,6 +15,21 @@
     "syntheticDataOnly": "Synthetic data only — no real patient information",
     "builtBy": "Built by Noa Health",
     "saved": "Saved"
+  },
+  "status": {
+    "extractingPatient": "Reading patient details...",
+    "creatingTask": "Creating task...",
+    "applyingChanges": "Applying changes...",
+    "savingNote": "Saving note...",
+    "generatingSuggestions": "Generating suggestions...",
+    "generatingHandoff": "Generating handoff report...",
+    "generatingSbar": "Generating SBAR summary...",
+    "generatingPatientUpdate": "Writing patient update...",
+    "assigning": "Assigning...",
+    "failed": "Failed — try again",
+    "extractFailed": "Couldn't read that — check the fields below",
+    "handoffFailed": "Couldn't generate the report — try again",
+    "suggestionsFailed": "Couldn't generate suggestions"
   },
   "errors": {
     "loadPatients": "Could not load patients. Please try reloading.",

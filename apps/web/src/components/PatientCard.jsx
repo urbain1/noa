@@ -7,6 +7,8 @@ import { localeTag } from "../i18n";
 import { sortTasks } from "../utils/taskSort";
 import { codeStatusLabel, departmentLabel } from "../i18n/enums";
 import { getActiveDischargeTasks } from "../utils/discharge";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
 // `task_type` (0011) is the reliable marker: it is set only by the
 // discharge-planning workflow. The department/description heuristic below it
@@ -36,8 +38,12 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
   // Opened from the Tasks screen or Unit View: show the task list straight
   // away rather than making the nurse expand it again after the jump.
   const [tasksExpanded, setTasksExpanded] = useState(Boolean(isFocused));
-  const [sbarLoading, setSbarLoading] = useState(false);
-  const [patientUpdateLoading, setPatientUpdateLoading] = useState(false);
+  // Both generations run in App (it owns the resulting view), but the
+  // pending state stays here so only this card's button reports it, and
+  // says which of the two is running rather than a shared "Generating...".
+  const ops = useOperationStatus();
+  const sbarLoading = ops.isRunning("sbar");
+  const patientUpdateLoading = ops.isRunning("patientUpdate");
   const [dischargeDetailOpen, setDischargeDetailOpen] = useState(false);
   const [cancellingDischarge, setCancellingDischarge] = useState(false);
 
@@ -118,18 +124,22 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
     }
   };
 
-  // Generation runs in App (it owns the handoff view), but the pending state
-  // stays here so only this card's button shows a spinner.
   const handleGenerateSbar = () => {
     if (!onGenerateSbar || sbarLoading) return;
-    setSbarLoading(true);
-    Promise.resolve(onGenerateSbar(patient)).finally(() => setSbarLoading(false));
+    ops.run(
+      "sbar",
+      { messageKey: "status.generatingSbar", errorKey: "status.handoffFailed", surface: "button" },
+      () => Promise.resolve(onGenerateSbar(patient)),
+    ).catch((err) => console.error("SBAR generation failed:", err));
   };
 
   const handleGeneratePatientUpdate = () => {
     if (!onGeneratePatientUpdate || patientUpdateLoading) return;
-    setPatientUpdateLoading(true);
-    Promise.resolve(onGeneratePatientUpdate(patient)).finally(() => setPatientUpdateLoading(false));
+    ops.run(
+      "patientUpdate",
+      { messageKey: "status.generatingPatientUpdate", errorKey: "status.handoffFailed", surface: "button" },
+      () => Promise.resolve(onGeneratePatientUpdate(patient)),
+    ).catch((err) => console.error("Patient update generation failed:", err));
   };
 
   const riskScore = computeRiskScore(patient);
@@ -270,7 +280,11 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           disabled={sbarLoading}
           className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {sbarLoading ? t("common.generating") : t("patientCard.sbarSummary")}
+          {ops.operations.sbar ? (
+            <OperationStatus operations={ops.operations} name="sbar" variant="button" />
+          ) : (
+            t("patientCard.sbarSummary")
+          )}
         </button>
         <button
           type="button"
@@ -278,7 +292,11 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           disabled={patientUpdateLoading}
           className="whitespace-nowrap rounded-md bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 ring-1 ring-purple-200 transition-colors hover:bg-purple-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {patientUpdateLoading ? t("common.generating") : t("patientCard.familyUpdate")}
+          {ops.operations.patientUpdate ? (
+            <OperationStatus operations={ops.operations} name="patientUpdate" variant="button" />
+          ) : (
+            t("patientCard.familyUpdate")
+          )}
         </button>
       </div>
 

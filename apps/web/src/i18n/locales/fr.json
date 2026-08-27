@@ -8,8 +8,6 @@
     "save": "Enregistrer",
     "saveChanges": "Enregistrer les modifications",
     "saving": "Enregistrement...",
-    "processing": "Traitement...",
-    "generating": "Génération...",
     "listening": "Écoute en cours...",
     "optional": "(facultatif)",
     "none": "Aucune",
@@ -17,6 +15,21 @@
     "syntheticDataOnly": "Données fictives uniquement — aucune information réelle de patient",
     "builtBy": "Développé par Noa Health",
     "saved": "Enregistré"
+  },
+  "status": {
+    "extractingPatient": "Lecture des informations du patient...",
+    "creatingTask": "Création de la tâche...",
+    "applyingChanges": "Application des modifications...",
+    "savingNote": "Enregistrement de la note...",
+    "generatingSuggestions": "Génération des suggestions...",
+    "generatingHandoff": "Génération du rapport de transmission...",
+    "generatingSbar": "Génération du résumé SBAR...",
+    "generatingPatientUpdate": "Rédaction du point pour la famille...",
+    "assigning": "Attribution...",
+    "failed": "Échec — réessayez",
+    "extractFailed": "Lecture impossible — vérifiez les champs ci-dessous",
+    "handoffFailed": "Génération impossible — réessayez",
+    "suggestionsFailed": "Génération des suggestions impossible"
   },
   "errors": {
     "loadPatients": "Impossible de charger les patients. Veuillez recharger la page.",

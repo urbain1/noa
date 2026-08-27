@@ -4,6 +4,8 @@ import { SUPPORTED_LANGUAGES, normalizeLanguage } from "../i18n";
 import { departmentLabel } from "../i18n/enums";
 import { formatActionTimestamp } from "../utils/actionTimestamp";
 import { isDischargePlanned } from "../utils/discharge";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
 // Real Supabase patient rows carry `label`, `location_label` and
 // `diagnosis`. The demo-era `name`/`room` fields these lists used to read
@@ -24,16 +26,21 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
   const [isOpen, setIsOpen] = useState(false);
   const [showPatientList, setShowPatientList] = useState(false);
   const [showBottomSheet, setShowBottomSheet] = useState(false);
-  const [handoffLoading, setHandoffLoading] = useState(false);
+  // The menu stays open for the round-trip, so the report's progress is
+  // reported on the row that started it -- the one place the nurse is
+  // looking. App deliberately doesn't also toast it.
+  const ops = useOperationStatus();
+  const handoffLoading = ops.isRunning("shiftHandoff");
 
   const handleGenerateHandoff = () => {
     if (handoffLoading) return;
-    setHandoffLoading(true);
-    Promise.resolve(onGenerateHandoff())
-      .finally(() => {
-        setHandoffLoading(false);
-        closeMenu();
-      });
+    ops.run(
+      "shiftHandoff",
+      { messageKey: "status.generatingHandoff", errorKey: "status.handoffFailed", surface: "button" },
+      () => Promise.resolve(onGenerateHandoff()),
+    )
+      .catch((err) => console.error("Handoff generation failed:", err))
+      .finally(closeMenu);
   };
 
   const closeMenu = () => {
@@ -117,7 +124,13 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                 >
                   <span className="text-lg mt-0.5">📋</span>
                   <div>
-                    <p className="text-sm text-gray-700">{handoffLoading ? t("common.generating") : t("topMenu.generateHandoff")}</p>
+                    <p className="text-sm text-gray-700">
+                      {ops.operations.shiftHandoff ? (
+                        <OperationStatus operations={ops.operations} name="shiftHandoff" variant="button" />
+                      ) : (
+                        t("topMenu.generateHandoff")
+                      )}
+                    </p>
                     <p className="text-xs text-gray-400">{t("topMenu.generateHandoffSubtitle")}</p>
                   </div>
                 </button>

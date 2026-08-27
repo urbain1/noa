@@ -8,6 +8,8 @@ import PatientUpdateSummary from "./components/PatientUpdateSummary";
 import AddNoteDialog from "./components/AddNoteDialog";
 import SuggestionModal from "./components/SuggestionModal";
 import AddPatientDialog from "./components/AddPatientDialog";
+import OperationStatus from "./components/OperationStatus";
+import { useOperationStatus } from "./hooks/useOperationStatus";
 import EditPatientDialog from "./components/EditPatientDialog";
 import TaskEditDialog from "./components/TaskEditDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
@@ -266,6 +268,14 @@ function App() {
   const [patientUpdateData, setPatientUpdateData] = useState(null);
   const [showAddNote, setShowAddNote] = useState(null); // patientId or null
   const [suggestionData, setSuggestionData] = useState(null); // { suggestions, patientId, patientName, triggerSummary } or null
+  // The follow-up suggestions that run in the background after a task or
+  // note is created: no button of their own to report on, and nothing the
+  // nurse has to wait for, so they surface on the non-blocking toast layer
+  // rendered with the modals. The other AI actions are deliberately absent
+  // here -- SBAR, the family update and the shift report each already
+  // report on the control that started them, and two indicators for one
+  // operation is worse than one.
+  const ops = useOperationStatus();
 
   // --- Navigation ---
   //
@@ -520,6 +530,8 @@ function App() {
     }
   };
 
+  // Progress is reported by TopRightMenu, which owns the row that triggers
+  // this and stays open while it runs -- one indicator per operation.
   const handleGenerateShiftHandoff = async () => {
     const result = await generateHandoffSummary(patients);
     if (result) {
@@ -839,7 +851,11 @@ function App() {
     if (!patient) return;
 
     try {
-      const suggestions = await generateSuggestions(patient, newItem);
+      const suggestions = await ops.run(
+        "suggestions",
+        { messageKey: "status.generatingSuggestions", errorKey: "status.suggestionsFailed", surface: "toast" },
+        () => generateSuggestions(patient, newItem),
+      );
       if (suggestions && suggestions.length > 0) {
         const triggerSummary = newItem.type === "task"
           ? t("suggestions.triggerTask", { description: newItem.data.description })
@@ -1009,6 +1025,7 @@ function App() {
 
   const modals = (
     <>
+      <OperationStatus operations={ops.operations} variant="toast" />
       {selectedPatientForDischarge && (
         <DischargeDialog
           patient={selectedPatientForDischarge}

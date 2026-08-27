@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { codeStatusLabel } from "../i18n/enums";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
 // Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
@@ -23,7 +25,12 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
   const [allergiesInput, setAllergiesInput] = useState((initialFields?.allergies || []).join(", "));
   const [admissionDate, setAdmissionDate] = useState(initialFields?.admissionDate || "");
   const [locationLabel, setLocationLabel] = useState(initialFields?.locationLabel || "");
-  const [saving, setSaving] = useState(false);
+  // Creating the patient is the one thing on this dialog that can't be
+  // interrupted halfway, so the whole form is blocked for its duration --
+  // and told why. Everything else here is local editing that needs no
+  // feedback at all.
+  const ops = useOperationStatus();
+  const saving = ops.isRunning("createPatient");
   const [error, setError] = useState(null);
 
   const handleSave = async () => {
@@ -32,44 +39,49 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
       setError(t("errors.labelRequired"));
       return;
     }
-    setSaving(true);
     setError(null);
+    const allergies = allergiesInput
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
     try {
-      const allergies = allergiesInput
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean);
-      await onSave({
-        label: trimmedLabel,
-        diagnosis: diagnosis.trim(),
-        age: age.trim() === "" ? null : parseInt(age, 10),
-        codeStatus,
-        attendingPhysician: attendingPhysician.trim(),
-        allergies,
-        admissionDate: admissionDate || null,
-        locationLabel: locationLabel.trim(),
-      });
+      await ops.run(
+        "createPatient",
+        { messageKey: "common.saving", errorKey: "status.failed", surface: "overlay" },
+        () =>
+          onSave({
+            label: trimmedLabel,
+            diagnosis: diagnosis.trim(),
+            age: age.trim() === "" ? null : parseInt(age, 10),
+            codeStatus,
+            attendingPhysician: attendingPhysician.trim(),
+            allergies,
+            admissionDate: admissionDate || null,
+            locationLabel: locationLabel.trim(),
+          }),
+      );
     } catch (err) {
       setError(err.message || t("errors.createPatient"));
-      setSaving(false);
     }
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={onCancel}
+      onClick={saving ? undefined : onCancel}
     >
       <div
         className="relative flex w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
+        <OperationStatus operations={ops.operations} name="createPatient" variant="overlay" />
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <h2 className="text-xl font-bold text-gray-900">{t("patientDialog.addTitle")}</h2>
           <button
             onClick={onCancel}
-            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
+            disabled={saving}
+            className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-40"
             aria-label={t("patientDialog.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +198,8 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
+            disabled={saving}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {t("common.cancel")}
           </button>
@@ -195,7 +208,7 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
             disabled={!label.trim() || saving}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? t("common.saving") : t("patientDialog.addButton")}
+            {t("patientDialog.addButton")}
           </button>
         </div>
       </div>

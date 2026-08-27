@@ -7,8 +7,6 @@ common.edit,Edit,Modifier
 common.save,Save,Enregistrer
 common.saveChanges,Save Changes,Enregistrer les modifications
 common.saving,Saving...,Enregistrement...
-common.processing,Processing...,Traitement...
-common.generating,Generating...,Génération...
 common.listening,Listening...,Écoute en cours...
 common.optional,(optional),(facultatif)
 common.none,None,Aucune
@@ -16,6 +14,19 @@ common.or,or,ou
 common.syntheticDataOnly,Synthetic data only — no real patient information,Données fictives uniquement — aucune information réelle de patient
 common.builtBy,Built by Noa Health,Développé par Noa Health
 common.saved,Saved,Enregistré
+status.extractingPatient,Reading patient details...,Lecture des informations du patient...
+status.creatingTask,Creating task...,Création de la tâche...
+status.applyingChanges,Applying changes...,Application des modifications...
+status.savingNote,Saving note...,Enregistrement de la note...
+status.generatingSuggestions,Generating suggestions...,Génération des suggestions...
+status.generatingHandoff,Generating handoff report...,Génération du rapport de transmission...
+status.generatingSbar,Generating SBAR summary...,Génération du résumé SBAR...
+status.generatingPatientUpdate,Writing patient update...,Rédaction du point pour la famille...
+status.assigning,Assigning...,Attribution...
+status.failed,Failed — try again,Échec — réessayez
+status.extractFailed,Couldn't read that — check the fields below,Lecture impossible — vérifiez les champs ci-dessous
+status.handoffFailed,Couldn't generate the report — try again,Génération impossible — réessayez
+status.suggestionsFailed,Couldn't generate suggestions,Génération des suggestions impossible
 errors.loadPatients,Could not load patients. Please try reloading.,Impossible de charger les patients. Veuillez recharger la page.
 errors.loadFacilities,Could not load facilities. Please try again.,Impossible de charger les établissements. Veuillez réessayer.
 errors.saveTask,Failed to save task. Please try again.,Échec de l'enregistrement de la tâche. Veuillez réessayer.
@@ -47,8 +58,8 @@ errors.assignTask,Failed to assign task. Please try again.,Échec de l'attributi
 errors.assignUnavailable,Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.,L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.
 errors.createDischargeTasks,Failed to create discharge planning tasks. Please try again.,Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.
 errors.dischargeTasksUntagged,"Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.","Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée."
-errors.dischargeAlreadyPlanned,"This patient already has discharge planning tasks. Cancel the existing set before creating a new one.","Ce patient a déjà des tâches de préparation de la sortie. Annulez l'ensemble existant avant d'en créer un nouveau."
-errors.cancelDischargePlanning,"Failed to cancel discharge planning. Please try again.","Échec de l'annulation de la préparation de la sortie. Veuillez réessayer."
+errors.dischargeAlreadyPlanned,This patient already has discharge planning tasks. Cancel the existing set before creating a new one.,Ce patient a déjà des tâches de préparation de la sortie. Annulez l'ensemble existant avant d'en créer un nouveau.
+errors.cancelDischargePlanning,Failed to cancel discharge planning. Please try again.,Échec de l'annulation de la préparation de la sortie. Veuillez réessayer.
 errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
 language.label,Language,Langue
 language.en,English,English
@@ -141,8 +152,8 @@ patientCard.noNotes,No clinical notes yet,Aucune note clinique pour le moment
 patientCard.dischargePlanning,Discharge Planning,Préparation de la sortie
 patientCard.dischargePlanned,Discharge Planned,Sortie préparée
 patientCard.dischargePlannedBadge,Planned,Préparée
-patientCard.dischargePlannedHint_one,"Discharge planned {{date}} · {{count}} task","Sortie préparée le {{date}} · {{count}} tâche"
-patientCard.dischargePlannedHint_other,"Discharge planned {{date}} · {{count}} tasks","Sortie préparée le {{date}} · {{count}} tâches"
+patientCard.dischargePlannedHint_one,Discharge planned {{date}} · {{count}} task,Sortie préparée le {{date}} · {{count}} tâche
+patientCard.dischargePlannedHint_other,Discharge planned {{date}} · {{count}} tasks,Sortie préparée le {{date}} · {{count}} tâches
 patientCard.dischargePlannedAt,Discharge planning started {{date}},Préparation de la sortie commencée le {{date}}
 patientCard.cancelDischargePlanning,Cancel Discharge Planning,Annuler la préparation de la sortie
 taskCard.justNow,just now,à l'instant

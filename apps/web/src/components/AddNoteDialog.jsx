@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { parseNoteInput } from "../utils/claudeAPI";
 import { localeTag } from "../i18n";
+import OperationStatus from "./OperationStatus";
+import { useOperationStatus } from "../hooks/useOperationStatus";
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -10,7 +12,8 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [text, setText] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const ops = useOperationStatus();
+  const isProcessing = ops.isRunning("saveNote");
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
 
@@ -82,21 +85,29 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
     setIsRecording(false);
 
     if (!finalInput) return;
-    setIsProcessing(true);
     setError(null);
 
     try {
-      const result = await parseNoteInput(finalInput);
-      if (result) {
-        onSave(result);
-      } else {
-        // Fallback: save raw text as Assessment
-        onSave({ text: finalInput, category: "Assessment" });
-      }
+      await ops.run(
+        "saveNote",
+        { messageKey: "status.savingNote", errorKey: "status.failed", surface: "button" },
+        async () => {
+          // Categorisation is best-effort; failing to reach Claude must not
+          // cost the nurse the note they just dictated.
+          let result = null;
+          try {
+            result = await parseNoteInput(finalInput);
+          } catch (err) {
+            console.error("Note categorisation failed, saving as Assessment:", err);
+          }
+          await onSave(result || { text: finalInput, category: "Assessment" });
+        },
+      );
     } catch (err) {
+      // Previously this both re-called onSave and left the button spinning
+      // for good, because nothing ever cleared isProcessing.
       console.error("Note creation error:", err);
-      // Fallback on error
-      onSave({ text: finalInput, category: "Assessment" });
+      setError(err.message || t("errors.saveNote"));
     }
   };
 
@@ -178,13 +189,7 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isProcessing ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                {t("common.processing")}
-              </span>
+              <OperationStatus operations={ops.operations} name="saveNote" variant="button" />
             ) : (
               t("noteDialog.saveNote")
             )}
