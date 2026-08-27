@@ -74,56 +74,62 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
   const repagedText = formatActionTimestamp(t, i18n.language, task.last_repaged_at, "repaged");
   const escalatedText = formatActionTimestamp(t, i18n.language, task.escalated_at, "escalated");
 
+  // Layout is one wrapping column, not a two-column row.
+  //
+  // The previous version put the description in a `flex-1` column beside a
+  // `shrink-0` stack of up to four buttons plus the status badge. On a phone
+  // that column could not give up any width, so the description was squeezed
+  // into a strip that wrapped one word per line while the action labels ran
+  // off the right edge of the screen. Nothing shrinks or scales here
+  // instead: every row wraps, the description gets the full card width, and
+  // the reading order is status and the primary action first, then the
+  // task's categories and its secondary actions, then the description, then
+  // the timing metadata underneath.
   return (
     <div className={`rounded-lg border p-3 shadow-sm transition-shadow duration-200 hover:shadow-md ${isNew ? 'bg-blue-50 border-blue-200' : 'border-gray-200 bg-white'}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="font-medium text-gray-900 leading-snug">{task.description}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-            <span>{departmentLabel(t, task.department)}</span>
-            <span className="text-gray-300">|</span>
-            <span>{getTimeElapsed(t, task.created_at)}</span>
-            <span className="text-gray-300">|</span>
-            <span
-              className={`font-semibold ${task.priority === "Stat" ? "text-red-600" : task.priority === "Urgent" ? "text-orange-600" : "text-gray-500"}`}
-            >
-              {priorityLabel(t, task.priority)}
-            </span>
-          </div>
-          {deadlineInfo && (
-            <div className={`mt-1 flex items-center gap-1 text-xs font-medium ${deadlineInfo.colorClass}`}>
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-              {deadlineInfo.text}
-            </div>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors duration-300 ${badgeClass}`}
+      {/* Status + primary action. `justify-between` puts them at opposite
+          ends when there is room and lets them stack when there isn't. */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span
+          className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors duration-300 ${badgeClass}`}
+        >
+          {statusLabel(t, task.status)}
+        </span>
+        {!isCompleted && (
+          <button
+            onClick={() => onComplete?.(task)}
+            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white"
           >
-            {statusLabel(t, task.status)}
+            {t("taskCard.complete")}
+          </button>
+        )}
+      </div>
+
+      {/* Category labels and secondary actions. Same row while it fits,
+          separate rows when it doesn't -- the labels stay left, the buttons
+          stay together. */}
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+          <span className="break-words">{departmentLabel(t, task.department)}</span>
+          <span aria-hidden="true" className="text-gray-300">|</span>
+          <span
+            className={`font-semibold ${task.priority === "Stat" ? "text-red-600" : task.priority === "Urgent" ? "text-orange-600" : "text-gray-500"}`}
+          >
+            {priorityLabel(t, task.priority)}
           </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => onEdit?.(task)}
-            className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-700 hover:text-white transition-colors"
+            className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 transition-colors hover:bg-gray-700 hover:text-white"
           >
             {t("taskCard.edit")}
           </button>
-          {!isCompleted && (
-            <button
-              onClick={() => onComplete?.(task)}
-              className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
-            >
-              {t("taskCard.complete")}
-            </button>
-          )}
           {overdue && (
             <button
               onClick={() => onRepage?.(task)}
               title={repagedText || undefined}
-              className="rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-600 hover:text-white transition-colors"
+              className="rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-600 hover:text-white"
             >
               {t("taskCard.repage")}
             </button>
@@ -132,15 +138,34 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
             <button
               onClick={() => onEscalate?.(task)}
               title={escalatedText || undefined}
-              className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-600 hover:text-white transition-colors"
+              className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-600 hover:text-white"
             >
               {t("taskCard.escalate")}
             </button>
           )}
         </div>
       </div>
+
+      {/* The description, at full card width. `break-words` covers a long
+          unbroken token (a drug name, a pasted identifier) that would
+          otherwise widen the card past the viewport. */}
+      <p className="mt-2 break-words font-medium leading-snug text-gray-900">{task.description}</p>
+
+      {/* Metadata last: when it was raised, when it is due, and what has
+          been done about it. */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
+        <span>{getTimeElapsed(t, task.created_at)}</span>
+        {deadlineInfo && (
+          <span className={`flex items-center gap-1 font-medium ${deadlineInfo.colorClass}`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            {deadlineInfo.text}
+          </span>
+        )}
+      </div>
       {overdue && (repagedText || escalatedText) && (
-        <div className="mt-1 flex flex-wrap gap-x-2 text-[11px] text-gray-400">
+        <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-gray-400">
           {repagedText && <span>{repagedText}</span>}
           {escalatedText && <span>{escalatedText}</span>}
         </div>

@@ -71,6 +71,10 @@ const NOT_A_DIAGNOSIS = new Set([
   "mister", "madame", "monsieur", "mme", "dr", "doctor", "docteur",
   "avec", "et", "ou", "depuis", "il", "elle", "le", "la", "les", "un",
   "une", "des", "du", "est", "ont", "été", "pour", "dans", "lit",
+  // Family and social context, which the bare "has"/"with"/"a une" triggers
+  // otherwise read as a complaint ("she has a daughter with her").
+  "daughter", "son", "wife", "husband", "family", "partner", "carer",
+  "fille", "fils", "femme", "mari", "famille", "épouse", "epouse",
 ]);
 
 const MONTHS = {
@@ -169,7 +173,11 @@ function extractAge(text, claims) {
   return value;
 }
 
-const ADMIT_LEAD = "(?:admitted|admission|admis(?:e)?|hospitalisée?)";
+// "admission date yesterday" and "admitted date the 3rd" are both natural
+// dictation, so an optional "date" sits between the lead-in and the date
+// itself. Without it the whole phrase falls through to the diagnosis
+// extractor and lands "admission date yesterday" in the diagnosis field.
+const ADMIT_LEAD = "(?:admitted|admission|admis(?:e)?|hospitalisée?)(?:\\s+date)?";
 const ADMIT_ISO_RE = new RegExp(`\\b${ADMIT_LEAD}\\s+(?:on\\s+|le\\s+)?(\\d{4}-\\d{2}-\\d{2})\\b`, "i");
 const ADMIT_DAY_MONTH_RE = new RegExp(
   `\\b${ADMIT_LEAD}\\s+(?:on\\s+|le\\s+)?(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?([A-Za-zÀ-ÿ]+)\\b`,
@@ -280,12 +288,70 @@ function extractAllergies(text, claims) {
 
 const PHYSICIAN_TRAILING_RE =
   /\b((?:dr\.?|doctor|docteur)\s+[A-Za-zÀ-ÿ'’-]+(?:\s+[A-Za-zÀ-ÿ'’-]+)?)\s+is\s+(?:the\s+)?attending\b/i;
+// Lead-ins only. The name is read separately, from the free text after the
+// lead-in, rather than captured by the regex itself -- see `readName` for
+// why that distinction is the whole fix.
 const PHYSICIAN_LEAD_RE =
-  /\b(?:attending(?:\s+(?:physician|doctor))?|consultant|médecin(?:\s+traitant)?|medecin(?:\s+traitant)?)\s*(?:is|:|est)?\s+((?:dr\.?|doctor|docteur)\s+)?([A-Za-zÀ-ÿ'’-]+(?:\s+[A-Za-zÀ-ÿ'’-]+)?)/i;
+  /\b(?:attending(?:\s+(?:physician|doctor))?|consultant|médecin(?:\s+traitant)?|medecin(?:\s+traitant)?)\s*(?:is|:|est)?\s+/i;
 // No lead-in required: the title is the marker. This is the case natural
 // dictation actually produces ("Patient Test 12, COPD, Dr Whitfield").
-const PHYSICIAN_TITLE_RE =
-  /\b(dr\.?|doctor|docteur)\s+([A-Za-zÀ-ÿ'’-]+(?:\s+[A-Za-zÀ-ÿ'’-]+)?)/i;
+const PHYSICIAN_TITLE_RE = /\b(?:dr\.?|doctor|docteur)\s+/i;
+const TITLE_PREFIX_RE = /^(?:dr\.?|doctor|docteur)\s+/i;
+
+const NAME_WORD_RE = /[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’-]*/g;
+
+// Reads a physician's name out of the text starting at `from`, and reports
+// where it actually ended.
+//
+// This replaces capturing the name inside the lead-in regex, which caused
+// two distinct field losses, both confirmed by exhaustive ordering tests:
+//
+//   1. `firstFreeMatch` rejects a match that overlaps an already-claimed
+//      range *in full*. A greedy two-word capture running into the next
+//      recognised field ("Dr Chen Test Room A") therefore threw the whole
+//      physician away rather than trimming it -- the attending was lost in
+//      a third of natural field orderings.
+//   2. The claim staked afterwards covered the entire regex match, words
+//      `cleanName` had already rejected included. "Dr Chen Patient Test 5"
+//      claimed the word "Patient", so the label extractor found its own
+//      text already taken and returned null.
+//
+// Reading the name against `captureLimit` fixes both: the name stops at the
+// next claimed field, at punctuation, or at a word that can't be a surname,
+// and the claim covers exactly the words kept.
+function readName(text, from, claims, maxWords) {
+  const limit = captureLimit(text, from, claims, maxWords);
+  const segment = text.slice(from, limit);
+  const re = new RegExp(NAME_WORD_RE.source, "g");
+
+  const kept = [];
+  let end = from;
+  let cursor = 0;
+  let m;
+  while (kept.length < maxWords && (m = re.exec(segment)) !== null) {
+    // Words have to be adjacent: only whitespace may separate the lead-in
+    // from the first word, or one name word from the next. Anything else
+    // means the name is over.
+    if (!/^\s*$/.test(segment.slice(cursor, m.index))) break;
+    if (NOT_A_NAME.has(m[0].toLowerCase().replace(/[.'’-]+$/, ""))) break;
+    kept.push(m[0]);
+    cursor = m.index + m[0].length;
+    end = from + cursor;
+  }
+
+  if (kept.length === 0) return null;
+
+  // A second word is only a double-barrelled or given+family name when the
+  // name ends there. Mid-sentence, unpunctuated speech ("Dr Chen shoulder
+  // pain") it is the next field, and a wrong extra word on a clinical
+  // record is worse than a missing middle name the nurse can add back.
+  if (kept.length === 2 && !isTerminal(text, end, claims)) {
+    kept.pop();
+    end = from + segment.indexOf(kept[0]) + kept[0].length;
+  }
+
+  return { name: titleCase(kept.join(" ")), end };
+}
 
 // Trims a captured 1-2 word name down to the part that can actually be a
 // surname, and rejects it outright if none of it can.
@@ -301,9 +367,11 @@ function cleanName(raw) {
 }
 
 function extractPhysician(text, claims) {
+  // Anchored at both ends by "... is the attending", so the greedy capture
+  // here cannot run into a following field.
   const trailing = firstFreeMatch(text, PHYSICIAN_TRAILING_RE, claims);
   if (trailing) {
-    const withoutTitle = trailing[1].replace(/^(?:dr\.?|doctor|docteur)\s+/i, "");
+    const withoutTitle = trailing[1].replace(TITLE_PREFIX_RE, "");
     const name = cleanName(withoutTitle);
     if (name) {
       claim(claims, trailing.index, trailing.index + trailing[0].length);
@@ -311,22 +379,30 @@ function extractPhysician(text, claims) {
     }
   }
 
-  const lead = firstFreeMatch(text, PHYSICIAN_LEAD_RE, claims);
-  if (lead) {
-    const name = cleanName(lead[2]);
-    if (name) {
-      claim(claims, lead.index, lead.index + lead[0].length);
-      return lead[1] ? `Dr ${name}` : name;
-    }
-  }
+  for (const [re, titledByLead] of [
+    [PHYSICIAN_LEAD_RE, false],
+    [PHYSICIAN_TITLE_RE, true],
+  ]) {
+    const m = firstFreeMatch(text, re, claims);
+    if (!m) continue;
 
-  const titled = firstFreeMatch(text, PHYSICIAN_TITLE_RE, claims);
-  if (titled) {
-    const name = cleanName(titled[2]);
-    if (name) {
-      claim(claims, titled.index, titled.index + titled[0].length);
-      return `Dr ${name}`;
+    let from = m.index + m[0].length;
+    let titled = titledByLead;
+    if (!titled) {
+      // "attending physician is Dr Chen" -- the lead-in and the title are
+      // both present, and only the title decides how the name is rendered.
+      const prefix = text.slice(from).match(TITLE_PREFIX_RE);
+      if (prefix) {
+        titled = true;
+        from += prefix[0].length;
+      }
     }
+
+    const found = readName(text, from, claims, 2);
+    if (!found) continue;
+
+    claim(claims, m.index, found.end);
+    return titled ? `Dr ${found.name}` : found.name;
   }
 
   return null;
@@ -403,13 +479,16 @@ function extractLabel(text, claims) {
   return null;
 }
 
-// "has"/"with" are bare English triggers, added alongside the more specific
-// phrases below so a plain symptom or complaint ("has shoulder pain") is
-// captured, not just a formalised lead-in ("diagnosis of"). "has(?!\s+been)"
+// "has"/"with" are bare English triggers, and "a une"/"souffre de"/"presente"
+// their French counterparts, added alongside the more specific phrases below
+// so a plain symptom or complaint ("has shoulder pain", "a une douleur a
+// l'epaule") is captured, not just a formalised lead-in ("diagnosis of").
+// The French ones require an article or a full verb rather than a bare "a",
+// which is too common a word to trigger on alone. "has(?!\s+been)"
 // steps aside for "has been admitted with/diagnosed with", which are
 // already matched more specifically and further along in the sentence.
 const DIAGNOSIS_LEAD_RE =
-  /\b(?:admitted (?:with|for)|admission (?:diagnosis|for)|diagnosis(?:\s+(?:of|is))?|diagnosed with|presenting with|presents with|known|has(?!\s+been)|with|admis(?:e)? pour|hospitalisée? pour|diagnostic(?:\s+(?:de|d'|est))?)\s*:?\s+/i;
+  /\b(?:admitted (?:with|for)|admission (?:diagnosis|for)|diagnosis(?:\s+(?:of|is))?|diagnosed with|presenting with|presents with|known|has(?!\s+been)|with|admis(?:e)? pour|hospitalisée? pour|souffre d(?:e|')|se plaint d(?:e|')|pr[ée]sente(?:\s+(?:une?|des))?|a\s+(?:une?|des)|diagnostic(?:\s+(?:de|d'|est))?)\s*:?\s+/i;
 
 function extractDiagnosis(text, claims) {
   const m = firstFreeMatch(text, DIAGNOSIS_LEAD_RE, claims);
@@ -420,12 +499,18 @@ function extractDiagnosis(text, claims) {
   if (value.length < 2) return null;
   // "has"/"with" are bare enough that they also lead into non-clinical
   // speech ("with her daughter"). The same word-level filter the leftover
-  // extractor uses catches that without narrowing the specific lead-ins
-  // ("diagnosis of", "admitted with") that never needed it.
+  // extractor uses catches that -- but as a boundary, not a veto: the words
+  // before it were still stated as the reason the patient is here, so
+  // "shoulder pain and shortness of breath" records "shoulder pain" rather
+  // than nothing, while "with her daughter" still records nothing. Only
+  // what was literally said is kept, and it is never widened into a
+  // condition the nurse didn't state.
   const words = value.split(/\s+/);
-  if (words.some((w) => NOT_A_DIAGNOSIS.has(w.toLowerCase()))) return null;
-  claim(claims, m.index, to);
-  return value;
+  const stop = words.findIndex((w) => NOT_A_DIAGNOSIS.has(w.toLowerCase()));
+  const kept = (stop === -1 ? words : words.slice(0, stop)).join(" ").replace(/[\s,;:.-]+$/, "");
+  if (kept.length < 2) return null;
+  claim(claims, m.index, from + kept.length);
+  return kept;
 }
 
 // Natural dictation often states the diagnosis with no lead-in at all:
@@ -479,16 +564,30 @@ export function parsePatientTranscriptFallback(transcript) {
   const text = typeof transcript === "string" ? transcript : "";
   const claims = [];
 
-  // Order matters: every extractor that carries its own unambiguous marker
-  // runs before the two that read free text, so the free-text capture knows
-  // where to stop.
+  // Order matters, most rigidly-shaped field first, free text last, so each
+  // extractor stops where the next recognised field begins.
+  //
+  // `label` leads. It is the app's identifying field and the one with a
+  // hard format (Patient_Test_N, SECURITY.md), so it is also the one that
+  // can be recognised with the least ambiguity -- and, running seventh as
+  // it used to, it was the one most often destroyed by an earlier
+  // extractor's over-reach. In an exhaustive test over every ordering of a
+  // natural patient description it came back null in 14% of them, "Dr Chen
+  // Patient Test 5" among them, purely because the physician or allergy
+  // capture had already claimed the words "patient test". Claiming it first
+  // makes it independent of what the nurse says around it.
+  //
+  // `attendingPhysician` runs before `allergies` so "allergic to penicillin
+  // Dr Chen" stops the allergen list at the doctor rather than swallowing
+  // them into it, and after `locationLabel` so "Dr Chen Test Room A" ends
+  // the name at the location.
+  const label = extractLabel(text, claims);
   const age = extractAge(text, claims);
   const admissionDate = extractAdmissionDate(text, claims);
   const codeStatus = extractCodeStatus(text, claims);
   const locationLabel = extractLocationLabel(text, claims);
-  const allergies = extractAllergies(text, claims);
   const attendingPhysician = extractPhysician(text, claims);
-  const label = extractLabel(text, claims);
+  const allergies = extractAllergies(text, claims);
   const diagnosis =
     extractDiagnosis(text, claims) ?? extractDiagnosisFromLeftovers(text, claims);
 

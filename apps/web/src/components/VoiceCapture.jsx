@@ -12,6 +12,14 @@ import { useOperationStatus } from "../hooks/useOperationStatus";
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
 
+// True when a parsed patient draft carries at least one extracted value.
+// `allergies` is a list, and every other field is null when unextracted.
+function hasAnyField(fields) {
+  return Object.entries(fields).some(([key, value]) =>
+    key === "allergies" ? Array.isArray(value) && value.length > 0 : value !== null && value !== undefined && value !== "",
+  );
+}
+
 // Concatenate two stretches of speech with exactly one space between them.
 function joinSpeech(a, b) {
   const left = a.replace(/\s+$/, "");
@@ -294,6 +302,15 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
           let fields = await parsePatientFromVoice(spoken);
           if (!fields) {
             console.warn("[VoiceCapture] parsePatientFromVoice unavailable, falling back");
+            fields = parsePatientTranscriptFallback(spoken);
+          } else if (!hasAnyField(fields)) {
+            // The action answered, but with nothing in it. On a transcript
+            // the nurse actually spoke that is a failed extraction, not an
+            // empty description, and handing back a blank review form
+            // silently loses everything they said. The offline parser reads
+            // the same transcript under the same never-invent rule, so try
+            // it before giving up on the fields entirely.
+            console.warn("[VoiceCapture] parsePatientFromVoice returned no fields, falling back");
             fields = parsePatientTranscriptFallback(spoken);
           }
           console.log("[VoiceCapture] patient fields extracted:", { transcript: spoken, fields });

@@ -10,18 +10,22 @@ import { getActiveDischargeTasks } from "../utils/discharge";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
 
-// `task_type` (0011) is the reliable marker: it is set only by the
-// discharge-planning workflow. The department/description heuristic below it
-// is kept as a fallback for tasks created before 0011 -- it over-matches
-// (any Social Work task, any task merely mentioning discharge), which is
-// exactly why it isn't the primary test any more.
-function showDischargeBadge(tasks) {
-  return tasks.some((task) => {
-    if (task.task_type === "discharge") return true;
-    const desc = (task.description || "").toLowerCase();
-    return task.department === "Social Work" || desc.includes("discharge");
-  });
-}
+// Removed: a second, legacy discharge indicator -- a blue pill beside the
+// patient label -- rendered from a `task_type`-or-heuristic test of its own,
+// alongside the green Discharge Planning / Discharge Planned button below.
+// Two consequences, both seen on real cards:
+//
+//   - Where planning genuinely was in progress, both fired, so the card
+//     showed two different discharge indicators saying different things.
+//   - The heuristic half (any Social Work task, or any task whose text
+//     merely contains the word "discharge") fired for patients who had never
+//     been through discharge planning at all, which is why some cards showed
+//     the blue pill and no green "Discharge planned".
+//
+// `getActiveDischargeTasks` (utils/discharge.js) is now the only test, and
+// the green button is the only indicator. It is strict on purpose: it reads
+// `task_type` alone, so it can never claim a patient is being discharged
+// because someone raised a Social Work task.
 
 function formatAdmissionDate(dateStr, locale) {
   if (!dateStr) return null;
@@ -180,8 +184,8 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
     >
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-lg font-bold tracking-tight text-gray-900">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="font-display break-words text-lg font-bold tracking-tight text-gray-900">
               {patient.label}
               {riskLevel && (
                 <span className={`ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${riskLevel.bg} ${riskLevel.color}`}>
@@ -189,13 +193,8 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
                 </span>
               )}
             </h2>
-            {showDischargeBadge(tasks) && (
-              <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
-                {t("patientCard.dischargePlanningBadge")}
-              </span>
-            )}
           </div>
-          <p className="text-sm text-gray-700 mt-0.5">{patient.diagnosis || t("patientCard.noDiagnosis")}</p>
+          <p className="mt-0.5 break-words text-sm text-gray-700">{patient.diagnosis || t("patientCard.noDiagnosis")}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500">
             <span className="font-semibold text-gray-600">{codeStatusLabel(t, patient.code_status || "Full Code")}</span>
             {patient.location_label && (

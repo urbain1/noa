@@ -190,6 +190,25 @@ export async function updateTask(taskId, fields, completedBy = null) {
   return data
 }
 
+// Hard delete, used only by the AI edit dialog's explicit "delete this
+// task" command, which the nurse confirms first.
+//
+// Deliberately a delete and not a status change: the app already has a
+// Cancelled status for "this task is no longer needed but happened", and a
+// nurse who says "delete" after being shown a delete warning means the row.
+// RLS (tasks_facility_scope) is what stops this touching another facility's
+// task -- there is no client-side facility filter to add here, and adding
+// one would not be the boundary anyway.
+export async function deleteTask(taskId) {
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', taskId)
+
+  if (error) throw error
+  return taskId
+}
+
 // Repage: reset an overdue task back to Pending and log a delay alert.
 // `task` must carry its own `facility_id` (present on every fetched task)
 // so the alerts row lands in the right facility without a separate lookup.

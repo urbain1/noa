@@ -20,11 +20,45 @@ import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
 import { supabase } from "./lib/supabase";
 import { fetchFacilityNurses } from "./lib/nurses";
-import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
-import { generateHandoffSummary, generateSuggestions, generatePatientUpdate } from "./utils/claudeAPI";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, deleteTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
+import { generateHandoffSummary, generateSuggestions, generatePatientUpdate, parseTaskEditCommand } from "./utils/claudeAPI";
+import { parseTaskEditFallback } from "./utils/taskEditParse";
 import { needsAttention } from "./utils/taskOverdue";
 import { isDischargePlanned } from "./utils/discharge";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
+
+// Fields the tasks table has (0001_init.sql) and the AI edit path is allowed
+// to write. Assignment is deliberately absent: it has its own picker and its
+// own handler, and it is the one field where a wrong value points at a real
+// colleague.
+const EDITABLE_TASK_FIELDS = ["description", "department", "priority", "status", "deadline"];
+
+// `priority` is a two-level column, checked in the database. The deployed
+// edit prompt still offers "Urgent" as a third value from the demo era, and
+// `updateTask` maps anything that isn't "Stat" to "Routine" -- so an
+// un-mapped "Urgent" would answer "make this urgent" by *lowering* the
+// priority. Raising it is the only reading of that word that can be right.
+function sanitiseTaskEdit(updates) {
+  const clean = {};
+  if (!updates || typeof updates !== "object") return clean;
+
+  for (const field of EDITABLE_TASK_FIELDS) {
+    if (!(field in updates)) continue;
+    let value = updates[field];
+
+    if (field === "priority") {
+      if (value === "Urgent") value = "Stat";
+      if (value !== "Stat" && value !== "Routine") continue;
+    }
+    if (field === "status" && !["Pending", "Confirmed", "Delayed", "Completed", "Cancelled"].includes(value)) continue;
+    if (field === "description" && (typeof value !== "string" || !value.trim())) continue;
+    if (field === "deadline" && value !== null && (typeof value !== "string" || Number.isNaN(Date.parse(value)))) continue;
+
+    clean[field] = field === "description" ? value.trim() : value;
+  }
+
+  return clean;
+}
 
 function App() {
   const { t } = useTranslation();
@@ -739,6 +773,59 @@ function App() {
     );
   };
 
+  // The AI mode of the task edit dialog. `TaskEditDialog` has always called
+  // `onUpdate` here; until now nothing was passed for it, so Apply threw on
+  // an undefined call for every command and every field (FINAL_REVIEW.md
+  // §5). This is that missing handler.
+  //
+  // Two things it does that the raw action result cannot be trusted to do:
+  //
+  //   - It filters the returned fields to the ones the tasks table actually
+  //     has. The deployed prompt still offers `room`, a demo-era field
+  //     tasks never had (tasks reference a patient), and still offers
+  //     priority "Urgent", which `priority`'s check constraint rejects --
+  //     and which `updateTask` would otherwise quietly coerce down to
+  //     Routine, turning "make this urgent" into a de-escalation.
+  //   - It falls back to the local parser when the action errors or returns
+  //     nothing usable, per CLAUDE.md's fallback rule. That parser also
+  //     resolves deadlines in the nurse's own timezone, which the deployed
+  //     prompt (given UTC) does not.
+  const handleAiUpdateTask = async (command, task) => {
+    // "Usable" is deliberately stricter than "no error": the action can
+    // answer with `{}`, which reads as success and changes nothing.
+    const usable = (r) =>
+      Boolean(r) && (r.action === "delete" || (r.updates && Object.keys(sanitiseTaskEdit(r.updates)).length > 0));
+
+    let result = await parseTaskEditCommand(command, task);
+    if (!usable(result)) {
+      const local = parseTaskEditFallback(command, task);
+      // Only take the local reading if it actually read something. If both
+      // failed, the nurse gets the AI's own message, which is more specific.
+      if (usable(local)) result = local;
+    }
+
+    if (!usable(result)) {
+      const reason = result?.error;
+      throw new Error(
+        !reason || reason === "unreadable" || reason === "empty" ? t("errors.editNotUnderstood") : reason,
+      );
+    }
+
+    if (result.action === "delete") {
+      await deleteTask(task.id);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === task.patient_id ? { ...p, tasks: p.tasks.filter((tk) => tk.id !== task.id) } : p
+        )
+      );
+      setTaskToEditId(null);
+      return;
+    }
+
+    await handleManualUpdateTask(sanitiseTaskEdit(result.updates), task);
+    setTaskToEditId(null);
+  };
+
   // --- Note handlers (real writes) ---
 
   const handleAddNoteClick = (patientId) => {
@@ -942,6 +1029,8 @@ function App() {
         title={handoffData.title}
         patientCount={handoffData.patientCount}
         kind={handoffData.kind}
+        nurses={nurses}
+        currentNurseId={session?.user?.id}
         onClose={handleCloseHandoff}
       />
     );
@@ -1073,6 +1162,7 @@ function App() {
           currentNurseId={session?.user?.id}
           onAssign={handleAssignTask}
           onCancel={() => setTaskToEditId(null)}
+          onUpdate={handleAiUpdateTask}
           onManualUpdate={handleManualUpdateTask}
         />
       )}

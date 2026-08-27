@@ -44,6 +44,7 @@ errors.recordFirst,Please record something first,Veuillez d'abord enregistrer qu
 errors.createPatient,Failed to create patient.,Échec de la création du patient.
 errors.updatePatient,Failed to update patient.,Échec de la mise à jour du patient.
 errors.applyChanges,Failed to apply changes.,Échec de l'application des modifications.
+errors.editNotUnderstood,"Couldn't understand that change. Try naming the field, e.g. “change priority to stat”.","Impossible de comprendre cette modification. Essayez de nommer le champ, par exemple « changer la priorité en stat »."
 errors.labelRequired,Label is required.,L'identifiant est obligatoire.
 errors.fullNameRequired,Full name is required.,Le nom complet est obligatoire.
 errors.passwordsMismatch,Passwords do not match.,Les mots de passe ne correspondent pas.
@@ -136,7 +137,6 @@ dashboard.voiceInputAria,Voice input,Saisie vocale
 dashboard.tasksView,Tasks,Tâches
 dashboard.addPatientByVoice,Add by voice,Ajouter par la voix
 dashboard.noPatients,No patients yet. Add one to get started.,Aucun patient pour le moment. Ajoutez-en un pour commencer.
-patientCard.dischargePlanningBadge,Discharge Planning,Préparation de la sortie
 patientCard.noDiagnosis,No diagnosis on file,Aucun diagnostic enregistré
 patientCard.admitted,Admitted {{date}},Admis le {{date}}
 patientCard.allergies,Allergies: {{list}},Allergies : {{list}}
@@ -231,6 +231,8 @@ handoff.send.title,Send Handoff,Envoyer la transmission
 handoff.send.subtitle,Simulate sending this handoff to the incoming nurse,Simuler l'envoi de cette transmission à l'infirmier entrant
 handoff.send.nurseNameLabel,Incoming nurse name,Nom de l'infirmier entrant
 handoff.send.nurseNamePlaceholder,"e.g., Nurse Williams",ex. Infirmier Martin
+handoff.send.colleaguesLabel,Colleagues using Noa at this facility,Collègues utilisant Noa dans cet établissement
+handoff.send.noColleagueMatch,No colleague matches — send to this name anyway.,Aucun collègue correspondant — envoyer quand même à ce nom.
 handoff.send.viaLabel,Send via,Envoyer par
 handoff.send.methodSecureMessage,Secure Message,Messagerie sécurisée
 handoff.send.methodText,Text,SMS
@@ -270,9 +272,9 @@ taskEdit.currentTask,Current Task,Tâche actuelle
 taskEdit.patient,Patient,Patient
 taskEdit.tapToSpeak,Tap to speak,Appuyez pour dicter
 taskEdit.commandPlaceholder,Type your command...,Saisissez votre commande...
-taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, “move to room 405”, “delete”","Exemples : « passer en urgent », « marquer comme terminée », « déplacer en chambre 405 », « supprimer »"
+taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, “move the deadline to tomorrow 2pm”, “delete”","Exemples : « passer en immédiat », « marquer comme terminée », « reporter l’échéance à demain 14h », « supprimer »"
 taskEdit.yourCommand,Your command:,Votre commande :
-taskEdit.deleteWarning,This will delete the task. Confirm in next step.,Cette action supprimera la tâche. Confirmez à l'étape suivante.
+taskEdit.deleteWarning,Applying this will permanently delete the task.,Appliquer cette commande supprimera définitivement la tâche.
 taskEdit.applyChanges,Apply Changes,Appliquer les modifications
 taskEdit.createdBy,Created by:,Créée par :
 taskEdit.assignedTo,Assigned to:,Assignée à :

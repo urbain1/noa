@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import SendHandoffDialog from "./SendHandoffDialog";
 import { localeTag } from "../i18n";
 
-export default function HandoffSummary({ summaryText, title, onClose, patientCount, kind }) {
+export default function HandoffSummary({ summaryText, title, onClose, patientCount, kind, nurses = [], currentNurseId }) {
   const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(summaryText);
@@ -122,6 +122,8 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
 
       {showSendDialog && (
         <SendHandoffDialog
+          nurses={nurses}
+          currentNurseId={currentNurseId}
           onCancel={() => setShowSendDialog(false)}
           onSend={(details) => {
             setShowSendDialog(false);

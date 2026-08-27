@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { localeTag } from "../i18n";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import AssigneeSelect from "./AssigneeSelect";
+import { isDeleteCommand } from "../utils/taskEditParse";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
 
@@ -197,7 +198,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   };
 
   const finalCommand = voiceTranscript.trim() || textCommand.trim();
-  const isDelete = /\bdelete\b/i.test(finalCommand);
+  const isDelete = isDeleteCommand(finalCommand);
   const badgeClass = statusStyles[task?.status] || "bg-gray-100 text-gray-800";
 
   useEffect(() => {
@@ -271,10 +272,13 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
         { messageKey: "status.applyingChanges", errorKey: "status.failed", surface: "button" },
         () => onUpdate(finalCommand, task, patientId),
       );
-    } catch {
+    } catch (err) {
       // On success the dialog closes; on failure it stays, un-stuck, with
-      // the reason on screen.
-      setError(t("errors.applyChanges"));
+      // the reason on screen. The handler throws messages that are already
+      // translated ("I didn't understand that"), so they are shown as-is --
+      // a nurse who mis-phrased a command needs to know that, not a generic
+      // failure. Anything without a message falls back to the generic one.
+      setError(err?.message || t("errors.applyChanges"));
     }
   };
 

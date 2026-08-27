@@ -954,10 +954,17 @@ EXTRACTION RULES (these matter more than filling the object):
         ? parsed.label.trim()
         : null;
 
+    // Accept "74" as well as 74: the prompt asks for a number, but a model
+    // returning the digits as a string is a formatting slip, not a missing
+    // age, and silently dropping it loses something the nurse did say.
+    const ageValue =
+      typeof parsed.age === "number"
+        ? parsed.age
+        : typeof parsed.age === "string" && /^\d{1,3}$/.test(parsed.age.trim())
+          ? Number(parsed.age.trim())
+          : NaN;
     const age =
-      typeof parsed.age === "number" && Number.isFinite(parsed.age) && parsed.age >= 0 && parsed.age <= 130
-        ? Math.round(parsed.age)
-        : null;
+      Number.isFinite(ageValue) && ageValue >= 0 && ageValue <= 130 ? Math.round(ageValue) : null;
 
     return {
       label,

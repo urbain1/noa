@@ -88,7 +88,7 @@ function TaskRow({ task, patient, nurses, expanded, onToggle, onOpenPatient, onO
           <button
             type="button"
             onClick={onOpenTask}
-            className="block w-full text-left text-sm font-medium leading-snug text-gray-900 hover:text-blue-700"
+            className="block w-full break-words text-left text-sm font-medium leading-snug text-gray-900 hover:text-blue-700"
           >
             {task.description}
           </button>
@@ -98,13 +98,16 @@ function TaskRow({ task, patient, nurses, expanded, onToggle, onOpenPatient, onO
             <button
               type="button"
               onClick={onOpenPatient}
-              className="font-semibold text-blue-700 underline-offset-2 hover:underline"
+              className="break-words font-semibold text-blue-700 underline-offset-2 hover:underline"
             >
               {patient ? patient.label : t("tasksView.unknownPatient")}
             </button>
             <span className="text-gray-300">|</span>
             <span className={assignee ? "" : "italic text-gray-400"}>
-              {assignee ? assignee.name : t("tasksView.unassigned")}
+              {/* Same fallback as AssigneeSelect: a nurse who has not set a
+                  display name still has an email, and showing nothing at
+                  all reads as unassigned when the task is assigned. */}
+              {assignee ? assignee.name || assignee.email : t("tasksView.unassigned")}
             </span>
             <span className="text-gray-300">|</span>
             <span
