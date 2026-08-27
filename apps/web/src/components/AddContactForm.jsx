@@ -117,7 +117,7 @@ export default function AddContactForm({ onSave, onCancel, existingContact = nul
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+          className="flex-1 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white"
         >
           Cancel
         </button>

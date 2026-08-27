@@ -282,7 +282,12 @@
     "commandExamples": "Examples: “change to stat”, “mark completed”, “move to room 405”, “delete”",
     "yourCommand": "Your command:",
     "deleteWarning": "This will delete the task. Confirm in next step.",
-    "applyChanges": "Apply Changes"
+    "applyChanges": "Apply Changes",
+    "createdBy": "Created by:",
+    "assignedTo": "Assigned to:",
+    "completedBy": "Completed by:",
+    "unknownNurse": "Unknown",
+    "assignToMe": "Assign to me"
   },
   "patientDialog": {
     "addTitle": "Add Patient",
@@ -400,7 +405,13 @@
     "unknownPatient": "Unknown patient",
     "due": "Due {{value}}",
     "expandAria": "Show task details",
-    "collapseAria": "Hide task details"
+    "collapseAria": "Hide task details",
+    "filters": "Filters",
+    "filterByNurse": "Nurse",
+    "filterByPatient": "Patient",
+    "filterByStatus": "Status",
+    "clearFilters": "Clear filters",
+    "noFilterMatches": "No tasks match the selected filters"
   },
   "profile": {
     "title": "Profile",

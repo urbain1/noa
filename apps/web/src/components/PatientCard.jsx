@@ -259,7 +259,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           <button
             type="button"
             onClick={() => onDischargePatient?.(patient)}
-            className="whitespace-nowrap rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 transition-colors hover:bg-green-100"
+            className="whitespace-nowrap rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 transition-colors hover:bg-green-600 hover:text-white"
           >
             {t("patientCard.dischargePlanning")}
           </button>
@@ -268,7 +268,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           type="button"
           onClick={handleGenerateSbar}
           disabled={sbarLoading}
-          className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+          className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           {sbarLoading ? t("common.generating") : t("patientCard.sbarSummary")}
         </button>
@@ -276,7 +276,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           type="button"
           onClick={handleGeneratePatientUpdate}
           disabled={patientUpdateLoading}
-          className="whitespace-nowrap rounded-md bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 ring-1 ring-purple-200 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+          className="whitespace-nowrap rounded-md bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 ring-1 ring-purple-200 transition-colors hover:bg-purple-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           {patientUpdateLoading ? t("common.generating") : t("patientCard.familyUpdate")}
         </button>
@@ -303,7 +303,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
             type="button"
             onClick={handleCancelDischargePlanning}
             disabled={cancellingDischarge}
-            className="mt-2.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="mt-2.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancellingDischarge ? t("common.saving") : t("patientCard.cancelDischargePlanning")}
           </button>
@@ -337,7 +337,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onOpenVoiceCapture(patient); }}
-            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
           >
             {t("patientCard.addTask")}
           </button>
@@ -387,7 +387,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onAddNote(patient.id); }}
-            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
           >
             {t("patientCard.addNote")}
           </button>

@@ -102,7 +102,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
                   </button>
                   <button
                     onClick={() => handleAddAsNote(suggestion)}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.97]"
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
                   >
                     {t("suggestions.addAsNote")}
                   </button>
@@ -132,7 +132,7 @@ export default function SuggestionModal({ suggestions, patientName, triggerSumma
 
           <button
             onClick={onDismissAll}
-            className="w-full rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+            className="w-full rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
             {t("suggestions.dismissAll")}
           </button>

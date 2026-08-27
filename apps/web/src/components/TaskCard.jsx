@@ -107,14 +107,14 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
           </span>
           <button
             onClick={() => onEdit?.(task)}
-            className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-200 transition-colors"
+            className="rounded-md bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-700 hover:text-white transition-colors"
           >
             {t("taskCard.edit")}
           </button>
           {!isCompleted && (
             <button
               onClick={() => onComplete?.(task)}
-              className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-100 transition-colors"
+              className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 hover:bg-blue-600 hover:text-white transition-colors"
             >
               {t("taskCard.complete")}
             </button>
@@ -123,7 +123,7 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
             <button
               onClick={() => onRepage?.(task)}
               title={repagedText || undefined}
-              className="rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-100 transition-colors"
+              className="rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 hover:bg-orange-600 hover:text-white transition-colors"
             >
               {t("taskCard.repage")}
             </button>
@@ -132,7 +132,7 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
             <button
               onClick={() => onEscalate?.(task)}
               title={escalatedText || undefined}
-              className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+              className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 hover:bg-red-600 hover:text-white transition-colors"
             >
               {t("taskCard.escalate")}
             </button>

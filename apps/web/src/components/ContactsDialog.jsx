@@ -117,14 +117,14 @@ export default function ContactsDialog({ patient, onCancel, onAddContact, onEdit
           {!showAddForm && editingContactId === null && (
             <button
               onClick={() => setShowAddForm(true)}
-              className="flex-1 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100 active:scale-[0.97]"
+              className="flex-1 rounded-lg border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-600 hover:text-white active:scale-[0.97]"
             >
               + Add Contact
             </button>
           )}
           <button
             onClick={onCancel}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
             Done
           </button>

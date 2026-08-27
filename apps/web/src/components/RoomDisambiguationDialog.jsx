@@ -79,13 +79,13 @@ export default function RoomDisambiguationDialog({ spokenRoom, matchingRooms, on
         <div className="mt-4 flex gap-3">
           <button
             onClick={onManualEntry}
-            className="flex-1 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-300"
+            className="flex-1 rounded-lg bg-gray-200 px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white"
           >
             {t("patientMatch.noneOfThese")}
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white"
           >
             {t("common.cancel")}
           </button>

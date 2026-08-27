@@ -103,13 +103,13 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
           </button>
           <button
             onClick={() => setShowSendDialog(true)}
-            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.97]"
+            className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
             {t("handoff.sendToNurse")}
           </button>
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
             {isEditing ? t("handoff.doneEditing") : t("common.edit")}
           </button>

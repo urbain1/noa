@@ -282,7 +282,12 @@
     "commandExamples": "Exemples : « passer en urgent », « marquer comme terminée », « déplacer en chambre 405 », « supprimer »",
     "yourCommand": "Votre commande :",
     "deleteWarning": "Cette action supprimera la tâche. Confirmez à l'étape suivante.",
-    "applyChanges": "Appliquer les modifications"
+    "applyChanges": "Appliquer les modifications",
+    "createdBy": "Créée par :",
+    "assignedTo": "Assignée à :",
+    "completedBy": "Terminée par :",
+    "unknownNurse": "Inconnu",
+    "assignToMe": "Me l'assigner"
   },
   "patientDialog": {
     "addTitle": "Ajouter un patient",
@@ -400,7 +405,13 @@
     "unknownPatient": "Patient inconnu",
     "due": "Échéance {{value}}",
     "expandAria": "Afficher les détails de la tâche",
-    "collapseAria": "Masquer les détails de la tâche"
+    "collapseAria": "Masquer les détails de la tâche",
+    "filters": "Filtres",
+    "filterByNurse": "Infirmier(ère)",
+    "filterByPatient": "Patient",
+    "filterByStatus": "Statut",
+    "clearFilters": "Effacer les filtres",
+    "noFilterMatches": "Aucune tâche ne correspond aux filtres sélectionnés"
   },
   "profile": {
     "title": "Profil",

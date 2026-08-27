@@ -177,7 +177,12 @@ function App() {
   const [patientsError, setPatientsError] = useState(null);
   const [showAddPatient, setShowAddPatient] = useState(false);
   const [patientToEdit, setPatientToEdit] = useState(null);
-  const [taskToEdit, setTaskToEdit] = useState(null);
+  // Stores only the id, not the task object: TaskEditDialog now auto-saves
+  // and stays open across each save (no more "save closes the dialog"), so
+  // the task it displays must track `patients` live -- a frozen snapshot
+  // from the moment it was opened would show stale attribution/assignee
+  // data after the dialog's own writes land.
+  const [taskToEditId, setTaskToEditId] = useState(null);
 
   // Colleagues at this facility, for the assignee picker and Unit View's
   // personnel overview. Loaded alongside patients; a failure here is
@@ -233,6 +238,15 @@ function App() {
   // utils/taskOverdue.js. This is what feeds the three-dot menu's badge and
   // its attention-list bottom sheet, replacing the old demo-only simulated
   // "Delayed" status.
+  const taskToEdit = useMemo(() => {
+    if (!taskToEditId) return null;
+    for (const patient of patients) {
+      const found = patient.tasks.find((t) => t.id === taskToEditId);
+      if (found) return found;
+    }
+    return null;
+  }, [patients, taskToEditId]);
+
   const delayedTasks = useMemo(() => {
     const delayed = [];
     for (const patient of patients) {
@@ -660,7 +674,7 @@ function App() {
   };
 
   const handleEditTaskClick = (task) => {
-    setTaskToEdit(task);
+    setTaskToEditId(task.id);
   };
 
   const handleRepageTask = async (task) => {
@@ -695,6 +709,10 @@ function App() {
     }
   };
 
+  // Called per-field now (TaskEditDialog auto-saves on change), not once on
+  // an explicit Save click, so it must not close the dialog -- the nurse
+  // keeps editing after each field lands. Only the dialog's own Cancel/X
+  // closes it.
   const handleManualUpdateTask = async (updates, task) => {
     // The nurse id goes with the edit so that setting status to Completed
     // here records the same completer as the Complete button (FL1).
@@ -706,7 +724,6 @@ function App() {
           : p
       )
     );
-    setTaskToEdit(null);
   };
 
   // --- Note handlers (real writes) ---
@@ -1034,8 +1051,9 @@ function App() {
           patientId={taskToEdit.patient_id}
           patientLabel={patients.find((p) => p.id === taskToEdit.patient_id)?.label}
           nurses={nurses}
+          currentNurseId={session?.user?.id}
           onAssign={handleAssignTask}
-          onCancel={() => setTaskToEdit(null)}
+          onCancel={() => setTaskToEditId(null)}
           onManualUpdate={handleManualUpdateTask}
         />
       )}

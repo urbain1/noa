@@ -98,7 +98,7 @@ export default function DischargeDialog({ patient, onCancel, onConfirm }) {
           <button
             onClick={onCancel}
             disabled={saving}
-            className="flex-1 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex-1 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {t("common.cancel")}
           </button>

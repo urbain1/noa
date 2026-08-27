@@ -262,6 +262,11 @@ taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, 
 taskEdit.yourCommand,Your command:,Votre commande :
 taskEdit.deleteWarning,This will delete the task. Confirm in next step.,Cette action supprimera la tâche. Confirmez à l'étape suivante.
 taskEdit.applyChanges,Apply Changes,Appliquer les modifications
+taskEdit.createdBy,Created by:,Créée par :
+taskEdit.assignedTo,Assigned to:,Assignée à :
+taskEdit.completedBy,Completed by:,Terminée par :
+taskEdit.unknownNurse,Unknown,Inconnu
+taskEdit.assignToMe,Assign to me,Me l'assigner
 patientDialog.addTitle,Add Patient,Ajouter un patient
 patientDialog.editTitle,Edit Patient,Modifier le patient
 patientDialog.closeAria,Close,Fermer
@@ -358,6 +363,12 @@ tasksView.unknownPatient,Unknown patient,Patient inconnu
 tasksView.due,Due {{value}},Échéance {{value}}
 tasksView.expandAria,Show task details,Afficher les détails de la tâche
 tasksView.collapseAria,Hide task details,Masquer les détails de la tâche
+tasksView.filters,Filters,Filtres
+tasksView.filterByNurse,Nurse,Infirmier(ère)
+tasksView.filterByPatient,Patient,Patient
+tasksView.filterByStatus,Status,Statut
+tasksView.clearFilters,Clear filters,Effacer les filtres
+tasksView.noFilterMatches,No tasks match the selected filters,Aucune tâche ne correspond aux filtres sélectionnés
 profile.title,Profile,Profil
 profile.nameLabel,Name,Nom
 profile.nameHint,Shown to colleagues at your facility when a task is assigned to you.,Visible par vos collègues de l'établissement lorsqu'une tâche vous est attribuée.

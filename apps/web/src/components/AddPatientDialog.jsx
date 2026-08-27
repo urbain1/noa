@@ -186,7 +186,7 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={onCancel}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
             {t("common.cancel")}
           </button>

@@ -4,6 +4,13 @@ import { localeTag } from "../i18n";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import AssigneeSelect from "./AssigneeSelect";
 
+// How long a field's "Saved" confirmation stays visible after a successful
+// write, and how long description/deadline wait after the last keystroke
+// before saving -- long enough that a fast typist doesn't fire a write per
+// character, short enough that it still reads as "auto".
+const SAVED_FLASH_MS = 1800;
+const DEBOUNCE_MS = 700;
+
 // Canonical values, stored and matched as-is. Only the <option> label is
 // translated, never the value.
 const STATUS_OPTIONS = ["Pending", "Confirmed", "Delayed", "Completed"];
@@ -28,7 +35,44 @@ const statusStyles = {
   Completed: "bg-blue-100 text-blue-800",
 };
 
-export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], onAssign, onCancel, onUpdate, onManualUpdate }) {
+// Nurses come from the same facility-scoped list AssigneeSelect uses --
+// display name, falling back to email the same way that select does.
+function nurseName(nurses, id) {
+  if (!id) return null;
+  const nurse = nurses.find((n) => n.id === id);
+  if (!nurse) return null;
+  return nurse.name || nurse.email;
+}
+
+// `datetime-local` inputs want "YYYY-MM-DDTHH:mm" in the browser's own
+// timezone, not the UTC ISO string the column stores.
+function toLocalDatetimeValue(deadline) {
+  if (!deadline) return "";
+  const date = new Date(deadline);
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+// The brief, per-field confirmation every auto-saved field shows: a quiet
+// "Saving..." while the write is in flight, then a "Saved" flash that fades
+// on its own (SAVED_FLASH_MS). Never both at once.
+function FieldStatus({ t, saving, saved, className = "" }) {
+  if (saving) {
+    return <span className={`ml-2 text-xs font-normal text-gray-400 ${className}`}>{t("common.saving")}</span>;
+  }
+  if (saved) {
+    return (
+      <span className={`ml-2 inline-flex items-center gap-1 text-xs font-normal text-green-600 ${className}`}>
+        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+        {t("common.saved")}
+      </span>
+    );
+  }
+  return null;
+}
+
+export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, onAssign, onCancel, onUpdate, onManualUpdate }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -37,23 +81,139 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
   const [editMode, setEditMode] = useState("manual"); // "manual" or "ai"
-  const [isSavingManual, setIsSavingManual] = useState(false);
   const [manualFields, setManualFields] = useState({
     description: task?.description || "",
     status: task?.status || "Pending",
     department: task?.department || "Other",
     priority: task?.priority || "Routine",
-    deadline: task?.deadline ? new Date(new Date(task.deadline).getTime() - new Date(task.deadline).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "",
+    deadline: toLocalDatetimeValue(task?.deadline),
   });
 
-  const originalDeadlineLocal = task?.deadline ? new Date(new Date(task.deadline).getTime() - new Date(task.deadline).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+  // Per-field auto-save state: which fields are mid-write, and which just
+  // finished (drives the brief "Saved" flash). Keyed by the DB column name
+  // (description/status/department/priority/deadline/assigned_to), not the
+  // form field name, so the assignee's own save path can flash the same way.
+  const [savingFields, setSavingFields] = useState({});
+  const [savedFields, setSavedFields] = useState({});
+  const debounceTimers = useRef({});
+  const savedFlashTimers = useRef({});
+  const lastCommitted = useRef({
+    description: task?.description || "",
+    deadline: task?.deadline || null,
+  });
 
-  const hasManualChanges =
-    manualFields.description !== (task?.description || "") ||
-    manualFields.status !== (task?.status || "Pending") ||
-    manualFields.department !== (task?.department || "Other") ||
-    manualFields.priority !== (task?.priority || "Routine") ||
-    manualFields.deadline !== originalDeadlineLocal;
+  useEffect(() => {
+    const debounceTimersAtMount = debounceTimers.current;
+    const savedFlashTimersAtMount = savedFlashTimers.current;
+    return () => {
+      Object.values(debounceTimersAtMount).forEach(clearTimeout);
+      Object.values(savedFlashTimersAtMount).forEach(clearTimeout);
+    };
+  }, []);
+
+  const flashSaved = useCallback((field) => {
+    setSavedFields((prev) => ({ ...prev, [field]: true }));
+    clearTimeout(savedFlashTimers.current[field]);
+    savedFlashTimers.current[field] = setTimeout(() => {
+      setSavedFields((prev) => ({ ...prev, [field]: false }));
+    }, SAVED_FLASH_MS);
+  }, []);
+
+  // The one place that actually writes a field. `dbValue` is already in the
+  // shape the database expects (deadline as ISO, everything else as-is).
+  const commitField = useCallback(
+    async (field, dbValue) => {
+      setSavingFields((prev) => ({ ...prev, [field]: true }));
+      setError(null);
+      try {
+        await onManualUpdate({ [field]: dbValue }, task, patientId);
+        setSavingFields((prev) => ({ ...prev, [field]: false }));
+        flashSaved(field);
+      } catch (err) {
+        setSavingFields((prev) => ({ ...prev, [field]: false }));
+        setError(err.message || t("errors.updateTask"));
+      }
+    },
+    [onManualUpdate, task, patientId, t, flashSaved]
+  );
+
+  // Selects/status/department/priority save the moment they change -- a
+  // discrete choice, not something to debounce. Description and deadline
+  // debounce: typing (or picking a date/time digit by digit) fires the
+  // native onChange repeatedly, and saving on every one of those would mean
+  // a write per keystroke.
+  const scheduleField = useCallback(
+    (field, dbValue) => {
+      clearTimeout(debounceTimers.current[field]);
+      debounceTimers.current[field] = setTimeout(() => {
+        if (dbValue === lastCommitted.current[field]) return;
+        lastCommitted.current[field] = dbValue;
+        commitField(field, dbValue);
+      }, DEBOUNCE_MS);
+    },
+    [commitField]
+  );
+
+  const handleDescriptionChange = (value) => {
+    setManualFields((prev) => ({ ...prev, description: value }));
+    scheduleField("description", value);
+  };
+
+  const handleDeadlineChange = (value) => {
+    setManualFields((prev) => ({ ...prev, deadline: value }));
+    scheduleField("deadline", value ? new Date(value).toISOString() : null);
+  };
+
+  const handleStatusChange = (value) => {
+    setManualFields((prev) => ({ ...prev, status: value }));
+    commitField("status", value);
+  };
+
+  const handleDepartmentChange = (value) => {
+    setManualFields((prev) => ({ ...prev, department: value }));
+    commitField("department", value);
+  };
+
+  const handlePriorityChange = (value) => {
+    setManualFields((prev) => ({ ...prev, priority: value }));
+    commitField("priority", value);
+  };
+
+  // Flushes any pending debounced save immediately rather than dropping it
+  // -- closing right after typing shouldn't lose the edit just because the
+  // debounce window hadn't elapsed yet.
+  const handleClose = () => {
+    Object.entries(debounceTimers.current).forEach(([field, timer]) => {
+      if (!timer) return;
+      clearTimeout(timer);
+      const raw = field === "deadline" ? manualFields.deadline : manualFields[field];
+      const dbValue = field === "deadline" ? (raw ? new Date(raw).toISOString() : null) : raw;
+      if (dbValue !== lastCommitted.current[field]) {
+        onManualUpdate({ [field]: dbValue }, task, patientId).catch(() => {});
+      }
+    });
+    onCancel();
+  };
+
+  const handleAssigneeChange = async (nurseId) => {
+    await onAssign(task, nurseId);
+    flashSaved("assigned_to");
+  };
+
+  const [assigningToMe, setAssigningToMe] = useState(false);
+  // onAssign (App.jsx handleAssignTask) already reports its own failures via
+  // alert() and never rejects -- same contract AssigneeSelect relies on --
+  // so there's nothing to catch here, only the pending state to track.
+  const handleAssignToMe = async () => {
+    if (!currentNurseId || assigningToMe) return;
+    setAssigningToMe(true);
+    try {
+      await onAssign(task, currentNurseId);
+      flashSaved("assigned_to");
+    } finally {
+      setAssigningToMe(false);
+    }
+  };
 
   const finalCommand = voiceTranscript.trim() || textCommand.trim();
   const isDelete = /\bdelete\b/i.test(finalCommand);
@@ -132,30 +292,10 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     }
   };
 
-  const handleManualApply = async () => {
-    if (!hasManualChanges) return;
-    const updates = {};
-    if (manualFields.description !== (task?.description || "")) updates.description = manualFields.description;
-    if (manualFields.status !== (task?.status || "Pending")) updates.status = manualFields.status;
-    if (manualFields.department !== (task?.department || "Other")) updates.department = manualFields.department;
-    if (manualFields.priority !== (task?.priority || "Routine")) updates.priority = manualFields.priority;
-    if (manualFields.deadline !== originalDeadlineLocal) {
-      updates.deadline = manualFields.deadline ? new Date(manualFields.deadline).toISOString() : null;
-    }
-    setError(null);
-    setIsSavingManual(true);
-    try {
-      await onManualUpdate(updates, task, patientId);
-    } catch (err) {
-      setError(err.message || t("errors.updateTask"));
-      setIsSavingManual(false);
-    }
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={onCancel}
+      onClick={handleClose}
     >
       <div
         className="relative flex w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl"
@@ -165,7 +305,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <h2 className="text-2xl font-bold text-gray-900">{t("taskEdit.title")}</h2>
           <button
-            onClick={onCancel}
+            onClick={handleClose}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
             aria-label={t("taskEdit.closeAria")}
           >
@@ -203,14 +343,44 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
             </button>
           </div>
 
+          {/* Attribution: created / assigned / completed, each named
+              explicitly rather than merged into one line. Visible in both
+              modes since it isn't something either mode "owns". Completed
+              by only appears once the task actually has been -- a Pending
+              task showing "Completed by: —" would just be noise. Tasks
+              from before 0011 have no completed_by on record even when
+              Completed, shown as unknown rather than guessed from
+              created_by (decisions.md). */}
+          <div className="rounded-lg bg-gray-50 p-3 text-xs text-gray-600">
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              <span>
+                <span className="font-semibold text-gray-500">{t("taskEdit.createdBy")}</span>{" "}
+                {nurseName(nurses, task?.created_by) || t("taskEdit.unknownNurse")}
+              </span>
+              <span>
+                <span className="font-semibold text-gray-500">{t("taskEdit.assignedTo")}</span>{" "}
+                {nurseName(nurses, task?.assigned_to) || t("tasksView.unassigned")}
+              </span>
+              {task?.status === "Completed" && (
+                <span>
+                  <span className="font-semibold text-gray-500">{t("taskEdit.completedBy")}</span>{" "}
+                  {nurseName(nurses, task?.completed_by) || t("taskEdit.unknownNurse")}
+                </span>
+              )}
+            </div>
+          </div>
+
           {editMode === "manual" ? (
             <div className="flex flex-col gap-4">
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.description")}</label>
+                <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                  {t("taskEdit.description")}
+                  <FieldStatus t={t} saving={savingFields.description} saved={savedFields.description} />
+                </label>
                 <textarea
                   value={manualFields.description}
-                  onChange={(e) => setManualFields((prev) => ({ ...prev, description: e.target.value }))}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
                   rows={2}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
                 />
@@ -218,10 +388,13 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
               {/* Status dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.status")}</label>
+                <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                  {t("taskEdit.status")}
+                  <FieldStatus t={t} saving={savingFields.status} saved={savedFields.status} />
+                </label>
                 <select
                   value={manualFields.status}
-                  onChange={(e) => setManualFields((prev) => ({ ...prev, status: e.target.value }))}
+                  onChange={(e) => handleStatusChange(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {STATUS_OPTIONS.map((opt) => (
@@ -232,10 +405,13 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
               {/* Department dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.department")}</label>
+                <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                  {t("taskEdit.department")}
+                  <FieldStatus t={t} saving={savingFields.department} saved={savedFields.department} />
+                </label>
                 <select
                   value={manualFields.department}
-                  onChange={(e) => setManualFields((prev) => ({ ...prev, department: e.target.value }))}
+                  onChange={(e) => handleDepartmentChange(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {DEPARTMENT_OPTIONS.map((opt) => (
@@ -246,10 +422,13 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
               {/* Priority dropdown */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.priority")}</label>
+                <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                  {t("taskEdit.priority")}
+                  <FieldStatus t={t} saving={savingFields.priority} saved={savedFields.priority} />
+                </label>
                 <select
                   value={manualFields.priority}
-                  onChange={(e) => setManualFields((prev) => ({ ...prev, priority: e.target.value }))}
+                  onChange={(e) => handlePriorityChange(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   {PRIORITY_OPTIONS.map((opt) => (
@@ -260,27 +439,48 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
               {/* Deadline */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t("taskEdit.deadline")}</label>
+                <label className="mb-1 flex items-center text-sm font-medium text-gray-700">
+                  {t("taskEdit.deadline")}
+                  <FieldStatus t={t} saving={savingFields.deadline} saved={savedFields.deadline} />
+                </label>
                 <input
                   type="datetime-local"
                   value={manualFields.deadline}
-                  onChange={(e) => setManualFields((prev) => ({ ...prev, deadline: e.target.value }))}
+                  onChange={(e) => handleDeadlineChange(e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <p className="mt-1 text-xs text-gray-400">{t("taskEdit.deadlineHint")}</p>
               </div>
 
-              {/* Assignee. Saved on change rather than with the other
-                  fields: it is a separate write (lib/patients.js assignTask)
-                  with its own "migration not applied" failure mode, and
-                  bundling it would make one failure look like the other. */}
+              {/* Assignee, plus the one-click "assign to me" fast path.
+                  Created/assigned/completed stay deliberately independent
+                  (decisions.md) -- this is a shortcut for the nurse acting
+                  on the task right now, not an automatic side effect of
+                  editing or completing it. */}
               {onAssign && (
-                <AssigneeSelect
-                  compact
-                  value={task?.assigned_to || ""}
-                  nurses={nurses}
-                  onChange={(nurseId) => onAssign(task, nurseId)}
-                />
+                <div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <AssigneeSelect
+                        compact
+                        value={task?.assigned_to || ""}
+                        nurses={nurses}
+                        onChange={handleAssigneeChange}
+                      />
+                    </div>
+                    {currentNurseId && task?.assigned_to !== currentNurseId && (
+                      <button
+                        type="button"
+                        onClick={handleAssignToMe}
+                        disabled={assigningToMe}
+                        className="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {assigningToMe ? t("common.saving") : t("taskEdit.assignToMe")}
+                      </button>
+                    )}
+                  </div>
+                  <FieldStatus t={t} saving={false} saved={savedFields.assigned_to} className="mt-1" />
+                </div>
               )}
 
               {error && (
@@ -423,23 +623,19 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
           )}
         </div>
 
-        {/* Footer buttons */}
+        {/* Footer buttons. Manual mode has nothing to apply any more --
+            every field saves itself -- so it gets one full-width Close,
+            not a Cancel it would be misleading to keep next to a
+            non-functional Save. AI mode still needs both: the typed/spoken
+            command isn't applied until Apply Changes. */}
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
-            onClick={onCancel}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+            onClick={handleClose}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
           >
-            {t("common.cancel")}
+            {editMode === "manual" ? t("common.close") : t("common.cancel")}
           </button>
-          {editMode === "manual" ? (
-            <button
-              onClick={handleManualApply}
-              disabled={!hasManualChanges || isSavingManual}
-              className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isSavingManual ? t("common.saving") : t("common.saveChanges")}
-            </button>
-          ) : (
+          {editMode === "ai" && (
             <button
               onClick={handleApply}
               disabled={!finalCommand || isProcessing}

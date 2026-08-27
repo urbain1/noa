@@ -128,7 +128,7 @@ export default function ShareUpdateDialog({ patient, onCancel, onSend, onAddCont
           <div className="flex gap-3">
             <button
               onClick={onCancel}
-              className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200 active:scale-[0.97]"
+              className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
             >
               Cancel
             </button>

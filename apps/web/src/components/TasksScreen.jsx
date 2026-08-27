@@ -9,6 +9,32 @@ import { sortTasks, taskSortGroup, SORT_GROUP_URGENT, SORT_GROUP_OVERDUE } from 
 import { isTaskOverdue } from "../utils/taskOverdue";
 import { localeTag } from "../i18n";
 
+// Every value tasks.status can actually hold (0001, plus Cancelled from
+// discharge-plan cancellation) -- a superset of TaskEditDialog's
+// STATUS_OPTIONS, which only lists what a nurse can manually set a task to.
+const STATUS_FILTER_OPTIONS = ["Pending", "Confirmed", "Delayed", "Completed", "Cancelled"];
+
+// Sentinel for "no assignee" in the nurse filter -- not a real nurse id, so
+// it can't collide with one.
+const UNASSIGNED_FILTER = "__unassigned__";
+
+function FilterChip({ active, onClick, children }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+        active
+          ? "border-blue-600 bg-blue-600 text-white"
+          : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-700 hover:text-white"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
 // Deadline as an absolute time. The relative form ("Overdue by 20m") already
 // lives on TaskCard in the expanded row; repeating it in the summary line
 // would say the same thing twice. 24-hour in French, 12-hour with AM/PM in
@@ -154,6 +180,25 @@ export default function TasksScreen({
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Multi-select per dimension: an empty array means "no filter on this
+  // dimension", not "match nothing". Kept separate from `query` -- text
+  // search and these dropdown filters both narrow the same list, but
+  // clearing one shouldn't clear the other.
+  const [nurseFilter, setNurseFilter] = useState([]);
+  const [patientFilter, setPatientFilter] = useState([]);
+  const [statusFilter, setStatusFilter] = useState([]);
+
+  const toggleFilter = (setFn, value) => {
+    setFn((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  };
+
+  const activeFilterCount = nurseFilter.length + patientFilter.length + statusFilter.length;
+  const clearFilters = () => {
+    setNurseFilter([]);
+    setPatientFilter([]);
+    setStatusFilter([]);
+  };
 
   // Flattened once, then sorted by the shared comparator so this screen and
   // Patient View can't disagree about ordering.
@@ -170,11 +215,20 @@ export default function TasksScreen({
 
   // Plain client-side text filter over what's already loaded -- description,
   // patient label, location label and assignee name. No server-side search,
-  // no saved filters (deliberately out of scope).
+  // no saved filters (deliberately out of scope). The dropdown filters below
+  // narrow the same list further, live, on top of whatever the text search
+  // already matched.
   const visibleTasks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return allTasks;
     return allTasks.filter(({ task, patient }) => {
+      if (nurseFilter.length > 0) {
+        const key = task.assigned_to || UNASSIGNED_FILTER;
+        if (!nurseFilter.includes(key)) return false;
+      }
+      if (patientFilter.length > 0 && !patientFilter.includes(patient?.id)) return false;
+      if (statusFilter.length > 0 && !statusFilter.includes(task.status)) return false;
+
+      if (!q) return true;
       const assignee = nurses.find((n) => n.id === task.assigned_to);
       return [
         task.description,
@@ -185,7 +239,7 @@ export default function TasksScreen({
         .filter(Boolean)
         .some((field) => field.toLowerCase().includes(q));
     });
-  }, [allTasks, query, nurses]);
+  }, [allTasks, query, nurses, nurseFilter, patientFilter, statusFilter]);
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-100">
@@ -216,13 +270,85 @@ export default function TasksScreen({
           </p>
         </div>
 
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("tasksView.searchPlaceholder")}
-          className="mb-3 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
+        <div className="mb-3 flex items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("tasksView.searchPlaceholder")}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button
+            type="button"
+            onClick={() => setFiltersOpen((open) => !open)}
+            aria-expanded={filtersOpen}
+            className={`relative flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              filtersOpen
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-700 hover:text-white"
+            }`}
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 8h12M10 12h4" />
+            </svg>
+            {t("tasksView.filters")}
+            {activeFilterCount > 0 && (
+              <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {filtersOpen && (
+          <div className="mb-3 flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3">
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("tasksView.filterByNurse")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                <FilterChip active={nurseFilter.includes(UNASSIGNED_FILTER)} onClick={() => toggleFilter(setNurseFilter, UNASSIGNED_FILTER)}>
+                  {t("tasksView.unassigned")}
+                </FilterChip>
+                {nurses.map((nurse) => (
+                  <FilterChip key={nurse.id} active={nurseFilter.includes(nurse.id)} onClick={() => toggleFilter(setNurseFilter, nurse.id)}>
+                    {nurse.name || nurse.email}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("tasksView.filterByPatient")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {patients.map((patient) => (
+                  <FilterChip key={patient.id} active={patientFilter.includes(patient.id)} onClick={() => toggleFilter(setPatientFilter, patient.id)}>
+                    {patient.label}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("tasksView.filterByStatus")}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_FILTER_OPTIONS.map((status) => (
+                  <FilterChip key={status} active={statusFilter.includes(status)} onClick={() => toggleFilter(setStatusFilter, status)}>
+                    {statusLabel(t, status)}
+                  </FilterChip>
+                ))}
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="self-start text-xs font-semibold text-blue-700 hover:underline"
+              >
+                {t("tasksView.clearFilters")}
+              </button>
+            )}
+          </div>
+        )}
 
         {allTasks.length === 0 ? (
           <p className="rounded-lg bg-white p-6 text-center text-sm text-gray-400">
@@ -230,7 +356,7 @@ export default function TasksScreen({
           </p>
         ) : visibleTasks.length === 0 ? (
           <p className="rounded-lg bg-white p-6 text-center text-sm text-gray-400">
-            {t("tasksView.noMatches", { query: query.trim() })}
+            {query.trim() ? t("tasksView.noMatches", { query: query.trim() }) : t("tasksView.noFilterMatches")}
           </p>
         ) : (
           <ul className="flex flex-col gap-2 pb-8">

@@ -148,7 +148,7 @@ export default function ProfileScreen({ session, nurseProfile, onNameSaved, onSi
             type="button"
             onClick={handleChangeEmail}
             disabled={!emailChanged || savingEmail}
-            className="mt-3 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
             {savingEmail ? t("common.saving") : t("profile.changeEmail")}
           </button>
@@ -159,7 +159,7 @@ export default function ProfileScreen({ session, nurseProfile, onNameSaved, onSi
           <button
             type="button"
             onClick={onSignOut}
-            className="w-full rounded-lg bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-100 active:scale-[0.97]"
+            className="w-full rounded-lg bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-600 hover:text-white active:scale-[0.97]"
           >
             {t("profile.signOut")}
           </button>
