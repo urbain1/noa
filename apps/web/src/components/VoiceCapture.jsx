@@ -97,14 +97,46 @@ function parseTranscriptFallback(text) {
 // recognise with certainty, and leaves everything else null for the nurse to
 // fill in on the review form. Guessing a diagnosis or an age onto a clinical
 // record is worse than leaving the field empty.
+// Web Speech API commonly transcribes small spoken numbers as words ("four")
+// while multi-digit numbers usually come through as numerals ("12", "35").
+// The label rule (SECURITY.md) is understood to cover both -- the server
+// prompt spells out "patient test three" -> "Patient_Test_3" -- but the
+// digit-only regex below missed the word form entirely, silently failing
+// label extraction for any single-digit Patient_Test_N spoken naturally.
+const NUMBER_WORDS = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
+  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60,
+  seventy: 70, eighty: 80, ninety: 90,
+};
+
+function wordsToNumber(phrase) {
+  const parts = phrase.toLowerCase().split(/[\s-]+/).filter(Boolean);
+  if (parts.length === 0 || parts.length > 2 || !parts.every((p) => p in NUMBER_WORDS)) return null;
+  if (parts.length === 1) return NUMBER_WORDS[parts[0]];
+  const [tens, ones] = parts.map((p) => NUMBER_WORDS[p]);
+  return tens >= 20 && tens % 10 === 0 && ones < 10 ? tens + ones : null;
+}
+
 function parsePatientTranscriptFallback(text) {
   const lower = text.toLowerCase();
 
   // Patient_Test_N only. Never a name, a real room/bed number, or an ID --
   // see SECURITY.md. Anything else leaves the label blank.
   let label = null;
-  const labelMatch = lower.match(/\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*(\d{1,4})\b/);
-  if (labelMatch) label = `Patient_Test_${labelMatch[1]}`;
+  const labelDigitMatch = lower.match(/\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*(\d{1,4})\b/);
+  if (labelDigitMatch) {
+    label = `Patient_Test_${labelDigitMatch[1]}`;
+  } else {
+    const labelWordMatch = lower.match(
+      /\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*((?:[a-z]+[\s-])?[a-z]+)\b/
+    );
+    if (labelWordMatch) {
+      const n = wordsToNumber(labelWordMatch[1]);
+      if (n !== null) label = `Patient_Test_${n}`;
+    }
+  }
 
   // "68 year old" / "68 ans" / "aged 68"
   let age = null;
@@ -131,6 +163,18 @@ function parsePatientTranscriptFallback(text) {
   );
   if (diagnosisMatch) diagnosis = diagnosisMatch[1].trim();
 
+  // Attending physician, either "attending (physician) is/: Dr X" or
+  // "Dr X is the attending (physician)".
+  let attendingPhysician = null;
+  const physicianLeadInMatch = text.match(
+    /\b(?:attending physician|attending doctor|attending|médecin traitant)\s*(?:is|:)?\s+(Dr\.?\s*[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?|[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?)/
+  );
+  const physicianTrailingMatch = text.match(
+    /\b(Dr\.?\s*[A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)?)\s+is\s+(?:the\s+)?attending/i
+  );
+  if (physicianLeadInMatch) attendingPhysician = physicianLeadInMatch[1].trim();
+  else if (physicianTrailingMatch) attendingPhysician = physicianTrailingMatch[1].trim();
+
   // Synthetic location labels only ("Test Room A", "Bay 2").
   let locationLabel = null;
   const locationMatch = text.match(/\b(?:test room|bay|chambre test)\s+([A-Za-z0-9]{1,4})\b/i);
@@ -141,7 +185,7 @@ function parsePatientTranscriptFallback(text) {
     age,
     diagnosis,
     codeStatus,
-    attendingPhysician: null,
+    attendingPhysician,
     allergies: [],
     admissionDate: null,
     locationLabel,
