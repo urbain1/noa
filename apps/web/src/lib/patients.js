@@ -82,13 +82,49 @@ export async function createTask(facilityId, patientId, createdBy, fields) {
   return data
 }
 
-export async function completeTask(taskId) {
+// True when Postgres/PostgREST rejected a write because a column doesn't
+// exist yet -- i.e. migration 0011 hasn't been run against this project.
+// 42703 is Postgres' undefined_column; PGRST204 is PostgREST's schema-cache
+// equivalent. Used to keep pre-0011 behaviour working instead of breaking
+// task completion outright, per the "degrade visibly, don't crash" rule.
+function isMissingColumnError(error, column) {
+  if (!error) return false
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST204' ||
+    (typeof error.message === 'string' && error.message.includes(column))
+  )
+}
+
+// `completedBy` records which nurse actually marked the task complete
+// (0011). It is deliberately separate from `created_by`: the nurse who
+// raised a task is very often not the one who closed it, and Unit View's
+// personnel overview reports the two as distinct figures.
+//
+// Tasks completed before 0011 keep completed_by NULL, which is shown as
+// "unknown" rather than being attributed to anyone.
+export async function completeTask(taskId, completedBy = null) {
+  const completion = { status: 'Completed', completed_at: new Date().toISOString() }
+
   const { data, error } = await supabase
     .from('tasks')
-    .update({ status: 'Completed', completed_at: new Date().toISOString() })
+    .update({ ...completion, completed_by: completedBy })
     .eq('id', taskId)
     .select()
     .single()
+
+  if (error && isMissingColumnError(error, 'completed_by')) {
+    // 0011 not applied yet: complete the task anyway, without attribution.
+    console.warn('[patients] completed_by column missing -- migration 0011 not applied. Completing without attribution.')
+    const retry = await supabase
+      .from('tasks')
+      .update(completion)
+      .eq('id', taskId)
+      .select()
+      .single()
+    if (retry.error) throw retry.error
+    return retry.data
+  }
 
   if (error) throw error
   return data
@@ -104,6 +140,9 @@ export async function updateTask(taskId, fields) {
   if (fields.priority !== undefined) updates.priority = fields.priority === 'Stat' ? 'Stat' : 'Routine'
   if (fields.deadline !== undefined) updates.deadline = fields.deadline || null
   if (fields.status !== undefined) updates.status = fields.status
+  // null is a real value here -- it clears the assignee back to unassigned,
+  // which stays a valid state for any task (0011).
+  if (fields.assignedTo !== undefined) updates.assigned_to = fields.assignedTo
 
   const { data, error } = await supabase
     .from('tasks')
@@ -204,4 +243,73 @@ export async function addNote(facilityId, patientId, nurseId, content) {
 
   if (error) throw error
   return data
+}
+
+// Assign a task to a nurse at the same facility, or clear the assignment by
+// passing null. Assignment is optional -- unassigned is a valid resting
+// state, not an error.
+//
+// Visibility is deliberately untouched: `tasks_facility_scope` (0001/0002)
+// still shows every task at the facility to every nurse there, assigned or
+// not. Per-nurse task visibility is a ward-manager decision (project.md),
+// not something this write should quietly start implying.
+//
+// If 0011 hasn't been applied, this throws a `MISSING_MIGRATION_0011` error
+// the UI can recognise and explain, rather than failing with a raw Postgres
+// message or silently doing nothing.
+export async function assignTask(taskId, nurseId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .update({ assigned_to: nurseId })
+    .eq('id', taskId)
+    .select()
+    .single()
+
+  if (error && isMissingColumnError(error, 'assigned_to')) {
+    const err = new Error('MISSING_MIGRATION_0011')
+    err.code = 'MISSING_MIGRATION_0011'
+    throw err
+  }
+  if (error) throw error
+  return data
+}
+
+// Discharge planning creates ordinary tasks: same table, same facility
+// scope, same statuses, so they appear and sort in every existing view
+// exactly like any other task. `task_type: 'discharge'` (0011) is the only
+// thing that marks them, so the discharge badge and any future filter don't
+// have to guess from the description text.
+//
+// Falls back to creating them untagged if 0011 hasn't been applied -- a
+// discharge task that exists but isn't tagged is far better than a nurse's
+// discharge planning silently failing. The caller is told via the returned
+// `tagged` flag so it can say so.
+export async function createDischargeTasks(facilityId, patientId, createdBy, taskDrafts) {
+  const rows = taskDrafts.map((draft) => ({
+    facility_id: facilityId,
+    patient_id: patientId,
+    created_by: createdBy,
+    description: draft.description,
+    department: draft.department || 'Other',
+    priority: draft.priority === 'Stat' ? 'Stat' : 'Routine',
+    deadline: draft.deadline || null,
+    task_type: 'discharge',
+  }))
+
+  const { data, error } = await supabase.from('tasks').insert(rows).select()
+
+  if (error && isMissingColumnError(error, 'task_type')) {
+    console.warn('[patients] task_type column missing -- migration 0011 not applied. Creating discharge tasks untagged.')
+    const untagged = rows.map((row) => {
+      const copy = { ...row }
+      delete copy.task_type
+      return copy
+    })
+    const retry = await supabase.from('tasks').insert(untagged).select()
+    if (retry.error) throw retry.error
+    return { tasks: retry.data, tagged: false }
+  }
+
+  if (error) throw error
+  return { tasks: data, tagged: true }
 }

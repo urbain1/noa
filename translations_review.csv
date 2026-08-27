@@ -216,7 +216,7 @@ patientDialog.admissionDate,Admission Date,Date d'admission
 patientDialog.locationLabel,Location Label,Emplacement
 patientDialog.locationLabelPlaceholder,Test Room A,Chambre Test A
 patientDialog.addButton,Add Patient,Ajouter le patient
-discharge.title,Discharge Planning – Room {{room}},Préparation de la sortie – Chambre {{room}}
+discharge.title,Discharge Planning – {{patient}},Préparation de la sortie – {{patient}}
 discharge.notifyPatient,Notify patient about discharge,Informer le patient de sa sortie
 discharge.requestNursingHome,Request nursing home placement,Demander un placement en EHPAD
 discharge.notesLabel,Additional notes (optional),Notes complémentaires (facultatif)
@@ -263,3 +263,62 @@ enums.codeStatus.DNR/DNI,DNR/DNI,Ne pas réanimer / ne pas intuber
 enums.codeStatus.Comfort Care,Comfort Care,Soins de confort
 enums.suggestionType.task,task,tâche
 enums.suggestionType.note,note,note
+common.saved,Saved,Enregistré
+errors.assignTask,Failed to assign task. Please try again.,Échec de l'attribution de la tâche. Veuillez réessayer.
+errors.assignUnavailable,Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.,L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.
+errors.createDischargeTasks,Failed to create discharge planning tasks. Please try again.,Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.
+errors.dischargeTasksUntagged,"Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.","Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée."
+errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
+nav.backToTasks,Back to Tasks,Retour aux tâches
+nav.backToUnit,Back to Unit View,Retour à la vue du service
+dashboard.tasksView,Tasks,Tâches
+dashboard.addPatientByVoice,Add by voice,Ajouter par la voix
+dashboard.noPatients,No patients yet. Add one to get started.,Aucun patient pour le moment. Ajoutez-en un pour commencer.
+patientCard.dischargePlanning,Discharge Planning,Préparation de la sortie
+tasksView.heading,All Tasks,Toutes les tâches
+tasksView.taskCount_one,{{count}} task,{{count}} tâche
+tasksView.taskCount_other,{{count}} tasks,{{count}} tâches
+tasksView.searchPlaceholder,"Filter by task, patient or nurse...","Filtrer par tâche, patient ou infirmier(ère)..."
+tasksView.empty,No tasks yet at this facility.,Aucune tâche pour le moment dans cet établissement.
+tasksView.noMatches,"No tasks match ""{{query}}""",Aucune tâche ne correspond à « {{query}} »
+tasksView.unassigned,Unassigned,Non attribuée
+tasksView.assignee,Assigned to,Attribuée à
+tasksView.unknownPatient,Unknown patient,Patient inconnu
+tasksView.due,Due {{value}},Échéance {{value}}
+tasksView.expandAria,Show task details,Afficher les détails de la tâche
+tasksView.collapseAria,Hide task details,Masquer les détails de la tâche
+topMenu.profile,Profile,Profil
+topMenu.noPatients,No patients to discharge,Aucun patient à faire sortir
+voiceCapture.titlePatient,Add Patient by Voice,Ajouter un patient par la voix
+voiceCapture.tapToRecordPatient,Tap to describe a new patient,Appuyez pour décrire un nouveau patient
+voiceCapture.examplePatient,"Try: ""Patient Test 4, 72 years old, admitted with pneumonia, Test Room B""","Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »"
+voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels."
+voiceCapture.reviewPatient,Review Patient,Vérifier le patient
+patientDialog.voiceReviewHint,"Review every field before saving. Anything Noa could not make out has been left blank, fill it in yourself. AI transcription can be wrong.","Vérifiez chaque champ avant d'enregistrer. Tout ce que Noa n'a pas pu identifier a été laissé vide, complétez-le vous-même. La transcription par IA peut être erronée."
+discharge.selectAtLeastOne,Select at least one item to create tasks.,Sélectionnez au moins un élément pour créer des tâches.
+unitView.statCount_one,{{count}} STAT,{{count}} immédiate
+unitView.statCount_other,{{count}} STAT,{{count}} immédiates
+unitView.delayedAttentionCount_one,{{count}} delayed,{{count}} en retard
+unitView.delayedAttentionCount_other,{{count}} delayed,{{count}} en retard
+unitView.personnel,Personnel,Personnel
+unitView.nurseCount_one,{{count}} nurse,{{count}} infirmier(ère)
+unitView.nurseCount_other,{{count}} nurses,{{count}} infirmier(ère)s
+unitView.noNurses,No colleagues found at this facility.,Aucun collègue trouvé dans cet établissement.
+unitView.nurse,Nurse,Infirmier(ère)
+unitView.tasksCreated,Created,Créées
+unitView.tasksAssigned,Assigned,Attribuées
+unitView.tasksCompleted,Completed,Terminées
+unitView.unassignedTasks_one,{{count}} unassigned task,{{count}} tâche non attribuée
+unitView.unassignedTasks_other,{{count}} unassigned tasks,{{count}} tâches non attribuées
+unitView.completedUnknown_one,{{count}} completed by unknown,{{count}} terminée par un(e) inconnu(e)
+unitView.completedUnknown_other,{{count}} completed by unknown,{{count}} terminées par un(e) inconnu(e)
+profile.title,Profile,Profil
+profile.nameLabel,Name,Nom
+profile.nameHint,Shown to colleagues at your facility when a task is assigned to you.,Visible par vos collègues de l'établissement lorsqu'une tâche vous est attribuée.
+profile.saveName,Save name,Enregistrer le nom
+profile.nameSaved,Name saved.,Nom enregistré.
+profile.emailLabel,Email,E-mail
+profile.emailHint,Changing this sends a confirmation link to the new address. The change only takes effect once you click it.,Cette modification envoie un lien de confirmation à la nouvelle adresse. Le changement ne prend effet qu'après avoir cliqué sur ce lien.
+profile.changeEmail,Change email,Modifier l'e-mail
+profile.emailConfirmationSent,Confirmation link sent to {{email}}. The change takes effect once you click it.,Lien de confirmation envoyé à {{email}}. Le changement prendra effet après avoir cliqué dessus.
+profile.signOut,Sign out,Se déconnecter

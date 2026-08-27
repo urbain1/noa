@@ -15,7 +15,8 @@
     "none": "None",
     "or": "or",
     "syntheticDataOnly": "Synthetic data only — no real patient information",
-    "builtBy": "Built by Noa Health"
+    "builtBy": "Built by Noa Health",
+    "saved": "Saved"
   },
   "errors": {
     "loadPatients": "Could not load patients. Please try reloading.",
@@ -28,6 +29,7 @@
     "saveNote": "Failed to save note. Please try again.",
     "generateHandoff": "Failed to generate handoff summary. Please try again.",
     "generateSbar": "Failed to generate SBAR summary. Please try again.",
+    "generatePatientUpdate": "Failed to generate patient update. Please try again.",
     "parseTask": "Could not parse task. Please try again.",
     "createTask": "Error creating task. Please try again.",
     "recordFirst": "Please record something first",
@@ -43,7 +45,12 @@
     "speechUnsupported": "Speech recognition is not supported in this browser.",
     "micDenied": "Microphone access denied. Please allow microphone permissions.",
     "speechError": "Speech recognition error: {{error}}",
-    "speechStartFailed": "Failed to start speech recognition."
+    "speechStartFailed": "Failed to start speech recognition.",
+    "assignTask": "Failed to assign task. Please try again.",
+    "assignUnavailable": "Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.",
+    "createDischargeTasks": "Failed to create discharge planning tasks. Please try again.",
+    "dischargeTasksUntagged": "Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.",
+    "updateName": "Could not save your name. Please try again."
   },
   "language": {
     "label": "Language",
@@ -109,7 +116,10 @@
     "myPatients": "My Patients",
     "unitView": "Unit View",
     "addPatient": "Add Patient",
-    "voiceInputAria": "Voice input"
+    "voiceInputAria": "Voice input",
+    "tasksView": "Tasks",
+    "addPatientByVoice": "Add by voice",
+    "noPatients": "No patients yet. Add one to get started."
   },
   "patientCard": {
     "dischargePlanningBadge": "Discharge Planning",
@@ -117,13 +127,15 @@
     "admitted": "Admitted {{date}}",
     "allergies": "Allergies: {{list}}",
     "sbarSummary": "SBAR Summary",
+    "familyUpdate": "Family Update",
     "editPatientAria": "Edit patient",
     "tasksLabel": "Tasks",
     "notesLabel": "Clinical Notes",
     "newCount": "+ {{count}} new",
     "addTask": "+ Add Task",
     "addNote": "+ Add Note",
-    "noNotes": "No clinical notes yet"
+    "noNotes": "No clinical notes yet",
+    "dischargePlanning": "Discharge Planning"
   },
   "taskCard": {
     "justNow": "just now",
@@ -158,7 +170,9 @@
     "repage": "Repage",
     "escalate": "Escalate",
     "backArrow": "← Back",
-    "room": "Room {{room}}"
+    "room": "Room {{room}}",
+    "profile": "Profile",
+    "noPatients": "No patients to discharge"
   },
   "voiceCapture": {
     "title": "Voice Capture",
@@ -171,7 +185,12 @@
     "exampleGeneral": "Try: \"Order a CBC stat for Patient Test 1 due tomorrow\"",
     "transcriptLabel": "Transcript (tap to edit):",
     "transcriptPlaceholder": "Your speech will appear here. Tap to write or edit before creating a task.",
-    "createTask": "Create Task"
+    "createTask": "Create Task",
+    "titlePatient": "Add Patient by Voice",
+    "tapToRecordPatient": "Tap to describe a new patient",
+    "examplePatient": "Try: \"Patient Test 4, 72 years old, admitted with pneumonia, Test Room B\"",
+    "patientSyntheticHint": "Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number.",
+    "reviewPatient": "Review Patient"
   },
   "patientMatch": {
     "multipleFound": "Multiple Patients Found",
@@ -210,6 +229,11 @@
       "methodEmail": "Email",
       "sendButton": "Send"
     }
+  },
+  "patientUpdate": {
+    "title": "Family Update",
+    "subtitle": "Plain-language update for patients and families",
+    "footer": "Questions? Contact your nurse."
   },
   "suggestions": {
     "title": "AI Suggested Follow-ups",
@@ -269,17 +293,19 @@
     "admissionDate": "Admission Date",
     "locationLabel": "Location Label",
     "locationLabelPlaceholder": "Test Room A",
-    "addButton": "Add Patient"
+    "addButton": "Add Patient",
+    "voiceReviewHint": "Review every field before saving. Anything Noa could not make out has been left blank, fill it in yourself. AI transcription can be wrong."
   },
   "discharge": {
-    "title": "Discharge Planning – Room {{room}}",
+    "title": "Discharge Planning – {{patient}}",
     "notifyPatient": "Notify patient about discharge",
     "requestNursingHome": "Request nursing home placement",
     "notesLabel": "Additional notes (optional)",
     "notesPlaceholder": "Enter any additional discharge notes...",
     "createTasks": "Create Tasks",
     "taskNotifyPatient": "Notify patient about discharge plan",
-    "taskArrangeNursingHome": "Arrange nursing home placement"
+    "taskArrangeNursingHome": "Arrange nursing home placement",
+    "selectAtLeastOne": "Select at least one item to create tasks."
   },
   "unitView": {
     "patients": "Patients",
@@ -299,7 +325,23 @@
     "delayedCount": "{{count}} delayed",
     "attnDelayed": "{{department}} — delayed, no response",
     "attnStatPending": "{{department}} — stat order pending",
-    "attnOverdue": "Overdue by {{value}}"
+    "attnOverdue": "Overdue by {{value}}",
+    "statCount_one": "{{count}} STAT",
+    "statCount_other": "{{count}} STAT",
+    "delayedAttentionCount_one": "{{count}} delayed",
+    "delayedAttentionCount_other": "{{count}} delayed",
+    "personnel": "Personnel",
+    "nurseCount_one": "{{count}} nurse",
+    "nurseCount_other": "{{count}} nurses",
+    "noNurses": "No colleagues found at this facility.",
+    "nurse": "Nurse",
+    "tasksCreated": "Created",
+    "tasksAssigned": "Assigned",
+    "tasksCompleted": "Completed",
+    "unassignedTasks_one": "{{count}} unassigned task",
+    "unassignedTasks_other": "{{count}} unassigned tasks",
+    "completedUnknown_one": "{{count}} completed by unknown",
+    "completedUnknown_other": "{{count}} completed by unknown"
   },
   "enums": {
     "department": {
@@ -333,5 +375,35 @@
       "task": "task",
       "note": "note"
     }
+  },
+  "nav": {
+    "backToTasks": "Back to Tasks",
+    "backToUnit": "Back to Unit View"
+  },
+  "tasksView": {
+    "heading": "All Tasks",
+    "taskCount_one": "{{count}} task",
+    "taskCount_other": "{{count}} tasks",
+    "searchPlaceholder": "Filter by task, patient or nurse...",
+    "empty": "No tasks yet at this facility.",
+    "noMatches": "No tasks match \"{{query}}\"",
+    "unassigned": "Unassigned",
+    "assignee": "Assigned to",
+    "unknownPatient": "Unknown patient",
+    "due": "Due {{value}}",
+    "expandAria": "Show task details",
+    "collapseAria": "Hide task details"
+  },
+  "profile": {
+    "title": "Profile",
+    "nameLabel": "Name",
+    "nameHint": "Shown to colleagues at your facility when a task is assigned to you.",
+    "saveName": "Save name",
+    "nameSaved": "Name saved.",
+    "emailLabel": "Email",
+    "emailHint": "Changing this sends a confirmation link to the new address. The change only takes effect once you click it.",
+    "changeEmail": "Change email",
+    "emailConfirmationSent": "Confirmation link sent to {{email}}. The change takes effect once you click it.",
+    "signOut": "Sign out"
   }
 }

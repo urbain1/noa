@@ -1,14 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import TaskCard from "./TaskCard";
 import NoteCard from "./NoteCard";
 import { computeRiskScore, getRiskLevel } from "./ChargeNurseDashboard";
 import { localeTag } from "../i18n";
+import { sortTasks } from "../utils/taskSort";
 import { codeStatusLabel } from "../i18n/enums";
 
+// `task_type` (0011) is the reliable marker: it is set only by the
+// discharge-planning workflow. The department/description heuristic below it
+// is kept as a fallback for tasks created before 0011 -- it over-matches
+// (any Social Work task, any task merely mentioning discharge), which is
+// exactly why it isn't the primary test any more.
 function showDischargeBadge(tasks) {
   return tasks.some((task) => {
-    const desc = task.description.toLowerCase();
+    if (task.task_type === "discharge") return true;
+    const desc = (task.description || "").toLowerCase();
     return task.department === "Social Work" || desc.includes("discharge");
   });
 }
@@ -22,14 +29,23 @@ function formatAdmissionDate(dateStr, locale) {
   });
 }
 
-export default function PatientCard({ patient, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar }) {
+export default function PatientCard({ patient, isFocused, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient }) {
   const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
-  const [tasksExpanded, setTasksExpanded] = useState(false);
+  // Opened from the Tasks screen or Unit View: show the task list straight
+  // away rather than making the nurse expand it again after the jump.
+  const [tasksExpanded, setTasksExpanded] = useState(Boolean(isFocused));
   const [sbarLoading, setSbarLoading] = useState(false);
+  const [patientUpdateLoading, setPatientUpdateLoading] = useState(false);
 
   const tasks = patient.tasks || [];
   const notes = patient.notes || [];
+
+  // Same ordering the Tasks screen uses -- one shared function so the two
+  // can't disagree about what's most urgent (scenarios.md SC-7). The
+  // unsorted `tasks` stays as-is for counts and new-task detection, which
+  // care about membership, not order.
+  const sortedTasks = useMemo(() => sortTasks(patient.tasks || []), [patient.tasks]);
 
   const [prevTaskIds, setPrevTaskIds] = useState(() => new Set(tasks.map((t) => t.id)));
   const [newTaskCount, setNewTaskCount] = useState(0);
@@ -107,12 +123,22 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
     Promise.resolve(onGenerateSbar(patient)).finally(() => setSbarLoading(false));
   };
 
+  const handleGeneratePatientUpdate = () => {
+    if (!onGeneratePatientUpdate || patientUpdateLoading) return;
+    setPatientUpdateLoading(true);
+    Promise.resolve(onGeneratePatientUpdate(patient)).finally(() => setPatientUpdateLoading(false));
+  };
+
   const riskScore = computeRiskScore(patient);
   const riskLevel = getRiskLevel(riskScore);
   const admissionDisplay = formatAdmissionDate(patient.admission_date, localeTag(i18n.language));
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-5">
+    <div
+      className={`rounded-xl border bg-white p-4 shadow-sm transition-shadow duration-200 hover:shadow-md sm:p-5 ${
+        isFocused ? "border-blue-400 ring-2 ring-blue-200" : "border-gray-200"
+      }`}
+    >
       <div className="flex items-start justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -159,14 +185,6 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
           )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button
-            type="button"
-            onClick={handleGenerateSbar}
-            disabled={sbarLoading}
-            className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {sbarLoading ? t("common.generating") : t("patientCard.sbarSummary")}
-          </button>
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600 ring-1 ring-blue-200">
             {tasks.length}
           </span>
@@ -181,6 +199,39 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
             </svg>
           </button>
         </div>
+      </div>
+
+      {/* Patient actions. Three different actions producing three different
+          things, so each carries its own hue instead of all reading as one
+          undifferentiated blue: discharge planning green, SBAR blue
+          (unchanged), family update purple. Every pairing is a -700 text on
+          a -50 background (>= 7:1 on white), chosen over the previous
+          blue-600 for legibility on a phone in ward lighting; colour is
+          never the only signal, each button is also labelled. */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={() => onDischargePatient?.(patient)}
+          className="whitespace-nowrap rounded-md bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 transition-colors hover:bg-green-100"
+        >
+          {t("patientCard.dischargePlanning")}
+        </button>
+        <button
+          type="button"
+          onClick={handleGenerateSbar}
+          disabled={sbarLoading}
+          className="whitespace-nowrap rounded-md bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {sbarLoading ? t("common.generating") : t("patientCard.sbarSummary")}
+        </button>
+        <button
+          type="button"
+          onClick={handleGeneratePatientUpdate}
+          disabled={patientUpdateLoading}
+          className="whitespace-nowrap rounded-md bg-purple-50 px-2.5 py-1.5 text-xs font-semibold text-purple-800 ring-1 ring-purple-200 transition-colors hover:bg-purple-100 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {patientUpdateLoading ? t("common.generating") : t("patientCard.familyUpdate")}
+        </button>
       </div>
 
       {/* Tasks Section - collapsible */}
@@ -217,7 +268,7 @@ export default function PatientCard({ patient, onEditPatient, onCompleteTask, on
         </div>
         {tasksExpanded && (
           <div className="mt-2 flex flex-col gap-2">
-            {tasks.map((task) => (
+            {sortedTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}

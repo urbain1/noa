@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import TopRightMenu from "./TopRightMenu";
+import ViewSwitcher from "./ViewSwitcher";
 import { departmentLabel } from "../i18n/enums";
 import { isTaskOverdue } from "../utils/taskOverdue";
 
@@ -18,16 +19,21 @@ function computeRiskScore(patient) {
   // +1 per stat task still pending
   score += tasks.filter((t) => t.priority === "Stat" && t.status === "Pending").length;
 
-  // +1 if admitted < 24 hours
-  if (patient.admissionDate) {
-    const hoursSinceAdmission = (now - new Date(patient.admissionDate).getTime()) / (1000 * 60 * 60);
+  // +1 if admitted < 24 hours. Reads `admission_date` (the real Supabase
+  // column) with the demo-era `admissionDate` as a fallback, so local-only
+  // patients from the unmatched-voice-task path still score.
+  const admission = patient.admission_date || patient.admissionDate;
+  if (admission) {
+    const hoursSinceAdmission = (now - new Date(admission).getTime()) / (1000 * 60 * 60);
     if (hoursSinceAdmission < 24) score += 1;
   }
 
-  // +1 per task pending > 1 hour
+  // +1 per task pending > 1 hour. Same field-name story: `created_at` is the
+  // column, `timestamp`/`createdAt` are the demo shapes.
   score += tasks.filter((t) => {
     if (t.status !== "Pending") return false;
-    const taskTime = new Date(t.timestamp || t.createdAt).getTime();
+    const taskTime = new Date(t.created_at || t.timestamp || t.createdAt).getTime();
+    if (Number.isNaN(taskTime)) return false;
     return (now - taskTime) > 60 * 60 * 1000;
   }).length;
 
@@ -42,7 +48,7 @@ function getRiskLevel(score) {
   return null;
 }
 
-export default function ChargeNurseDashboard({ patients, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange }) {
+export default function ChargeNurseDashboard({ patients, nurses = [], view, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange, onOpenProfile }) {
   const { t } = useTranslation();
   const stats = useMemo(() => {
     const allTasks = patients.flatMap((p) => p.tasks || []);
@@ -72,22 +78,64 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
       .map(([name, counts]) => ({ name, ...counts, total: counts.pending + counts.delayed + counts.confirmed }))
       .sort((a, b) => b.total - a.total);
 
-    // Attention items
+    // Attention items. `p.label` is the real Supabase column; the demo-era
+    // `p.name` these rows used to read doesn't exist on them, which is why
+    // this list rendered nameless entries.
     const attention = [];
+    // STAT and delayed are counted separately and shown as two figures.
+    // They answer different questions -- "how much is urgent by order" vs
+    // "how much has slipped" -- and merging them into one number hides
+    // both. A task that is Stat AND overdue is counted in both, on purpose;
+    // it is genuinely both things. Counted by task id so one task can't
+    // inflate a single figure twice (Delayed status and a passed deadline
+    // are two ways of being late, not two late tasks).
+    const statTaskIds = new Set();
+    const delayedTaskIds = new Set();
+
     patients.forEach((p) => {
       (p.tasks || []).forEach((t) => {
+        const stillOpen = t.status !== "Completed" && t.status !== "Cancelled";
+        if (t.priority === "Stat" && stillOpen && t.status !== "Confirmed") {
+          statTaskIds.add(t.id);
+        }
+        if (isTaskOverdue(t) || (t.status === "Delayed" && stillOpen)) {
+          delayedTaskIds.add(t.id);
+        }
+
         if (t.status === "Delayed") {
-          attention.push({ type: "delayed", patient: p.name, task: t.description, department: t.department, patientId: p.id });
+          attention.push({ type: "delayed", patient: p.label, task: t.description, department: t.department, patientId: p.id });
         }
         if (t.priority === "Stat" && t.status === "Pending") {
-          attention.push({ type: "stat_pending", patient: p.name, task: t.description, department: t.department, patientId: p.id });
+          attention.push({ type: "stat_pending", patient: p.label, task: t.description, department: t.department, patientId: p.id });
         }
         if (isTaskOverdue(t)) {
           const overdueMin = Math.round((now - new Date(t.deadline).getTime()) / 60000);
-          attention.push({ type: "overdue", patient: p.name, task: t.description, overdueMin, patientId: p.id });
+          attention.push({ type: "overdue", patient: p.label, task: t.description, overdueMin, patientId: p.id });
         }
       });
     });
+
+    // Personnel overview. Created, assigned and completed are three
+    // different figures and are never combined:
+    //   created   -- this nurse raised the task (`created_by`)
+    //   assigned  -- this task is currently theirs to do (`assigned_to`)
+    //   completed -- this nurse marked it done (`completed_by`, 0011)
+    // A task can count towards all three for different nurses, or none.
+    //
+    // Tasks completed before 0011 have no `completed_by`. They are reported
+    // as an explicit "unknown" figure rather than being attributed to
+    // whoever created them, which was never recorded and would be a guess.
+    const personnel = nurses.map((nurse) => ({
+      id: nurse.id,
+      name: nurse.name || nurse.email,
+      created: allTasks.filter((t) => t.created_by === nurse.id).length,
+      assigned: allTasks.filter((t) => t.assigned_to === nurse.id).length,
+      completed: allTasks.filter((t) => t.completed_by === nurse.id).length,
+    }));
+    const unassignedCount = allTasks.filter((t) => !t.assigned_to).length;
+    const completedUnknownCount = allTasks.filter(
+      (t) => t.status === "Completed" && !t.completed_by
+    ).length;
 
     // Risk scores
     const flaggedPatients = patients
@@ -107,20 +155,24 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
       pending, confirmed, delayed, completed,
       departments,
       attention,
+      statCount: statTaskIds.size,
+      delayedAttentionCount: delayedTaskIds.size,
+      personnel,
+      unassignedCount,
+      completedUnknownCount,
       flaggedPatients,
     };
-  }, [patients]);
+  }, [patients, nurses]);
 
   const maxDeptTotal = Math.max(...stats.departments.map((d) => d.total), 1);
 
   return (
     <div className="flex min-h-screen flex-col bg-gray-100">
       {/* Header */}
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 shadow-sm">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 shadow-sm sm:px-4">
         <h1 className="text-xl font-bold text-black">noa</h1>
-        <div className="flex items-center gap-4">
-          <button onClick={onSwitchView} className="px-3 py-1.5 rounded-lg text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100">{t("dashboard.myPatients")}</button>
-          <button className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-blue-600 text-white">{t("dashboard.unitView")}</button>
+        <div className="flex items-center gap-1 sm:gap-3">
+          <ViewSwitcher current={view} onSwitch={onSwitchView} />
           <TopRightMenu
             patients={patients}
             delayedTasks={delayedTasks || []}
@@ -129,6 +181,7 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
             onRepageTask={onRepageTask}
             onEscalateTask={onEscalateTask}
             onLanguageChange={onLanguageChange}
+            onOpenProfile={onOpenProfile}
           />
         </div>
       </header>
@@ -165,9 +218,11 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
                   onClick={() => onPatientClick(p.id)}
                   className={`flex items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-gray-50 ${p.risk.border}`}
                 >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{p.name}</p>
-                    <p className="text-xs text-gray-500">{t("unitView.room", { room: p.room })} &middot; {p.diagnosis}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{p.label}</p>
+                    <p className="truncate text-xs text-gray-500">
+                      {[p.location_label, p.diagnosis].filter(Boolean).join(" · ") || t("patientCard.noDiagnosis")}
+                    </p>
                   </div>
                   <div className={`rounded-full px-2.5 py-1 text-xs font-bold ${p.risk.bg} ${p.risk.color}`}>
                     {t("unitView.riskBadge", { label: t(p.risk.labelKey), score: p.riskScore })}
@@ -181,7 +236,22 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
         {/* Attention needed */}
         {stats.attention.length > 0 && (
           <div className="rounded-lg bg-white p-4 shadow-sm">
-            <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.attentionNeeded")}</h2>
+            <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="text-sm font-bold text-gray-900">{t("unitView.attentionNeeded")}</h2>
+              {/* Two figures, never one merged number: STAT is "how much is
+                  urgent by order", delayed is "how much has slipped". A task
+                  that is both is counted in both. STAT carries the stronger
+                  weight visually. */}
+              <span className="flex items-center gap-1.5 text-xs">
+                <span className="rounded-full bg-red-100 px-2 py-0.5 font-bold text-red-700 ring-1 ring-red-300">
+                  {t("unitView.statCount", { count: stats.statCount })}
+                </span>
+                <span className="text-gray-300">·</span>
+                <span className="rounded-full bg-orange-50 px-2 py-0.5 font-semibold text-orange-800">
+                  {t("unitView.delayedAttentionCount", { count: stats.delayedAttentionCount })}
+                </span>
+              </span>
+            </div>
             <div className="flex flex-col gap-2">
               {stats.attention.map((item, i) => (
                 <button
@@ -231,6 +301,78 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
             </div>
           </div>
         )}
+
+        {/* Task status breakdown */}
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.taskStatus")}</h2>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="rounded-lg bg-blue-50 p-2">
+              <p className="text-lg font-bold text-blue-700">{stats.pending}</p>
+              <p className="text-xs text-blue-600">{t("enums.status.Pending")}</p>
+            </div>
+            <div className="rounded-lg bg-green-50 p-2">
+              <p className="text-lg font-bold text-green-700">{stats.confirmed}</p>
+              <p className="text-xs text-green-600">{t("enums.status.Confirmed")}</p>
+            </div>
+            <div className="rounded-lg bg-red-50 p-2">
+              <p className="text-lg font-bold text-red-700">{stats.delayed}</p>
+              <p className="text-xs text-red-600">{t("enums.status.Delayed")}</p>
+            </div>
+            <div className="rounded-lg bg-purple-50 p-2">
+              <p className="text-lg font-bold text-purple-700">{stats.completed}</p>
+              <p className="text-xs text-purple-600">{t("enums.status.Completed")}</p>
+            </div>
+          </div>
+        </div>
+        {/* Personnel overview. Created / assigned / completed are kept
+            strictly distinct -- they answer three different questions and a
+            single "tasks handled" number would answer none of them. */}
+        <div className="rounded-lg bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-bold text-gray-900">{t("unitView.personnel")}</h2>
+            <p className="text-xs text-gray-500">
+              {t("unitView.nurseCount", { count: stats.personnel.length })}
+            </p>
+          </div>
+
+          {stats.personnel.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">{t("unitView.noNurses")}</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[22rem] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 text-xs text-gray-500">
+                      <th scope="col" className="py-1.5 pr-2 font-medium">{t("unitView.nurse")}</th>
+                      <th scope="col" className="py-1.5 px-1 text-center font-medium">{t("unitView.tasksCreated")}</th>
+                      <th scope="col" className="py-1.5 px-1 text-center font-medium">{t("unitView.tasksAssigned")}</th>
+                      <th scope="col" className="py-1.5 pl-1 text-center font-medium">{t("unitView.tasksCompleted")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.personnel.map((nurse) => (
+                      <tr key={nurse.id} className="border-b border-gray-50 last:border-b-0">
+                        <td className="py-2 pr-2 text-gray-900">{nurse.name}</td>
+                        <td className="py-2 px-1 text-center tabular-nums text-gray-700">{nurse.created}</td>
+                        <td className="py-2 px-1 text-center tabular-nums text-gray-700">{nurse.assigned}</td>
+                        <td className="py-2 pl-1 text-center tabular-nums text-gray-700">{nurse.completed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>{t("unitView.unassignedTasks", { count: stats.unassignedCount })}</span>
+                {stats.completedUnknownCount > 0 && (
+                  // Completed before completed_by existed (0011). Reported as
+                  // unknown rather than credited to whoever created the task.
+                  <span>{t("unitView.completedUnknown", { count: stats.completedUnknownCount })}</span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Department bottlenecks */}
         <div className="rounded-lg bg-white p-4 shadow-sm">
@@ -292,28 +434,6 @@ export default function ChargeNurseDashboard({ patients, onSwitchView, onPatient
           )}
         </div>
 
-        {/* Task status breakdown */}
-        <div className="rounded-lg bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-bold text-gray-900 mb-3">{t("unitView.taskStatus")}</h2>
-          <div className="grid grid-cols-4 gap-2 text-center">
-            <div className="rounded-lg bg-blue-50 p-2">
-              <p className="text-lg font-bold text-blue-700">{stats.pending}</p>
-              <p className="text-xs text-blue-600">{t("enums.status.Pending")}</p>
-            </div>
-            <div className="rounded-lg bg-green-50 p-2">
-              <p className="text-lg font-bold text-green-700">{stats.confirmed}</p>
-              <p className="text-xs text-green-600">{t("enums.status.Confirmed")}</p>
-            </div>
-            <div className="rounded-lg bg-red-50 p-2">
-              <p className="text-lg font-bold text-red-700">{stats.delayed}</p>
-              <p className="text-xs text-red-600">{t("enums.status.Delayed")}</p>
-            </div>
-            <div className="rounded-lg bg-purple-50 p-2">
-              <p className="text-lg font-bold text-purple-700">{stats.completed}</p>
-              <p className="text-xs text-purple-600">{t("enums.status.Completed")}</p>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

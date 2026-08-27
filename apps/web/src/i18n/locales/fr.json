@@ -15,7 +15,8 @@
     "none": "Aucune",
     "or": "ou",
     "syntheticDataOnly": "Données fictives uniquement — aucune information réelle de patient",
-    "builtBy": "Développé par Noa Health"
+    "builtBy": "Développé par Noa Health",
+    "saved": "Enregistré"
   },
   "errors": {
     "loadPatients": "Impossible de charger les patients. Veuillez recharger la page.",
@@ -28,6 +29,7 @@
     "saveNote": "Échec de l'enregistrement de la note. Veuillez réessayer.",
     "generateHandoff": "Échec de la génération du rapport de transmission. Veuillez réessayer.",
     "generateSbar": "Échec de la génération du rapport SBAR. Veuillez réessayer.",
+    "generatePatientUpdate": "Échec de la génération de la mise à jour patient. Veuillez réessayer.",
     "parseTask": "Impossible d'interpréter la tâche. Veuillez réessayer.",
     "createTask": "Erreur lors de la création de la tâche. Veuillez réessayer.",
     "recordFirst": "Veuillez d'abord enregistrer quelque chose",
@@ -43,7 +45,12 @@
     "speechUnsupported": "La reconnaissance vocale n'est pas prise en charge par ce navigateur.",
     "micDenied": "Accès au microphone refusé. Veuillez autoriser l'accès au microphone.",
     "speechError": "Erreur de reconnaissance vocale : {{error}}",
-    "speechStartFailed": "Impossible de démarrer la reconnaissance vocale."
+    "speechStartFailed": "Impossible de démarrer la reconnaissance vocale.",
+    "assignTask": "Échec de l'attribution de la tâche. Veuillez réessayer.",
+    "assignUnavailable": "L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.",
+    "createDischargeTasks": "Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.",
+    "dischargeTasksUntagged": "Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.",
+    "updateName": "Impossible d'enregistrer votre nom. Veuillez réessayer."
   },
   "language": {
     "label": "Langue",
@@ -109,7 +116,10 @@
     "myPatients": "Mes patients",
     "unitView": "Vue du service",
     "addPatient": "Ajouter un patient",
-    "voiceInputAria": "Saisie vocale"
+    "voiceInputAria": "Saisie vocale",
+    "tasksView": "Tâches",
+    "addPatientByVoice": "Ajouter par la voix",
+    "noPatients": "Aucun patient pour le moment. Ajoutez-en un pour commencer."
   },
   "patientCard": {
     "dischargePlanningBadge": "Préparation de la sortie",
@@ -117,13 +127,15 @@
     "admitted": "Admis le {{date}}",
     "allergies": "Allergies : {{list}}",
     "sbarSummary": "Rapport SBAR",
+    "familyUpdate": "Mise à jour famille",
     "editPatientAria": "Modifier le patient",
     "tasksLabel": "Tâches",
     "notesLabel": "Notes cliniques",
     "newCount": "+ {{count}} nouvelle(s)",
     "addTask": "+ Ajouter une tâche",
     "addNote": "+ Ajouter une note",
-    "noNotes": "Aucune note clinique pour le moment"
+    "noNotes": "Aucune note clinique pour le moment",
+    "dischargePlanning": "Préparation de la sortie"
   },
   "taskCard": {
     "justNow": "à l'instant",
@@ -158,7 +170,9 @@
     "repage": "Relancer",
     "escalate": "Escalader",
     "backArrow": "← Retour",
-    "room": "Chambre {{room}}"
+    "room": "Chambre {{room}}",
+    "profile": "Profil",
+    "noPatients": "Aucun patient à faire sortir"
   },
   "voiceCapture": {
     "title": "Saisie vocale",
@@ -171,7 +185,12 @@
     "exampleGeneral": "Exemple : « Demander une NFS en urgence pour Patient Test 1 pour demain »",
     "transcriptLabel": "Transcription (cliquez pour modifier) :",
     "transcriptPlaceholder": "Votre transcription apparaîtra ici. Appuyez pour la modifier avant de créer la tâche.",
-    "createTask": "Créer la tâche"
+    "createTask": "Créer la tâche",
+    "titlePatient": "Ajouter un patient par la voix",
+    "tapToRecordPatient": "Appuyez pour décrire un nouveau patient",
+    "examplePatient": "Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »",
+    "patientSyntheticHint": "Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels.",
+    "reviewPatient": "Vérifier le patient"
   },
   "patientMatch": {
     "multipleFound": "Plusieurs patients trouvés",
@@ -210,6 +229,11 @@
       "methodEmail": "E-mail",
       "sendButton": "Envoyer"
     }
+  },
+  "patientUpdate": {
+    "title": "Mise à jour famille",
+    "subtitle": "Mise à jour en langage simple pour les patients et leurs familles",
+    "footer": "Des questions ? Contactez votre infirmier(ère)."
   },
   "suggestions": {
     "title": "Suivis suggérés par l'IA",
@@ -269,17 +293,19 @@
     "admissionDate": "Date d'admission",
     "locationLabel": "Emplacement",
     "locationLabelPlaceholder": "Chambre Test A",
-    "addButton": "Ajouter le patient"
+    "addButton": "Ajouter le patient",
+    "voiceReviewHint": "Vérifiez chaque champ avant d'enregistrer. Tout ce que Noa n'a pas pu identifier a été laissé vide, complétez-le vous-même. La transcription par IA peut être erronée."
   },
   "discharge": {
-    "title": "Préparation de la sortie – Chambre {{room}}",
+    "title": "Préparation de la sortie – {{patient}}",
     "notifyPatient": "Informer le patient de sa sortie",
     "requestNursingHome": "Demander un placement en EHPAD",
     "notesLabel": "Notes complémentaires (facultatif)",
     "notesPlaceholder": "Saisissez toute note complémentaire sur la sortie...",
     "createTasks": "Créer les tâches",
     "taskNotifyPatient": "Informer le patient du plan de sortie",
-    "taskArrangeNursingHome": "Organiser un placement en EHPAD"
+    "taskArrangeNursingHome": "Organiser un placement en EHPAD",
+    "selectAtLeastOne": "Sélectionnez au moins un élément pour créer des tâches."
   },
   "unitView": {
     "patients": "Patients",
@@ -299,7 +325,23 @@
     "delayedCount": "{{count}} en retard",
     "attnDelayed": "{{department}} — en retard, aucune réponse",
     "attnStatPending": "{{department}} — prescription immédiate en attente",
-    "attnOverdue": "En retard de {{value}}"
+    "attnOverdue": "En retard de {{value}}",
+    "statCount_one": "{{count}} immédiate",
+    "statCount_other": "{{count}} immédiates",
+    "delayedAttentionCount_one": "{{count}} en retard",
+    "delayedAttentionCount_other": "{{count}} en retard",
+    "personnel": "Personnel",
+    "nurseCount_one": "{{count}} infirmier(ère)",
+    "nurseCount_other": "{{count}} infirmier(ère)s",
+    "noNurses": "Aucun collègue trouvé dans cet établissement.",
+    "nurse": "Infirmier(ère)",
+    "tasksCreated": "Créées",
+    "tasksAssigned": "Attribuées",
+    "tasksCompleted": "Terminées",
+    "unassignedTasks_one": "{{count}} tâche non attribuée",
+    "unassignedTasks_other": "{{count}} tâches non attribuées",
+    "completedUnknown_one": "{{count}} terminée par un(e) inconnu(e)",
+    "completedUnknown_other": "{{count}} terminées par un(e) inconnu(e)"
   },
   "enums": {
     "department": {
@@ -333,5 +375,35 @@
       "task": "tâche",
       "note": "note"
     }
+  },
+  "nav": {
+    "backToTasks": "Retour aux tâches",
+    "backToUnit": "Retour à la vue du service"
+  },
+  "tasksView": {
+    "heading": "Toutes les tâches",
+    "taskCount_one": "{{count}} tâche",
+    "taskCount_other": "{{count}} tâches",
+    "searchPlaceholder": "Filtrer par tâche, patient ou infirmier(ère)...",
+    "empty": "Aucune tâche pour le moment dans cet établissement.",
+    "noMatches": "Aucune tâche ne correspond à « {{query}} »",
+    "unassigned": "Non attribuée",
+    "assignee": "Attribuée à",
+    "unknownPatient": "Patient inconnu",
+    "due": "Échéance {{value}}",
+    "expandAria": "Afficher les détails de la tâche",
+    "collapseAria": "Masquer les détails de la tâche"
+  },
+  "profile": {
+    "title": "Profil",
+    "nameLabel": "Nom",
+    "nameHint": "Visible par vos collègues de l'établissement lorsqu'une tâche vous est attribuée.",
+    "saveName": "Enregistrer le nom",
+    "nameSaved": "Nom enregistré.",
+    "emailLabel": "E-mail",
+    "emailHint": "Cette modification envoie un lien de confirmation à la nouvelle adresse. Le changement ne prend effet qu'après avoir cliqué sur ce lien.",
+    "changeEmail": "Modifier l'e-mail",
+    "emailConfirmationSent": "Lien de confirmation envoyé à {{email}}. Le changement prendra effet après avoir cliqué dessus.",
+    "signOut": "Se déconnecter"
   }
 }

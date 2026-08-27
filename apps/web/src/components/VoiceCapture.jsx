@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { parseVoiceToTask } from "../utils/claudeAPI";
+import { parseVoiceToTask, parsePatientFromVoice } from "../utils/claudeAPI";
 import { localeTag } from "../i18n";
 import { findMatchingPatients } from "../utils/roomMatcher";
 import RoomDisambiguationDialog from "./RoomDisambiguationDialog";
@@ -89,7 +89,70 @@ function parseTranscriptFallback(text) {
   };
 }
 
-export default function VoiceCapture({ onClose, onTaskCreated, allPatients, knownPatient }) {
+// Fallback for `parsePatientFromVoice`, used when the Edge Function call
+// fails (including when the deployed function predates that action).
+// CLAUDE.md requires a fallback parser for every prompt.
+//
+// Deliberately conservative: it only picks up things stated in a form it can
+// recognise with certainty, and leaves everything else null for the nurse to
+// fill in on the review form. Guessing a diagnosis or an age onto a clinical
+// record is worse than leaving the field empty.
+function parsePatientTranscriptFallback(text) {
+  const lower = text.toLowerCase();
+
+  // Patient_Test_N only. Never a name, a real room/bed number, or an ID --
+  // see SECURITY.md. Anything else leaves the label blank.
+  let label = null;
+  const labelMatch = lower.match(/\b(?:patient|test)[\s_-]*(?:test|patient)?[\s_-]*(\d{1,4})\b/);
+  if (labelMatch) label = `Patient_Test_${labelMatch[1]}`;
+
+  // "68 year old" / "68 ans" / "aged 68"
+  let age = null;
+  const ageMatch =
+    lower.match(/\b(\d{1,3})[\s-]*(?:years?[\s-]*old|y\/?o\b|ans\b)/) ||
+    lower.match(/\b(?:aged|âgé[e]?\s+de)\s+(\d{1,3})\b/);
+  if (ageMatch) {
+    const value = parseInt(ageMatch[1], 10);
+    if (value >= 0 && value <= 130) age = value;
+  }
+
+  // Only an explicit statement sets code status.
+  let codeStatus = null;
+  if (/\bdnr\s*\/?\s*dni\b|\bne pas réanimer\s*\/?\s*ne pas intuber\b/.test(lower)) codeStatus = "DNR/DNI";
+  else if (/\bdnr\b|\bdo not resuscitate\b|\bne pas réanimer\b/.test(lower)) codeStatus = "DNR";
+  else if (/\bcomfort care\b|\bsoins de confort\b/.test(lower)) codeStatus = "Comfort Care";
+  else if (/\bfull code\b|\bréanimation complète\b/.test(lower)) codeStatus = "Full Code";
+
+  // Diagnosis only from an explicit lead-in, never inferred from symptoms
+  // or medications.
+  let diagnosis = null;
+  const diagnosisMatch = text.match(
+    /\b(?:admitted (?:with|for)|diagnosis(?: of| is)?|diagnosed with|presenting with|admis(?:e)? pour|diagnostic(?: de)?)\s+([^.,;]{3,80})/i
+  );
+  if (diagnosisMatch) diagnosis = diagnosisMatch[1].trim();
+
+  // Synthetic location labels only ("Test Room A", "Bay 2").
+  let locationLabel = null;
+  const locationMatch = text.match(/\b(?:test room|bay|chambre test)\s+([A-Za-z0-9]{1,4})\b/i);
+  if (locationMatch) locationLabel = `${locationMatch[0].trim()}`;
+
+  return {
+    label,
+    age,
+    diagnosis,
+    codeStatus,
+    attendingPhysician: null,
+    allergies: [],
+    admissionDate: null,
+    locationLabel,
+  };
+}
+
+// `mode` selects what this capture produces: a task (default) or a draft
+// patient. Recording, transcription, editing the transcript and the Claude
+// round-trip are identical either way -- only the parse target and what
+// happens with the result differ, so there is one voice screen, not two.
+export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, allPatients, knownPatient, mode = "task" }) {
   const { t, i18n } = useTranslation();
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -100,6 +163,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
   const [showManualRoomEntry, setShowManualRoomEntry] = useState(false);
   const [parsedTaskDraft, setParsedTaskDraft] = useState(null);
   const recognitionRef = useRef(null);
+  const isPatientMode = mode === "patient";
 
   useEffect(() => {
     return () => {
@@ -160,6 +224,32 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
       setError(t("errors.speechStartFailed"));
     }
   }, [isRecording, i18n.language, t]);
+
+  // Patient mode: parse the transcript into draft fields and hand them to
+  // the review step. Nothing is written here -- the Add Patient form opens
+  // pre-filled, and the nurse's confirmation there is what creates the
+  // patient. Fields the parser couldn't extract stay blank.
+  const handleCapturePatient = async () => {
+    recognitionRef.current?.stop();
+    setIsRecording(false);
+
+    if (!transcript.trim()) {
+      alert(t("errors.recordFirst"));
+      return;
+    }
+
+    setIsProcessing(true);
+    setError(null);
+
+    let fields = await parsePatientFromVoice(transcript.trim());
+    if (!fields) {
+      console.warn("[VoiceCapture] parsePatientFromVoice unavailable, falling back");
+      fields = parsePatientTranscriptFallback(transcript.trim());
+    }
+
+    setIsProcessing(false);
+    onPatientParsed(fields);
+  };
 
   const handleCreateTask = async () => {
     // Stop recording if active
@@ -304,7 +394,11 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
           </svg>
         </button>
         <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">
-          {knownPatient ? t("voiceCapture.titleForPatient", { patient: knownPatient.label }) : t("voiceCapture.title")}
+          {isPatientMode
+            ? t("voiceCapture.titlePatient")
+            : knownPatient
+              ? t("voiceCapture.titleForPatient", { patient: knownPatient.label })
+              : t("voiceCapture.title")}
         </h1>
       </header>
 
@@ -330,13 +424,27 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
             </svg>
           </button>
           <p className="text-sm font-medium text-gray-500">
-            {isRecording ? t("common.listening") : t("voiceCapture.tapToRecord")}
+            {isRecording
+              ? t("common.listening")
+              : isPatientMode
+                ? t("voiceCapture.tapToRecordPatient")
+                : t("voiceCapture.tapToRecord")}
           </p>
           <p className="text-sm text-gray-400 italic mt-2">
-            {knownPatient
-              ? t("voiceCapture.exampleForPatient")
-              : t("voiceCapture.exampleGeneral")}
+            {isPatientMode
+              ? t("voiceCapture.examplePatient")
+              : knownPatient
+                ? t("voiceCapture.exampleForPatient")
+                : t("voiceCapture.exampleGeneral")}
           </p>
+          {isPatientMode && (
+            // The same rule the Add Patient form states, at the point the
+            // nurse is about to speak: synthetic labels only, never a real
+            // identifier (SECURITY.md).
+            <p className="mt-1 text-center text-xs text-gray-400">
+              {t("voiceCapture.patientSyntheticHint")}
+            </p>
+          )}
         </div>
 
         {/* Error */}
@@ -375,7 +483,7 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
             {t("common.cancel")}
           </button>
           <button
-            onClick={handleCreateTask}
+            onClick={isPatientMode ? handleCapturePatient : handleCreateTask}
             disabled={!transcript.trim() || isProcessing}
             className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-none px-6 py-3.5 text-base font-semibold shadow-md transition-all duration-200 active:scale-[0.98] ${
               transcript.trim()
@@ -407,6 +515,8 @@ export default function VoiceCapture({ onClose, onTaskCreated, allPatients, know
                 </svg>
                 {t("common.processing")}
               </>
+            ) : isPatientMode ? (
+              t("voiceCapture.reviewPatient")
             ) : (
               t("voiceCapture.createTask")
             )}

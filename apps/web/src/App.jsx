@@ -4,18 +4,22 @@ import Dashboard from "./components/Dashboard";
 import VoiceCapture from "./components/VoiceCapture";
 import DischargeDialog from "./components/DischargeDialog";
 import HandoffSummary from "./components/HandoffSummary";
+import PatientUpdateSummary from "./components/PatientUpdateSummary";
 import AddNoteDialog from "./components/AddNoteDialog";
 import SuggestionModal from "./components/SuggestionModal";
 import AddPatientDialog from "./components/AddPatientDialog";
 import EditPatientDialog from "./components/EditPatientDialog";
 import TaskEditDialog from "./components/TaskEditDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
+import TasksScreen from "./components/TasksScreen";
+import ProfileScreen from "./components/ProfileScreen";
 import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
 import { supabase } from "./lib/supabase";
-import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask } from "./lib/patients";
-import { generateHandoffSummary, generateSuggestions } from "./utils/claudeAPI";
+import { fetchFacilityNurses } from "./lib/nurses";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks } from "./lib/patients";
+import { generateHandoffSummary, generateSuggestions, generatePatientUpdate } from "./utils/claudeAPI";
 import { needsAttention } from "./utils/taskOverdue";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
 
@@ -70,7 +74,7 @@ function App() {
     setPreRowNoticeAck(false);
     const { data, error } = await supabase
       .from('nurses')
-      .select('id, facility_id, preferred_language, notice_acknowledged_at')
+      .select('id, facility_id, name, email, preferred_language, notice_acknowledged_at')
       .eq('id', user.id)
       .maybeSingle();
     if (error) {
@@ -103,6 +107,18 @@ function App() {
     await supabase.auth.signOut();
     setSession(null);
     setNurseProfile(undefined);
+    // Clear the previous nurse's facility data out of memory rather than
+    // leaving it to be replaced on the next load. Nothing from facility XX
+    // should be on screen for a nurse from facility YY signing in on the
+    // same device, even for the moment before their own data arrives
+    // (scenarios.md SC-11).
+    setPatients([]);
+    setNurses([]);
+    // Reset navigation too, so the next sign-in starts on the patient list
+    // instead of resuming wherever the previous nurse left off.
+    setView("patients");
+    setPatientFocus(null);
+    setShowProfile(false);
     // Don't leave the next person on this device in the previous nurse's language.
     applyLanguage(DEFAULT_LANGUAGE);
   };
@@ -162,6 +178,21 @@ function App() {
   const [patientToEdit, setPatientToEdit] = useState(null);
   const [taskToEdit, setTaskToEdit] = useState(null);
 
+  // Colleagues at this facility, for the assignee picker and Unit View's
+  // personnel overview. Loaded alongside patients; a failure here is
+  // non-fatal -- the app still works, assignment just shows nobody to
+  // assign to, which is visible rather than silent.
+  const [nurses, setNurses] = useState([]);
+
+  const loadNurses = async () => {
+    try {
+      setNurses(await fetchFacilityNurses());
+    } catch (err) {
+      console.error('Nurse list fetch error:', err);
+      setNurses([]);
+    }
+  };
+
   const loadPatients = async () => {
     setPatientsLoading(true);
     setPatientsError(null);
@@ -178,10 +209,20 @@ function App() {
   useEffect(() => {
     if (nurseProfile?.facility_id) {
       loadPatients();
+      loadNurses();
     }
   }, [nurseProfile]);
 
   const [showVoice, setShowVoice] = useState(false);
+  // "task" (default) or "patient" -- which kind of thing this voice session
+  // is capturing. Voice capture, transcription and the Claude round-trip are
+  // the same either way; only the parse target and what happens afterwards
+  // differ.
+  const [voiceMode, setVoiceMode] = useState("task");
+  // Fields parsed from speech, handed to AddPatientDialog to pre-fill. A
+  // patient is never created straight from a transcript: the dialog is the
+  // review step, and the nurse confirms it.
+  const [patientDraft, setPatientDraft] = useState(null);
   // Set when Voice Capture is opened from a specific patient's "+ Add Task"
   // button, so matching can be skipped entirely; null for the header/floating
   // mic button, which still needs to match a spoken/typed patient.
@@ -206,9 +247,29 @@ function App() {
   const [selectedPatientForDischarge, setSelectedPatientForDischarge] = useState(null);
   const [showHandoff, setShowHandoff] = useState(false);
   const [handoffData, setHandoffData] = useState(null);
+  const [showPatientUpdate, setShowPatientUpdate] = useState(false);
+  const [patientUpdateData, setPatientUpdateData] = useState(null);
   const [showAddNote, setShowAddNote] = useState(null); // patientId or null
   const [suggestionData, setSuggestionData] = useState(null); // { suggestions, patientId, patientName, triggerSummary } or null
-  const [showChargeView, setShowChargeView] = useState(false);
+
+  // --- Navigation ---
+  //
+  // Still plain state, not a router: introducing one is a large change with
+  // real regression risk and belongs in its own session (see FINAL_REVIEW.md
+  // for the case either way). What changed is that the three top-level
+  // screens are now one value instead of a set of booleans that could
+  // disagree with each other.
+  //
+  // "patients" | "tasks" | "unit". Overlays (voice capture, handoff, patient
+  // update, profile) stay separate flags layered on top: closing one returns
+  // to whichever of the three was underneath, which is what makes back
+  // navigation land in the previous context instead of the home screen.
+  const [view, setView] = useState("patients");
+  // Set when a patient is opened from somewhere other than the patient list
+  // (currently the Tasks screen). Drives the scroll-to/highlight on the
+  // card, and `returnView` is where the back link goes.
+  const [patientFocus, setPatientFocus] = useState(null); // { patientId, returnView } or null
+  const [showProfile, setShowProfile] = useState(false);
 
   const simulateStatusChange = (taskId) => {
     setPatients((prev) =>
@@ -353,45 +414,63 @@ function App() {
     }
   };
 
-  const handleDischargeConfirm = (options) => {
-    const newTasks = [];
+  // Discharge planning creates real tasks in `tasks`, tagged
+  // `task_type: 'discharge'` (0011), owned by the same facility and patient
+  // as any other task. They are deliberately ordinary in every other
+  // respect: they sort, complete, repage, escalate and appear in the Tasks
+  // screen, Patient View and Unit View with no special-casing.
+  //
+  // The patient is NOT marked discharged here. Discharge planning is the
+  // work leading up to a discharge; flagging `is_discharged` would remove
+  // the patient from the roster the moment planning starts, taking the new
+  // tasks with them.
+  //
+  // Throws on failure so DischargeDialog can show the error and keep the
+  // nurse's checklist and notes on screen to retry.
+  const handleDischargeConfirm = async (options) => {
+    const patient = selectedPatientForDischarge;
+    if (!patient) return;
+
+    const trimmedNotes = options.notes.trim();
+    const drafts = [];
 
     if (options.notifyPatient) {
-      newTasks.push({
-        id: `discharge-notify-${Date.now()}`,
-        description:
-          t("discharge.taskNotifyPatient") +
-          (options.notes ? ` — ${options.notes}` : ""),
+      drafts.push({
+        description: t("discharge.taskNotifyPatient") + (trimmedNotes ? ` — ${trimmedNotes}` : ""),
         department: "Nursing",
         priority: "Routine",
-        status: "Pending",
-        type: "discharge",
-        timestamp: new Date().toISOString(),
       });
     }
 
     if (options.needsNursingHome) {
-      newTasks.push({
-        id: `discharge-nh-${Date.now()}`,
+      drafts.push({
+        // The note is appended to whichever task is created first, so it
+        // isn't duplicated across both.
         description:
           t("discharge.taskArrangeNursingHome") +
-          (!options.notifyPatient && options.notes ? ` — ${options.notes}` : ""),
+          (!options.notifyPatient && trimmedNotes ? ` — ${trimmedNotes}` : ""),
         department: "Social Work",
-        priority: "Urgent",
-        status: "Pending",
-        type: "discharge",
-        timestamp: new Date().toISOString(),
+        priority: "Routine",
       });
     }
 
-    if (newTasks.length > 0) {
-      setPatients((prev) =>
-        prev.map((p) =>
-          p.id === selectedPatientForDischarge.id
-            ? { ...p, tasks: [...newTasks, ...p.tasks] }
-            : p
-        )
-      );
+    if (drafts.length === 0) return;
+
+    const { tasks: newTasks, tagged } = await createDischargeTasks(
+      nurseProfile.facility_id,
+      patient.id,
+      session.user.id,
+      drafts
+    );
+
+    setPatients((prev) =>
+      prev.map((p) => (p.id === patient.id ? { ...p, tasks: [...newTasks, ...p.tasks] } : p))
+    );
+
+    if (!tagged) {
+      // 0011 not applied: the tasks exist and work, they just aren't
+      // marked as discharge planning. Say so rather than looking fine.
+      alert(t("errors.dischargeTasksUntagged"));
     }
 
     setSelectedPatientForDischarge(null);
@@ -429,16 +508,70 @@ function App() {
     setHandoffData(null);
   };
 
+  // Plain-language patient/family update. Same Edge Function-per-action
+  // pattern as SBAR: App owns the network call, PatientCard just shows a
+  // spinner on its own button while the promise is pending.
+  const handleGeneratePatientUpdate = async (patient) => {
+    const result = await generatePatientUpdate(patient);
+    if (result) {
+      setPatientUpdateData({ summaryText: result, patient });
+      setShowPatientUpdate(true);
+    } else {
+      alert(t("errors.generatePatientUpdate"));
+    }
+  };
+
+  const handleClosePatientUpdate = () => {
+    setShowPatientUpdate(false);
+    setPatientUpdateData(null);
+  };
+
   // --- Patient handlers (real writes) ---
 
   const handleAddPatientClick = () => {
+    setPatientDraft(null);
     setShowAddPatient(true);
+  };
+
+  // Voice route into the same dialog. Opens voice capture in patient mode;
+  // what comes back lands in the form below, never straight in the database.
+  const handleAddPatientByVoice = () => {
+    setPatientDraft(null);
+    setVoiceCapturePatient(null);
+    setVoiceMode("patient");
+    setShowVoice(true);
+  };
+
+  // Speech has been parsed into fields. This is the hand-off to the review
+  // step: the existing Add Patient form opens pre-filled, the nurse checks
+  // and edits every field, and only their confirmation creates the patient.
+  // Fields the parser couldn't extract confidently arrive empty and stay
+  // empty -- nothing is invented to fill the form in.
+  const handlePatientParsed = (fields) => {
+    setPatientDraft(fields);
+    setShowVoice(false);
+    setVoiceMode("task");
+    setShowAddPatient(true);
+  };
+
+  const handleCloseAddPatient = () => {
+    setShowAddPatient(false);
+    setPatientDraft(null);
   };
 
   const handleAddPatientSave = async (fields) => {
     const newPatient = await createPatient(nurseProfile.facility_id, fields);
     setPatients((prev) => [{ ...newPatient, tasks: [], notes: [] }, ...prev]);
     setShowAddPatient(false);
+    setPatientDraft(null);
+  };
+
+  // The profile screen owns the write (lib/nurses.js updateMyName); App just
+  // keeps its copy of the profile in step so the name shown elsewhere -- the
+  // assignee picker, the personnel overview -- doesn't lag behind.
+  const handleNameSaved = (name) => {
+    setNurseProfile((prev) => (prev ? { ...prev, name } : prev));
+    setNurses((prev) => prev.map((n) => (n.id === session?.user?.id ? { ...n, name } : n)));
   };
 
   const handleEditPatientClick = (patient) => {
@@ -455,9 +588,13 @@ function App() {
 
   // --- Task handlers (real writes) ---
 
+  // Records who completed the task (`completed_by`, 0011), which is not the
+  // same question as who created it -- Unit View reports both separately.
+  // Tasks completed before 0011 have no completer recorded and are shown as
+  // "unknown" rather than being credited to the creator.
   const handleCompleteTask = async (task) => {
     try {
-      const updated = await completeTask(task.id);
+      const updated = await completeTask(task.id, session.user.id);
       setPatients((prev) =>
         prev.map((p) =>
           p.id === task.patient_id
@@ -468,6 +605,27 @@ function App() {
     } catch (err) {
       console.error("Complete task error:", err);
       alert(t("errors.completeTask"));
+    }
+  };
+
+  // Assign a task to a colleague at the same facility, or clear it back to
+  // unassigned with null. Assignment is data only: it changes nothing about
+  // who can see the task (see lib/patients.js assignTask).
+  const handleAssignTask = async (task, nurseId) => {
+    try {
+      const updated = await assignTask(task.id, nurseId);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === task.patient_id
+            ? { ...p, tasks: p.tasks.map((t) => (t.id === task.id ? updated : t)) }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Assign task error:", err);
+      alert(err.code === "MISSING_MIGRATION_0011"
+        ? t("errors.assignUnavailable")
+        : t("errors.assignTask"));
     }
   };
 
@@ -599,19 +757,31 @@ function App() {
     setSuggestionData(null);
   };
 
-  // --- Charge Nurse Dashboard handlers ---
+  // --- Navigation handlers ---
 
-  const handleSwitchToChargeView = () => {
-    setShowChargeView(true);
+  // Switching top-level screens by hand clears any "came from" context: the
+  // nurse has chosen where they are, so a stale back link to somewhere else
+  // would be misleading.
+  const handleSwitchView = (nextView) => {
+    setPatientFocus(null);
+    setView(nextView);
   };
 
-  const handleSwitchToMyPatients = () => {
-    setShowChargeView(false);
+  // Open one patient's card from another screen (Tasks, or Unit View's
+  // attention list). Records where to go back to so the back link returns
+  // there rather than dumping the nurse on the home screen.
+  const handleOpenPatient = (patientId, fromView) => {
+    if (!patientId) return;
+    setPatientFocus({ patientId, returnView: fromView });
+    setView("patients");
   };
 
-  const handleChargePatientClick = (patientId) => {
-    setShowChargeView(false);
-    // Scroll to patient card would happen here in a real app
+  // The back link on a focused patient card: return to the screen the nurse
+  // arrived from, with the focus cleared.
+  const handleReturnFromPatient = () => {
+    const target = patientFocus?.returnView || "patients";
+    setPatientFocus(null);
+    setView(target);
   };
 
   const triggerSuggestions = async (patientId, newItem) => {
@@ -694,10 +864,11 @@ function App() {
     );
   }
 
-  // Checked before showChargeView: a report generated from Unit View
-  // (three-dot menu is available from both views) must display immediately
-  // regardless of which view triggered it, rather than being masked by the
-  // charge view branch below until the nurse navigates back to My Patients.
+  // Checked before the three top-level screens: a report generated from Unit
+  // View (the three-dot menu is available from all of them) must display
+  // immediately regardless of which view triggered it, rather than being
+  // masked by the view branch below until the nurse navigates elsewhere.
+  // Closing it returns to whichever view is still set underneath.
   if (showHandoff && handoffData) {
     return (
       <HandoffSummary
@@ -709,18 +880,24 @@ function App() {
     );
   }
 
-  if (showChargeView) {
+  if (showPatientUpdate && patientUpdateData) {
     return (
-      <ChargeNurseDashboard
-        onLanguageChange={handleLanguageChange}
-        patients={patients}
-        onSwitchView={handleSwitchToMyPatients}
-        onPatientClick={handleChargePatientClick}
-        delayedTasks={delayedTasks}
-        onGenerateHandoff={handleGenerateShiftHandoff}
-        onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
-        onRepageTask={handleRepageTask}
-        onEscalateTask={handleEscalateTask}
+      <PatientUpdateSummary
+        summaryText={patientUpdateData.summaryText}
+        patient={patientUpdateData.patient}
+        onClose={handleClosePatientUpdate}
+      />
+    );
+  }
+
+  if (showProfile) {
+    return (
+      <ProfileScreen
+        session={session}
+        nurseProfile={nurseProfile}
+        onNameSaved={handleNameSaved}
+        onSignOut={handleSignOut}
+        onClose={() => setShowProfile(false)}
       />
     );
   }
@@ -731,45 +908,43 @@ function App() {
         onClose={() => {
           setShowVoice(false);
           setVoiceCapturePatient(null);
+          setVoiceMode("task");
         }}
+        mode={voiceMode}
         onTaskCreated={handleTaskCreated}
+        onPatientParsed={handlePatientParsed}
         allPatients={patients}
         knownPatient={voiceCapturePatient}
       />
     );
   }
 
-  return (
+  // Shared by all three top-level screens: the three-dot menu, the view
+  // switcher and the modals below are the same everywhere.
+  const sharedScreenProps = {
+    patients,
+    view,
+    onSwitchView: handleSwitchView,
+    delayedTasks,
+    onGenerateHandoff: handleGenerateShiftHandoff,
+    onDischargePatient: (patient) => setSelectedPatientForDischarge(patient),
+    onRepageTask: handleRepageTask,
+    onEscalateTask: handleEscalateTask,
+    onLanguageChange: handleLanguageChange,
+    onOpenProfile: () => setShowProfile(true),
+  };
+
+  // A failed patient load affects every screen, not just the patient list,
+  // so the banner travels with all three rather than only appearing on the
+  // one the nurse happens to be on.
+  const errorBanner = patientsError ? (
+    <div className="bg-red-50 px-4 py-2 text-center text-sm text-red-600">
+      {patientsError}
+    </div>
+  ) : null;
+
+  const modals = (
     <>
-      {patientsError && (
-        <div className="bg-red-50 px-4 py-2 text-center text-sm text-red-600">
-          {patientsError}
-        </div>
-      )}
-      <Dashboard
-        onLanguageChange={handleLanguageChange}
-        patients={patients}
-        onVoiceClick={() => {
-          setVoiceCapturePatient(null);
-          setShowVoice(true);
-        }}
-        onGenerateHandoff={handleGenerateShiftHandoff}
-        onSwitchToChargeView={handleSwitchToChargeView}
-        delayedTasks={delayedTasks}
-        onDischargePatient={(patient) => setSelectedPatientForDischarge(patient)}
-        onOpenVoiceCapture={(patient) => {
-          setVoiceCapturePatient(patient);
-          setShowVoice(true);
-        }}
-        onAddPatient={handleAddPatientClick}
-        onEditPatient={handleEditPatientClick}
-        onCompleteTask={handleCompleteTask}
-        onEditTask={handleEditTaskClick}
-        onRepageTask={handleRepageTask}
-        onEscalateTask={handleEscalateTask}
-        onAddNote={handleAddNoteClick}
-        onGenerateSbar={handleGeneratePatientHandoff}
-      />
       {selectedPatientForDischarge && (
         <DischargeDialog
           patient={selectedPatientForDischarge}
@@ -796,7 +971,8 @@ function App() {
       )}
       {showAddPatient && (
         <AddPatientDialog
-          onCancel={() => setShowAddPatient(false)}
+          initialFields={patientDraft}
+          onCancel={handleCloseAddPatient}
           onSave={handleAddPatientSave}
         />
       )}
@@ -811,10 +987,74 @@ function App() {
         <TaskEditDialog
           task={taskToEdit}
           patientId={taskToEdit.patient_id}
+          nurses={nurses}
+          onAssign={handleAssignTask}
           onCancel={() => setTaskToEdit(null)}
           onManualUpdate={handleManualUpdateTask}
         />
       )}
+    </>
+  );
+
+  if (view === "unit") {
+    return (
+      <>
+        {errorBanner}
+        <ChargeNurseDashboard
+          {...sharedScreenProps}
+          nurses={nurses}
+          onPatientClick={(patientId) => handleOpenPatient(patientId, "unit")}
+        />
+        {modals}
+      </>
+    );
+  }
+
+  if (view === "tasks") {
+    return (
+      <>
+        {errorBanner}
+        <TasksScreen
+          {...sharedScreenProps}
+          nurses={nurses}
+          onOpenPatient={(patientId) => handleOpenPatient(patientId, "tasks")}
+          onOpenTask={handleEditTaskClick}
+          onCompleteTask={handleCompleteTask}
+          onEditTask={handleEditTaskClick}
+          onAssignTask={handleAssignTask}
+        />
+        {modals}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {errorBanner}
+      <Dashboard
+        {...sharedScreenProps}
+        patientFocus={patientFocus}
+        onReturnFromPatient={handleReturnFromPatient}
+        onVoiceClick={() => {
+          setVoiceCapturePatient(null);
+          setVoiceMode("task");
+          setShowVoice(true);
+        }}
+        onOpenVoiceCapture={(patient) => {
+          setVoiceCapturePatient(patient);
+          setVoiceMode("task");
+          setShowVoice(true);
+        }}
+        onAddPatient={handleAddPatientClick}
+        onAddPatientByVoice={handleAddPatientByVoice}
+        onEditPatient={handleEditPatientClick}
+        onCompleteTask={handleCompleteTask}
+        onEditTask={handleEditTaskClick}
+        onAddNote={handleAddNoteClick}
+        onGenerateSbar={handleGeneratePatientHandoff}
+        onGeneratePatientUpdate={handleGeneratePatientUpdate}
+      />
+      {modals}
     </>
   );
 }

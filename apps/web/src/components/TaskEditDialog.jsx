@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { localeTag } from "../i18n";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
+import AssigneeSelect from "./AssigneeSelect";
 
 // Canonical values, stored and matched as-is. Only the <option> label is
 // translated, never the value.
@@ -27,7 +28,7 @@ const statusStyles = {
   Completed: "bg-blue-100 text-blue-800",
 };
 
-export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, onManualUpdate }) {
+export default function TaskEditDialog({ task, patientId, nurses = [], onAssign, onCancel, onUpdate, onManualUpdate }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -268,6 +269,19 @@ export default function TaskEditDialog({ task, patientId, onCancel, onUpdate, on
                 />
                 <p className="mt-1 text-xs text-gray-400">{t("taskEdit.deadlineHint")}</p>
               </div>
+
+              {/* Assignee. Saved on change rather than with the other
+                  fields: it is a separate write (lib/patients.js assignTask)
+                  with its own "migration not applied" failure mode, and
+                  bundling it would make one failure look like the other. */}
+              {onAssign && (
+                <AssigneeSelect
+                  compact
+                  value={task?.assigned_to || ""}
+                  nurses={nurses}
+                  onChange={(nurseId) => onAssign(task, nurseId)}
+                />
+              )}
 
               {error && (
                 <div className="rounded-lg bg-red-50 p-3 text-center text-sm text-red-600">

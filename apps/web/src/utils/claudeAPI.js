@@ -217,13 +217,18 @@ export async function generateSuggestions(patient, newItem) {
  * Generate a plain-language patient update summary for patients and families.
  * Written at a sixth-grade reading level with no unexplained medical jargon.
  *
+ * Output language is read from `currentLanguage()` at call time, never passed
+ * in, same pattern as `generateHandoffSummary` and `generateSuggestions`.
+ *
  * @param {object} patient - Full patient object
- * @param {string} language - Target language (e.g., "English", "Spanish", "French")
  * @returns {Promise<string|null>} Plain-language update text, or null on failure
  */
-export async function generatePatientUpdate(patient, language = "English") {
+export async function generatePatientUpdate(patient) {
   try {
-    return await invokeClaude("generatePatientUpdate", { patient, language });
+    return await invokeClaude("generatePatientUpdate", {
+      patient: toPromptPatient(patient),
+      language: currentLanguage(),
+    });
   } catch (err) {
     console.error("[claudeAPI] generatePatientUpdate failed:", err);
     return null;
@@ -244,6 +249,41 @@ export async function translateText(text, targetLanguage) {
     return await invokeClaude("translateText", { text, targetLanguage });
   } catch (err) {
     console.error("[claudeAPI] translateText failed:", err);
+    return null;
+  }
+}
+
+/**
+ * Parse a spoken patient description into Add Patient form fields.
+ *
+ * Extraction only, and never a write: the fields returned here are a draft
+ * the nurse reviews and confirms in the existing Add Patient dialog. A
+ * patient is never created straight from a transcript.
+ *
+ * Fields that weren't clearly stated come back null and stay blank on the
+ * form. Nothing is inferred to fill a gap.
+ *
+ * Output language is read from `currentLanguage()` at call time, same
+ * pattern as every other action here. It controls the free-text `diagnosis`
+ * only; `label`, `codeStatus` and the ISO `admissionDate` are structured
+ * values the app stores and matches against, and stay canonical.
+ *
+ * Returns null on any failure, including "the deployed Edge Function doesn't
+ * know this action yet". The caller falls back to
+ * `parsePatientTranscriptFallback` (VoiceCapture), per CLAUDE.md's rule that
+ * every prompt has a fallback parser.
+ *
+ * @param {string} transcript - Raw text from Web Speech API
+ * @returns {Promise<object|null>} Draft patient fields, or null on failure
+ */
+export async function parsePatientFromVoice(transcript) {
+  try {
+    return await invokeClaude("parsePatientFromVoice", {
+      transcript,
+      language: currentLanguage(),
+    });
+  } catch (err) {
+    console.error("[claudeAPI] parsePatientFromVoice failed:", err);
     return null;
   }
 }

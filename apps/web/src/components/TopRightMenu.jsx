@@ -4,7 +4,17 @@ import { SUPPORTED_LANGUAGES, normalizeLanguage } from "../i18n";
 import { departmentLabel } from "../i18n/enums";
 import { formatActionTimestamp } from "../utils/actionTimestamp";
 
-export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange }) {
+// Real Supabase patient rows carry `label`, `location_label` and
+// `diagnosis`. The demo-era `name`/`room` fields these lists used to read
+// don't exist on them, which is why the discharge patient list rendered
+// blank rows. Location is a synthetic label (SECURITY.md), never a real
+// room number, so it is shown as-is rather than as "Room N".
+function patientSubtitle(t, patient) {
+  const parts = [patient.location_label, patient.diagnosis].filter(Boolean);
+  return parts.length > 0 ? parts.join(" \u00b7 ") : t("patientCard.noDiagnosis");
+}
+
+export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange, onOpenProfile }) {
   const { t, i18n } = useTranslation();
   // Which button reads as selected comes from the one live value, not a
   // separately-passed copy, so the highlight can never disagree with what
@@ -63,19 +73,23 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                   {t("topMenu.backArrow")}
                 </button>
                 <div className="border-t border-gray-100">
-                  {patients.map((patient) => (
-                    <button
-                      key={patient.id}
-                      onClick={() => {
-                        onDischargePatient(patient);
-                        closeMenu();
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-gray-50 cursor-pointer border-t border-gray-100 first:border-t-0"
-                    >
-                      <p className="text-sm text-gray-700 font-medium">{patient.name}</p>
-                      <p className="text-xs text-gray-400">{t("topMenu.room", { room: patient.room })}</p>
-                    </button>
-                  ))}
+                  {patients.length === 0 ? (
+                    <p className="px-4 py-6 text-center text-sm text-gray-400">{t("topMenu.noPatients")}</p>
+                  ) : (
+                    patients.map((patient) => (
+                      <button
+                        key={patient.id}
+                        onClick={() => {
+                          onDischargePatient(patient);
+                          closeMenu();
+                        }}
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 cursor-pointer border-t border-gray-100 first:border-t-0"
+                      >
+                        <p className="text-sm text-gray-700 font-medium">{patient.label}</p>
+                        <p className="text-xs text-gray-400">{patientSubtitle(t, patient)}</p>
+                      </button>
+                    ))
+                  )}
                 </div>
               </>
             ) : (
@@ -121,6 +135,18 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                       {delayedTasks.length}
                     </span>
                   )}
+                </button>
+
+                {/* Profile: name, email, sign out. */}
+                <button
+                  onClick={() => {
+                    closeMenu();
+                    onOpenProfile?.();
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-50 flex items-center gap-3"
+                >
+                  <span className="text-lg">👤</span>
+                  <span className="text-sm text-gray-700">{t("topMenu.profile")}</span>
                 </button>
 
                 {/* Language: applies immediately and is saved to the nurse's
@@ -171,7 +197,9 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                     <div key={task.id} className="px-4 py-3">
                       <p className="text-sm font-medium text-gray-900">{task.description}</p>
                       <p className="text-xs text-gray-500 mt-0.5">
-                        {departmentLabel(t, task.department)} · {task.patientName} · {t("topMenu.room", { room: task.patientRoom })}
+                        {[departmentLabel(t, task.department), task.patientName, task.patientRoom]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                       <div className="flex gap-2 mt-2">
                         <button

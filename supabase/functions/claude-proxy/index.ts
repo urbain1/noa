@@ -738,7 +738,16 @@ async function generatePatientUpdate(
   payload: { patient: any; language?: string },
   callClaude: CallClaude,
 ) {
-  const { patient, language = "English" } = payload;
+  const { patient, language } = payload;
+
+  const languageBlock = languageDirective(
+    language,
+    [
+      "- Write the entire update in {{LANG}}: every section header, sentence, and the header line.",
+      "- Patient and doctor names, and the facility's synthetic room/location label, stay exactly as given, never translated.",
+    ].join("\n"),
+  );
+
   try {
     const daysSinceAdmission = patient.admissionDate
       ? Math.max(1, Math.round((Date.now() - new Date(patient.admissionDate).getTime()) / (24 * 60 * 60 * 1000)))
@@ -770,9 +779,6 @@ async function generatePatientUpdate(
       max_tokens: 2048,
       system: `You are a patient communication AI for a hospital. You generate clear, compassionate health updates for patients and their families.
 
-TARGET LANGUAGE: ${language}
-Write the ENTIRE update in ${language}. If the language is not English, translate everything including section headers.
-
 READING LEVEL: Sixth grade (age 11-12). This means:
 - Short sentences (under 15 words when possible)
 - Common everyday words
@@ -780,12 +786,6 @@ READING LEVEL: Sixth grade (age 11-12). This means:
 - When a medical term is unavoidable, explain it in parentheses: "pneumonia (a lung infection)"
 - Active voice, not passive
 - No complex sentence structures
-
-TRANSLATION RULES:
-- Medical term explanations should also be in the target language
-- Keep the same warm, clear tone in all languages
-- Use culturally appropriate phrasing
-- Patient and doctor names stay in their original form
 
 TONE:
 - Warm and reassuring but honest
@@ -795,7 +795,9 @@ TONE:
 - Address the reader as "you" when writing for the patient, or use the patient's first name when writing for family
 - Be specific about what was done and what's next
 
-STRUCTURE (use these sections, translated to target language if not English):
+NAME HANDLING: \`name\` and \`firstName\` are the facility's synthetic patient identifier (e.g. "Patient_Test_1"), not a natural human name. Reproduce it exactly as given, everywhere you would use the patient's name, including at the start of a sentence. Never substitute a generic word or placeholder like "Patient", "the patient", or "the resident" in its place.
+
+STRUCTURE (use these sections):
 1. A header line with: "Update for [Full Name]" and "Room [X] | [Today's date formatted nicely]"
 2. HOW THINGS ARE GOING: 2-3 sentences about current status, diagnosis in plain language, how long they've been here
 3. WHAT WE DID TODAY: bullet-style list of completed tasks, translated to plain language
@@ -820,11 +822,11 @@ TRANSLATION OF MEDICAL TASKS:
 - "Physical Therapy evaluation" → "a visit from the physical therapy team to check movement and strength"
 - "Lantus 10 units subcutaneous" → "insulin medicine given by injection to manage blood sugar"
 - "Prothrombin Time with INR" → "a blood test to check how well blood is clotting"
-- Translate similar terms using the same pattern: plain description first, medical name in parentheses only if helpful`,
+- Translate similar terms using the same pattern: plain description first, medical name in parentheses only if helpful${languageBlock}`,
       messages: [
         {
           role: "user",
-          content: `Generate a patient update in ${language} for:\n\n${JSON.stringify(patientData, null, 2)}`,
+          content: `Generate a patient update for:\n\n${JSON.stringify(patientData, null, 2)}`,
         },
       ],
     });
@@ -868,6 +870,122 @@ RULES:
   }
 }
 
+// ---------------------------------------------------------------------------
+// parsePatientFromVoice
+//
+// Turns a spoken patient description into the fields the Add Patient form
+// holds. It never creates anything: the result is a draft the nurse reviews
+// and confirms in that form (App.jsx handlePatientParsed), which is also
+// where the Patient_Test_N labelling rule is enforced.
+//
+// Extraction only. Anything not clearly stated comes back null and the form
+// field stays blank -- an invented diagnosis or age on a clinical record is
+// worse than an empty one the nurse fills in.
+//
+// The client has a regex fallback for this action (claudeAPI.js), so voice
+// patient capture still works if this function hasn't been deployed yet or
+// the API call fails.
+// ---------------------------------------------------------------------------
+
+const CODE_STATUSES = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"] as const;
+
+async function parsePatientFromVoice(
+  payload: { transcript: string; language?: string },
+  callClaude: CallClaude,
+) {
+  const { transcript, language } = payload;
+
+  const languageBlock = languageDirective(
+    language,
+    [
+      '- Write the "diagnosis" value in {{LANG}}, expanding medical abbreviations into full, standard clinical terminology in {{LANG}}.',
+      '- Everything else stays exactly as specified above and in English: the JSON field names, "codeStatus", the "label" and "locationLabel" values, and the ISO "admissionDate".',
+    ].join("\n"),
+  );
+
+  try {
+    const message = await callClaude({
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 1024,
+      system: `You extract patient record fields from a nurse's spoken description, for a hospital coordination app that holds SYNTHETIC TEST PATIENTS ONLY.
+
+Return ONLY a JSON object, no other text:
+{
+  "label": string|null,
+  "age": number|null,
+  "diagnosis": string|null,
+  "codeStatus": "Full Code"|"DNR"|"DNR/DNI"|"Comfort Care"|null,
+  "attendingPhysician": string|null,
+  "allergies": string[],
+  "admissionDate": string|null,
+  "locationLabel": string|null
+}
+
+EXTRACTION RULES (these matter more than filling the object):
+- Extract ONLY what the nurse actually said. If a field was not stated, return null (or [] for allergies). NEVER guess, infer, or invent a value. A blank field is correct and expected.
+- Do not infer a diagnosis from a medication, a symptom, or a department. Only use a diagnosis if one was stated.
+- Do not infer code status from anything other than an explicit statement of it.
+
+"label" is the app's synthetic patient identifier, always of the form Patient_Test_N where N is a number:
+- "patient test three" / "patient test 3" / "test patient 3" → "Patient_Test_3"
+- If no such identifier was spoken, return null. Never construct a label from a person's name, a real room or bed number, a hospital or national ID number, or a date of birth. If the nurse spoke something that looks like one of those, ignore it and return null for label.
+
+"locationLabel" is a made-up location for the test scenario ("Test Room A", "Bay 2"). If what was said sounds like a real ward/room/bed number rather than a test label, return null.
+
+"age" is a plain integer in years, or null.
+"admissionDate" is ISO YYYY-MM-DD, only if a date was clearly stated; relative phrasing like "admitted yesterday" resolves against today, ${new Date().toISOString().slice(0, 10)}. Otherwise null.
+"diagnosis" is expanded to standard clinical terminology (e.g. "CHF" → "Congestive Heart Failure").
+"allergies" is a list of individual allergens, [] if none were mentioned.${languageBlock}`,
+      messages: [
+        {
+          role: "user",
+          content: transcript,
+        },
+      ],
+    });
+
+    const parsed = JSON.parse(stripCodeFence(message.content[0].text));
+
+    // The label is the one field with a hard format rule (SECURITY.md), so
+    // it is validated here rather than trusted: anything that isn't exactly
+    // Patient_Test_N is dropped and the nurse types it themselves.
+    const label =
+      typeof parsed.label === "string" && /^Patient_Test_\d+$/.test(parsed.label.trim())
+        ? parsed.label.trim()
+        : null;
+
+    const age =
+      typeof parsed.age === "number" && Number.isFinite(parsed.age) && parsed.age >= 0 && parsed.age <= 130
+        ? Math.round(parsed.age)
+        : null;
+
+    return {
+      label,
+      age,
+      diagnosis: typeof parsed.diagnosis === "string" && parsed.diagnosis.trim() ? parsed.diagnosis.trim() : null,
+      codeStatus: CODE_STATUSES.includes(parsed.codeStatus) ? parsed.codeStatus : null,
+      attendingPhysician:
+        typeof parsed.attendingPhysician === "string" && parsed.attendingPhysician.trim()
+          ? parsed.attendingPhysician.trim()
+          : null,
+      allergies: Array.isArray(parsed.allergies)
+        ? parsed.allergies.filter((a: unknown) => typeof a === "string" && a.trim()).map((a: string) => a.trim())
+        : [],
+      admissionDate:
+        typeof parsed.admissionDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.admissionDate)
+          ? parsed.admissionDate
+          : null,
+      locationLabel:
+        typeof parsed.locationLabel === "string" && parsed.locationLabel.trim()
+          ? parsed.locationLabel.trim()
+          : null,
+    };
+  } catch (err) {
+    console.error("[claude-proxy] parsePatientFromVoice failed:", err);
+    return null;
+  }
+}
+
 const actionHandlers: Record<string, (payload: any, callClaude: CallClaude) => Promise<any>> = {
   parseVoiceToTask,
   parseTaskEditCommand,
@@ -876,6 +994,7 @@ const actionHandlers: Record<string, (payload: any, callClaude: CallClaude) => P
   parseNoteEditCommand,
   generateSuggestions,
   generatePatientUpdate,
+  parsePatientFromVoice,
   translateText,
 };
 

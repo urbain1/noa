@@ -5,16 +5,24 @@ import { codeStatusLabel } from "../i18n/enums";
 // Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
 
-export default function AddPatientDialog({ onCancel, onSave }) {
+// `initialFields` pre-fills the form from a voice capture (App.jsx
+// handlePatientParsed). This dialog is the review step of that flow, not a
+// second way of creating a patient: a patient is only ever created by the
+// nurse confirming these fields here. Fields the parser couldn't extract
+// arrive undefined and stay blank -- nothing is invented to fill them.
+export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
   const { t } = useTranslation();
-  const [label, setLabel] = useState("");
-  const [diagnosis, setDiagnosis] = useState("");
-  const [age, setAge] = useState("");
-  const [codeStatus, setCodeStatus] = useState("Full Code");
-  const [attendingPhysician, setAttendingPhysician] = useState("");
-  const [allergiesInput, setAllergiesInput] = useState("");
-  const [admissionDate, setAdmissionDate] = useState("");
-  const [locationLabel, setLocationLabel] = useState("");
+  const fromVoice = Boolean(initialFields);
+  const [label, setLabel] = useState(initialFields?.label || "");
+  const [diagnosis, setDiagnosis] = useState(initialFields?.diagnosis || "");
+  const [age, setAge] = useState(
+    initialFields?.age === null || initialFields?.age === undefined ? "" : String(initialFields.age)
+  );
+  const [codeStatus, setCodeStatus] = useState(initialFields?.codeStatus || "Full Code");
+  const [attendingPhysician, setAttendingPhysician] = useState(initialFields?.attendingPhysician || "");
+  const [allergiesInput, setAllergiesInput] = useState((initialFields?.allergies || []).join(", "));
+  const [admissionDate, setAdmissionDate] = useState(initialFields?.admissionDate || "");
+  const [locationLabel, setLocationLabel] = useState(initialFields?.locationLabel || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -72,6 +80,11 @@ export default function AddPatientDialog({ onCancel, onSave }) {
 
         {/* Body */}
         <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          {fromVoice && (
+            <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              {t("patientDialog.voiceReviewHint")}
+            </p>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">{t("patientDialog.label")}</label>
             <input
