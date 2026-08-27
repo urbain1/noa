@@ -523,7 +523,7 @@ function App() {
   const handleGenerateShiftHandoff = async () => {
     const result = await generateHandoffSummary(patients);
     if (result) {
-      setHandoffData({ summaryText: result, title: t("handoff.shiftReportTitle"), patientCount: patients.length });
+      setHandoffData({ summaryText: result, title: t("handoff.shiftReportTitle"), patientCount: patients.length, kind: "shift" });
       setShowHandoff(true);
     } else {
       alert(t("errors.generateHandoff"));
@@ -540,6 +540,7 @@ function App() {
         summaryText: result,
         title: t("handoff.patientSbarTitle", { patient: patient.label }),
         patientCount: 1,
+        kind: "sbar",
       });
       setShowHandoff(true);
     } else {
@@ -924,6 +925,7 @@ function App() {
         summaryText={handoffData.summaryText}
         title={handoffData.title}
         patientCount={handoffData.patientCount}
+        kind={handoffData.kind}
         onClose={handleCloseHandoff}
       />
     );

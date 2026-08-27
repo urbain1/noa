@@ -156,10 +156,10 @@ taskCard.edit,Edit,Modifier
 taskCard.complete,Complete,Terminer
 taskCard.repage,Repage,Relancer
 taskCard.escalate,Escalate,Escalader
-taskCard.repagedToday,Repaged today at {{time}},Relancé aujourd'hui à {{time}}
-taskCard.repagedOn,Repaged on {{date}} at {{time}},Relancé le {{date}} à {{time}}
-taskCard.escalatedToday,Escalated today at {{time}},Escaladé aujourd'hui à {{time}}
-taskCard.escalatedOn,Escalated on {{date}} at {{time}},Escaladé le {{date}} à {{time}}
+taskCard.repagedToday,Repaged today at {{time}},Relancée aujourd'hui à {{time}}
+taskCard.repagedOn,Repaged on {{date}} at {{time}},Relancée le {{date}} à {{time}}
+taskCard.escalatedToday,Escalated today at {{time}},Escaladée aujourd'hui à {{time}}
+taskCard.escalatedOn,Escalated on {{date}} at {{time}},Escaladée le {{date}} à {{time}}
 noteCard.justNow,just now,à l'instant
 noteCard.minutesAgo,{{count}}m ago,il y a {{count}} min
 noteCard.hoursAgo,{{count}}h ago,il y a {{count}} h
@@ -207,7 +207,8 @@ patientMatch.selectNoMatch,No patients match your search. New patients must be a
 handoff.shiftReportTitle,Shift Handoff Report,Transmission de relève
 handoff.patientSbarTitle,SBAR — {{patient}},SBAR — {{patient}}
 handoff.subtitle,SBAR summary for shift change,Rapport SBAR pour le changement d'équipe
-handoff.generatedAt,Generated {{date}} at {{time}},Généré le {{date}} à {{time}}
+handoff.generatedAt_shift,Generated {{date}} at {{time}},Générée le {{date}} à {{time}}
+handoff.generatedAt_sbar,Generated {{date}} at {{time}},Généré le {{date}} à {{time}}
 handoff.patientCount_one,{{count}} patient,{{count}} patient
 handoff.patientCount_other,{{count}} patients,{{count}} patients
 handoff.copy,Copy,Copier
@@ -312,8 +313,8 @@ unitView.delayedCount,{{count}} delayed,{{count}} en retard
 unitView.attnDelayed,"{{department}} — delayed, no response","{{department}} — en retard, aucune réponse"
 unitView.attnStatPending,{{department}} — stat order pending,{{department}} — prescription immédiate en attente
 unitView.attnOverdue,Overdue by {{value}},En retard de {{value}}
-unitView.statCount_one,{{count}} STAT,{{count}} immédiate
-unitView.statCount_other,{{count}} STAT,{{count}} immédiates
+unitView.statCount_one,{{count}} STAT,{{count}} immédiat
+unitView.statCount_other,{{count}} STAT,{{count}} immédiats
 unitView.delayedAttentionCount_one,{{count}} delayed,{{count}} en retard
 unitView.delayedAttentionCount_other,{{count}} delayed,{{count}} en retard
 unitView.personnel,Personnel,Personnel

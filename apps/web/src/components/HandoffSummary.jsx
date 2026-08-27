@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import SendHandoffDialog from "./SendHandoffDialog";
 import { localeTag } from "../i18n";
 
-export default function HandoffSummary({ summaryText, title, onClose, patientCount }) {
+export default function HandoffSummary({ summaryText, title, onClose, patientCount, kind }) {
   const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(summaryText);
@@ -24,8 +24,12 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
       hour: "numeric",
       minute: "2-digit",
     });
-    return t("handoff.generatedAt", { date: formattedDate, time: formattedTime });
-  }, [t, i18n.language]);
+    // Two callers, two genders: "shift" is la transmission (feminine),
+    // "sbar" is le rapport/résumé SBAR (masculine) -- fr.json carries both
+    // as separate keys via i18next's context option rather than one string
+    // trying to agree with either.
+    return t("handoff.generatedAt", { date: formattedDate, time: formattedTime, context: kind });
+  }, [t, i18n.language, kind]);
 
   useEffect(() => {
     if (sentConfirmation) {
