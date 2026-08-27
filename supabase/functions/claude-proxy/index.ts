@@ -923,7 +923,7 @@ Return ONLY a JSON object, no other text:
 
 EXTRACTION RULES (these matter more than filling the object):
 - Extract ONLY what the nurse actually said. If a field was not stated, return null (or [] for allergies). NEVER guess, infer, or invent a value. A blank field is correct and expected.
-- Do not infer a diagnosis from a medication, a symptom, or a department. Only use a diagnosis if one was stated.
+- "diagnosis" holds whatever clinical reason for the patient's condition was stated, in whatever form the nurse said it: a symptom ("shoulder pain"), a presenting complaint ("chest pain", "admitted with abdominal pain"), or a formal diagnosis ("pneumonia", "suspected pneumonia"). Record it as stated. Do not infer a diagnosis from a medication or a department alone, and never infer a more specific or different underlying condition than what was literally said -- "shoulder pain" stays "shoulder pain", it never becomes "rotator cuff injury".
 - Do not infer code status from anything other than an explicit statement of it.
 
 "label" is the app's synthetic patient identifier, always of the form Patient_Test_N where N is a number:
@@ -934,7 +934,7 @@ EXTRACTION RULES (these matter more than filling the object):
 
 "age" is a plain integer in years, or null.
 "admissionDate" is ISO YYYY-MM-DD, only if a date was clearly stated; relative phrasing like "admitted yesterday" resolves against today, ${new Date().toISOString().slice(0, 10)}. Otherwise null.
-"diagnosis" is expanded to standard clinical terminology (e.g. "CHF" → "Congestive Heart Failure").
+"diagnosis" expands known abbreviations to standard clinical terminology (e.g. "CHF" → "Congestive Heart Failure") but otherwise stays exactly what was said -- expanding an abbreviation is not the same as inferring a condition, so a symptom or complaint is recorded as that symptom or complaint, not upgraded into a diagnosis.
 "allergies" is a list of individual allergens, [] if none were mentioned.${languageBlock}`,
       messages: [
         {

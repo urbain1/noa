@@ -403,8 +403,13 @@ function extractLabel(text, claims) {
   return null;
 }
 
+// "has"/"with" are bare English triggers, added alongside the more specific
+// phrases below so a plain symptom or complaint ("has shoulder pain") is
+// captured, not just a formalised lead-in ("diagnosis of"). "has(?!\s+been)"
+// steps aside for "has been admitted with/diagnosed with", which are
+// already matched more specifically and further along in the sentence.
 const DIAGNOSIS_LEAD_RE =
-  /\b(?:admitted (?:with|for)|admission (?:diagnosis|for)|diagnosis(?:\s+(?:of|is))?|diagnosed with|presenting with|presents with|known|admis(?:e)? pour|hospitalisée? pour|diagnostic(?:\s+(?:de|d'|est))?)\s*:?\s+/i;
+  /\b(?:admitted (?:with|for)|admission (?:diagnosis|for)|diagnosis(?:\s+(?:of|is))?|diagnosed with|presenting with|presents with|known|has(?!\s+been)|with|admis(?:e)? pour|hospitalisée? pour|diagnostic(?:\s+(?:de|d'|est))?)\s*:?\s+/i;
 
 function extractDiagnosis(text, claims) {
   const m = firstFreeMatch(text, DIAGNOSIS_LEAD_RE, claims);
@@ -413,6 +418,12 @@ function extractDiagnosis(text, claims) {
   const to = captureLimit(text, from, claims, 8);
   const value = text.slice(from, to).trim().replace(/^(?:(?:a|an|the|un|une|le|la|les)\s+|l')/i, "").replace(/[\s,;:.-]+$/, "");
   if (value.length < 2) return null;
+  // "has"/"with" are bare enough that they also lead into non-clinical
+  // speech ("with her daughter"). The same word-level filter the leftover
+  // extractor uses catches that without narrowing the specific lead-ins
+  // ("diagnosis of", "admitted with") that never needed it.
+  const words = value.split(/\s+/);
+  if (words.some((w) => NOT_A_DIAGNOSIS.has(w.toLowerCase()))) return null;
   claim(claims, m.index, to);
   return value;
 }
