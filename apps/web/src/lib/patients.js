@@ -87,13 +87,18 @@ export async function createTask(facilityId, patientId, createdBy, fields) {
 // 42703 is Postgres' undefined_column; PGRST204 is PostgREST's schema-cache
 // equivalent. Used to keep pre-0011 behaviour working instead of breaking
 // task completion outright, per the "degrade visibly, don't crash" rule.
+//
+// The error code has to match: 42703 and PGRST204 mean "this column does not
+// exist" and nothing else. The column name is then checked as a confirmation,
+// not as an alternative -- matching on the message alone would misread any
+// unrelated failure that happens to mention the column. A foreign key
+// violation on `tasks_assigned_to_fkey`, for instance, names `assigned_to` in
+// its message but has nothing to do with a missing migration, and reporting
+// it as one would send the reader off to check a migration that is fine.
 function isMissingColumnError(error, column) {
   if (!error) return false
-  return (
-    error.code === '42703' ||
-    error.code === 'PGRST204' ||
-    (typeof error.message === 'string' && error.message.includes(column))
-  )
+  if (error.code !== '42703' && error.code !== 'PGRST204') return false
+  return typeof error.message !== 'string' || error.message.includes(column)
 }
 
 // `completedBy` records which nurse actually marked the task complete

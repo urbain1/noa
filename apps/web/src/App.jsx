@@ -987,6 +987,7 @@ function App() {
         <TaskEditDialog
           task={taskToEdit}
           patientId={taskToEdit.patient_id}
+          patientLabel={patients.find((p) => p.id === taskToEdit.patient_id)?.label}
           nurses={nurses}
           onAssign={handleAssignTask}
           onCancel={() => setTaskToEdit(null)}

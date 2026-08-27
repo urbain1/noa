@@ -268,7 +268,7 @@
     "deadline": "Échéance",
     "deadlineHint": "Laissez vide pour ne pas fixer d'échéance",
     "currentTask": "Tâche actuelle",
-    "room": "Chambre",
+    "patient": "Patient",
     "tapToSpeak": "Appuyez pour dicter",
     "commandPlaceholder": "Saisissez votre commande...",
     "commandExamples": "Exemples : « passer en urgent », « marquer comme terminée », « déplacer en chambre 405 », « supprimer »",

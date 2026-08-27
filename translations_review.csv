@@ -15,14 +15,18 @@ common.none,None,Aucune
 common.or,or,ou
 common.syntheticDataOnly,Synthetic data only — no real patient information,Données fictives uniquement — aucune information réelle de patient
 common.builtBy,Built by Noa Health,Développé par Noa Health
+common.saved,Saved,Enregistré
 errors.loadPatients,Could not load patients. Please try reloading.,Impossible de charger les patients. Veuillez recharger la page.
 errors.loadFacilities,Could not load facilities. Please try again.,Impossible de charger les établissements. Veuillez réessayer.
 errors.saveTask,Failed to save task. Please try again.,Échec de l'enregistrement de la tâche. Veuillez réessayer.
 errors.completeTask,Failed to mark task complete. Please try again.,Impossible de marquer la tâche comme terminée. Veuillez réessayer.
+errors.repageTask,Failed to repage task. Please try again.,Échec du repage de la tâche. Veuillez réessayer.
+errors.escalateTask,Failed to escalate task. Please try again.,Échec de l'escalade de la tâche. Veuillez réessayer.
 errors.updateTask,Failed to update task.,Échec de la mise à jour de la tâche.
 errors.saveNote,Failed to save note. Please try again.,Échec de l'enregistrement de la note. Veuillez réessayer.
 errors.generateHandoff,Failed to generate handoff summary. Please try again.,Échec de la génération du rapport de transmission. Veuillez réessayer.
 errors.generateSbar,Failed to generate SBAR summary. Please try again.,Échec de la génération du rapport SBAR. Veuillez réessayer.
+errors.generatePatientUpdate,Failed to generate patient update. Please try again.,Échec de la génération de la mise à jour patient. Veuillez réessayer.
 errors.parseTask,Could not parse task. Please try again.,Impossible d'interpréter la tâche. Veuillez réessayer.
 errors.createTask,Error creating task. Please try again.,Erreur lors de la création de la tâche. Veuillez réessayer.
 errors.recordFirst,Please record something first,Veuillez d'abord enregistrer quelque chose
@@ -34,10 +38,16 @@ errors.fullNameRequired,Full name is required.,Le nom complet est obligatoire.
 errors.passwordsMismatch,Passwords do not match.,Les mots de passe ne correspondent pas.
 errors.passwordTooShort,Password must be at least 6 characters.,Le mot de passe doit contenir au moins 6 caractères.
 errors.languagePreference,Could not save your language preference. Please try again.,Impossible d'enregistrer votre préférence de langue. Veuillez réessayer.
+errors.noticeAcknowledgment,Could not save your acknowledgment. Please try again.,Impossible d'enregistrer votre confirmation. Veuillez réessayer.
 errors.speechUnsupported,Speech recognition is not supported in this browser.,La reconnaissance vocale n'est pas prise en charge par ce navigateur.
 errors.micDenied,Microphone access denied. Please allow microphone permissions.,Accès au microphone refusé. Veuillez autoriser l'accès au microphone.
 errors.speechError,Speech recognition error: {{error}},Erreur de reconnaissance vocale : {{error}}
 errors.speechStartFailed,Failed to start speech recognition.,Impossible de démarrer la reconnaissance vocale.
+errors.assignTask,Failed to assign task. Please try again.,Échec de l'attribution de la tâche. Veuillez réessayer.
+errors.assignUnavailable,Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.,L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.
+errors.createDischargeTasks,Failed to create discharge planning tasks. Please try again.,Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.
+errors.dischargeTasksUntagged,"Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.","Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée."
+errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
 language.label,Language,Langue
 language.en,English,English
 language.fr,Français,Français
@@ -67,6 +77,34 @@ auth.checkEmailHeading,Check your email,Vérifiez votre boîte mail
 auth.confirmationSentPrefix,We sent a confirmation link to,Nous avons envoyé un lien de confirmation à
 auth.confirmationSentSuffix,"Click it to activate your account, then come back here to sign in.","Cliquez dessus pour activer votre compte, puis revenez ici pour vous connecter."
 auth.backToSignIn,Back to Sign In,Retour à la connexion
+notice.title,Before You Continue,Avant de continuer
+notice.paragraphs,"Noa uses AI to parse voice input, generate SBAR summaries, and suggest follow-up actions. This content can be incomplete or wrong. Never use AI-generated content for a real clinical decision without independently verifying it yourself.
+
+Noa is in active development and has not yet completed formal healthcare data protection review for any jurisdiction, including the UK, EU, Switzerland, or US.
+
+Do not enter any information that could identify a real patient, directly or indirectly. Direct identifiers include names, dates of birth, national or hospital ID numbers, and real room, bed, or ward numbers. Indirect identification is just as much a risk: a specific diagnosis, age, and admission date together, even with no name attached, can be enough for someone who knows the patient to work out who you mean. If a detail isn't needed to test how the app works, leave it out or use a synthetic placeholder instead.
+
+If you're testing with a real patient in mind, use only a neutral test label such as ""Patient_Test_1"" that has no connection to that patient's actual hospital records, room, or ID, and would not let anyone outside your own memory identify who you mean. If the real patient you had in mind changes, retire that label and start a new one rather than reusing it for someone else.
+
+Wherever you are practicing, you remain bound by your own professional confidentiality obligations and your local data protection laws. This notice does not change or reduce those obligations, and using Noa does not transfer them to Noa Health Ltd.
+
+Entering real, identifiable patient information is outside how Noa is intended to be used at this stage, and Noa Health is not responsible for consequences arising from a decision to disregard this instruction, including any professional or regulatory consequences for the person entering the data.
+
+By continuing, you confirm you understand this and will not enter real, identifiable patient information.","Noa utilise l'IA pour analyser les entrées vocales, générer des résumés SBAR et suggérer des actions de suivi. Ce contenu peut être incomplet ou erroné. N'utilisez jamais de contenu généré par l'IA pour une décision clinique réelle sans le vérifier vous-même de manière indépendante.
+
+Noa est en développement actif et n'a pas encore fait l'objet d'une évaluation formelle de protection des données de santé, quelle que soit la juridiction, y compris le Royaume-Uni, l'EU, la Suisse ou les États-Unis.
+
+Ne saisissez aucune information susceptible d'identifier un patient réel, directement ou indirectement. Les identifiants directs comprennent les noms, dates de naissance, numéros d'identification nationaux ou hospitaliers, ainsi que les numéros réels de chambre, de lit ou de service. L'identification indirecte représente un risque tout aussi important : un diagnostic précis, un âge et une date d'admission combinés, même sans nom associé, peuvent suffire à permettre à une personne connaissant le patient de deviner de qui il s'agit. Si un détail n'est pas nécessaire pour tester le fonctionnement de l'application, omettez-le ou utilisez un identifiant synthétique à la place.
+
+Si vous testez en pensant à un patient réel, utilisez uniquement une étiquette de test neutre telle que « Patient_Test_1 », sans lien avec le dossier, la chambre ou l'identifiant réels de ce patient, et qui ne permettrait à personne, en dehors de votre propre mémoire, de savoir de qui il s'agit. Si le patient réel auquel vous pensiez change, retirez cette étiquette et utilisez-en une nouvelle plutôt que de la réutiliser pour quelqu'un d'autre.
+
+Quel que soit le lieu où vous exercez, vous restez tenu(e) par vos propres obligations de confidentialité professionnelle et par les lois locales sur la protection des données. Cet avis ne modifie ni ne réduit ces obligations, et l'utilisation de Noa ne les transfère pas à Noa Health Ltd.
+
+La saisie d'informations réelles permettant d'identifier un patient ne correspond pas à l'usage prévu de Noa à ce stade. Noa Health décline toute responsabilité quant aux conséquences résultant du non-respect de cette consigne, y compris toute conséquence professionnelle ou réglementaire pour la personne ayant saisi les données.
+
+En continuant, vous confirmez avoir compris cet avis et vous vous engagez à ne saisir aucune information réelle permettant d'identifier un patient."
+notice.builtBy,Built by Noa Health Ltd.,Développé par Noa Health Ltd.
+notice.confirmButton,I understand and agree,J'ai compris et j'accepte
 facility.subtitle,Select your facility to get started.,Sélectionnez votre établissement pour commencer.
 facility.searchPlaceholder,Search facilities...,Rechercher un établissement...
 facility.noSearchMatch,No facilities match your search.,Aucun établissement ne correspond à votre recherche.
@@ -82,11 +120,15 @@ dashboard.myPatients,My Patients,Mes patients
 dashboard.unitView,Unit View,Vue du service
 dashboard.addPatient,Add Patient,Ajouter un patient
 dashboard.voiceInputAria,Voice input,Saisie vocale
+dashboard.tasksView,Tasks,Tâches
+dashboard.addPatientByVoice,Add by voice,Ajouter par la voix
+dashboard.noPatients,No patients yet. Add one to get started.,Aucun patient pour le moment. Ajoutez-en un pour commencer.
 patientCard.dischargePlanningBadge,Discharge Planning,Préparation de la sortie
 patientCard.noDiagnosis,No diagnosis on file,Aucun diagnostic enregistré
 patientCard.admitted,Admitted {{date}},Admis le {{date}}
 patientCard.allergies,Allergies: {{list}},Allergies : {{list}}
 patientCard.sbarSummary,SBAR Summary,Rapport SBAR
+patientCard.familyUpdate,Family Update,Mise à jour famille
 patientCard.editPatientAria,Edit patient,Modifier le patient
 patientCard.tasksLabel,Tasks,Tâches
 patientCard.notesLabel,Clinical Notes,Notes cliniques
@@ -94,6 +136,7 @@ patientCard.newCount,+ {{count}} new,+ {{count}} nouvelle(s)
 patientCard.addTask,+ Add Task,+ Ajouter une tâche
 patientCard.addNote,+ Add Note,+ Ajouter une note
 patientCard.noNotes,No clinical notes yet,Aucune note clinique pour le moment
+patientCard.dischargePlanning,Discharge Planning,Préparation de la sortie
 taskCard.justNow,just now,à l'instant
 taskCard.minAgo,{{count}} min ago,il y a {{count}} min
 taskCard.overdueBy,Overdue by {{value}},En retard de {{value}}
@@ -103,6 +146,12 @@ taskCard.unitHours,{{count}}h,{{count}} h
 taskCard.unitDays,{{count}}d,{{count}} j
 taskCard.edit,Edit,Modifier
 taskCard.complete,Complete,Terminer
+taskCard.repage,Repage,Relancer
+taskCard.escalate,Escalate,Escalader
+taskCard.repagedToday,Repaged today at {{time}},Relancé aujourd'hui à {{time}}
+taskCard.repagedOn,Repaged on {{date}} at {{time}},Relancé le {{date}} à {{time}}
+taskCard.escalatedToday,Escalated today at {{time}},Escaladé aujourd'hui à {{time}}
+taskCard.escalatedOn,Escalated on {{date}} at {{time}},Escaladé le {{date}} à {{time}}
 noteCard.justNow,just now,à l'instant
 noteCard.minutesAgo,{{count}}m ago,il y a {{count}} min
 noteCard.hoursAgo,{{count}}h ago,il y a {{count}} h
@@ -110,17 +159,15 @@ noteCard.daysAgo,{{count}}d ago,il y a {{count}} j
 topMenu.generateHandoff,Generate handoff report,Générer le compte rendu à transmettre
 topMenu.generateHandoffSubtitle,SBAR summary for shift change,Rapport SBAR pour le changement d'équipe
 topMenu.dischargePatient,Discharge a patient,Préparer la sortie d'un patient
-topMenu.delayedTasks,Delayed tasks,Tâches en retard
-topMenu.delayedTasksHeading,Delayed Tasks ({{count}}),Tâches en retard ({{count}})
-topMenu.noDelayedTasks,No delayed tasks,Aucune tâche en retard
-topMenu.followUp,Follow Up,Relancer
+topMenu.delayedTasks,Needs attention,Nécessite attention
+topMenu.delayedTasksHeading,Needs Attention ({{count}}),Nécessite attention ({{count}})
+topMenu.noDelayedTasks,Nothing needs attention,Rien ne nécessite d'attention
+topMenu.repage,Repage,Relancer
+topMenu.escalate,Escalate,Escalader
 topMenu.backArrow,← Back,← Retour
 topMenu.room,Room {{room}},Chambre {{room}}
-alerts.taskDelayed,Task Delayed,Tâche en retard
-alerts.position,{{current}} of {{total}} delayed tasks,{{current}} sur {{total}} tâches en retard
-alerts.room,Room {{room}},Chambre {{room}}
-alerts.repage,Repage Dept,Relancer le service
-alerts.escalate,Escalate,Faire remonter
+topMenu.profile,Profile,Profil
+topMenu.noPatients,No patients to discharge,Aucun patient à faire sortir
 voiceCapture.title,Voice Capture,Saisie vocale
 voiceCapture.titleForPatient,Add Task — {{patient}},Ajouter une tâche — {{patient}}
 voiceCapture.goBackAria,Go back,Retour
@@ -132,6 +179,11 @@ voiceCapture.exampleGeneral,"Try: ""Order a CBC stat for Patient Test 1 due tomo
 voiceCapture.transcriptLabel,Transcript (tap to edit):,Transcription (cliquez pour modifier) :
 voiceCapture.transcriptPlaceholder,Your speech will appear here. Tap to write or edit before creating a task.,Votre transcription apparaîtra ici. Appuyez pour la modifier avant de créer la tâche.
 voiceCapture.createTask,Create Task,Créer la tâche
+voiceCapture.titlePatient,Add Patient by Voice,Ajouter un patient par la voix
+voiceCapture.tapToRecordPatient,Tap to describe a new patient,Appuyez pour décrire un nouveau patient
+voiceCapture.examplePatient,"Try: ""Patient Test 4, 72 years old, admitted with pneumonia, Test Room B""","Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »"
+voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels."
+voiceCapture.reviewPatient,Review Patient,Vérifier le patient
 patientMatch.multipleFound,Multiple Patients Found,Plusieurs patients trouvés
 patientMatch.foundCount,Found {{count}} patients matching '{{query}}'.,{{count}} patients correspondent à « {{query}} ».
 patientMatch.narrowLabel,Search to narrow results:,Rechercher pour affiner les résultats :
@@ -164,6 +216,9 @@ handoff.send.methodSecureMessage,Secure Message,Messagerie sécurisée
 handoff.send.methodText,Text,SMS
 handoff.send.methodEmail,Email,E-mail
 handoff.send.sendButton,Send,Envoyer
+patientUpdate.title,Family Update,Mise à jour famille
+patientUpdate.subtitle,Plain-language update for patients and families,Mise à jour en langage simple pour les patients et leurs familles
+patientUpdate.footer,Questions? Contact your nurse.,Des questions ? Contactez votre infirmier(ère).
 suggestions.title,AI Suggested Follow-ups,Suivis suggérés par l'IA
 suggestions.suggestedAs,Suggested as {{type}},Suggéré comme {{type}}
 suggestions.deadline,Deadline: {{value}},Échéance : {{value}}
@@ -192,7 +247,7 @@ taskEdit.priority,Priority,Priorité
 taskEdit.deadline,Deadline,Échéance
 taskEdit.deadlineHint,Leave empty for no deadline,Laissez vide pour ne pas fixer d'échéance
 taskEdit.currentTask,Current Task,Tâche actuelle
-taskEdit.room,Room,Chambre
+taskEdit.patient,Patient,Patient
 taskEdit.tapToSpeak,Tap to speak,Appuyez pour dicter
 taskEdit.commandPlaceholder,Type your command...,Saisissez votre commande...
 taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, “move to room 405”, “delete”","Exemples : « passer en urgent », « marquer comme terminée », « déplacer en chambre 405 », « supprimer »"
@@ -216,6 +271,7 @@ patientDialog.admissionDate,Admission Date,Date d'admission
 patientDialog.locationLabel,Location Label,Emplacement
 patientDialog.locationLabelPlaceholder,Test Room A,Chambre Test A
 patientDialog.addButton,Add Patient,Ajouter le patient
+patientDialog.voiceReviewHint,"Review every field before saving. Anything Noa could not make out has been left blank, fill it in yourself. AI transcription can be wrong.","Vérifiez chaque champ avant d'enregistrer. Tout ce que Noa n'a pas pu identifier a été laissé vide, complétez-le vous-même. La transcription par IA peut être erronée."
 discharge.title,Discharge Planning – {{patient}},Préparation de la sortie – {{patient}}
 discharge.notifyPatient,Notify patient about discharge,Informer le patient de sa sortie
 discharge.requestNursingHome,Request nursing home placement,Demander un placement en EHPAD
@@ -224,6 +280,7 @@ discharge.notesPlaceholder,Enter any additional discharge notes...,Saisissez tou
 discharge.createTasks,Create Tasks,Créer les tâches
 discharge.taskNotifyPatient,Notify patient about discharge plan,Informer le patient du plan de sortie
 discharge.taskArrangeNursingHome,Arrange nursing home placement,Organiser un placement en EHPAD
+discharge.selectAtLeastOne,Select at least one item to create tasks.,Sélectionnez au moins un élément pour créer des tâches.
 unitView.patients,Patients,Patients
 unitView.tasks,Tasks,Tâches
 unitView.notes,Notes,Notes
@@ -242,6 +299,22 @@ unitView.delayedCount,{{count}} delayed,{{count}} en retard
 unitView.attnDelayed,"{{department}} — delayed, no response","{{department}} — en retard, aucune réponse"
 unitView.attnStatPending,{{department}} — stat order pending,{{department}} — prescription immédiate en attente
 unitView.attnOverdue,Overdue by {{value}},En retard de {{value}}
+unitView.statCount_one,{{count}} STAT,{{count}} immédiate
+unitView.statCount_other,{{count}} STAT,{{count}} immédiates
+unitView.delayedAttentionCount_one,{{count}} delayed,{{count}} en retard
+unitView.delayedAttentionCount_other,{{count}} delayed,{{count}} en retard
+unitView.personnel,Personnel,Personnel
+unitView.nurseCount_one,{{count}} nurse,{{count}} infirmier(ère)
+unitView.nurseCount_other,{{count}} nurses,{{count}} infirmier(ère)s
+unitView.noNurses,No colleagues found at this facility.,Aucun collègue trouvé dans cet établissement.
+unitView.nurse,Nurse,Infirmier(ère)
+unitView.tasksCreated,Created,Créées
+unitView.tasksAssigned,Assigned,Attribuées
+unitView.tasksCompleted,Completed,Terminées
+unitView.unassignedTasks_one,{{count}} unassigned task,{{count}} tâche non attribuée
+unitView.unassignedTasks_other,{{count}} unassigned tasks,{{count}} tâches non attribuées
+unitView.completedUnknown_one,{{count}} completed by unknown,{{count}} terminée par un(e) inconnu(e)
+unitView.completedUnknown_other,{{count}} completed by unknown,{{count}} terminées par un(e) inconnu(e)
 enums.department.Radiology,Radiology,Radiologie
 enums.department.Lab,Lab,Laboratoire
 enums.department.Pharmacy,Pharmacy,Pharmacie
@@ -263,18 +336,8 @@ enums.codeStatus.DNR/DNI,DNR/DNI,Ne pas réanimer / ne pas intuber
 enums.codeStatus.Comfort Care,Comfort Care,Soins de confort
 enums.suggestionType.task,task,tâche
 enums.suggestionType.note,note,note
-common.saved,Saved,Enregistré
-errors.assignTask,Failed to assign task. Please try again.,Échec de l'attribution de la tâche. Veuillez réessayer.
-errors.assignUnavailable,Task assignment isn't available yet: the database update (migration 0011) hasn't been applied.,L'attribution des tâches n'est pas encore disponible : la mise à jour de la base de données (migration 0011) n'a pas été appliquée.
-errors.createDischargeTasks,Failed to create discharge planning tasks. Please try again.,Échec de la création des tâches de préparation de la sortie. Veuillez réessayer.
-errors.dischargeTasksUntagged,"Discharge planning tasks were created, but could not be marked as discharge planning: the database update (migration 0011) hasn't been applied.","Les tâches de préparation de la sortie ont été créées, mais n'ont pas pu être marquées comme telles : la mise à jour de la base de données (migration 0011) n'a pas été appliquée."
-errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
 nav.backToTasks,Back to Tasks,Retour aux tâches
 nav.backToUnit,Back to Unit View,Retour à la vue du service
-dashboard.tasksView,Tasks,Tâches
-dashboard.addPatientByVoice,Add by voice,Ajouter par la voix
-dashboard.noPatients,No patients yet. Add one to get started.,Aucun patient pour le moment. Ajoutez-en un pour commencer.
-patientCard.dischargePlanning,Discharge Planning,Préparation de la sortie
 tasksView.heading,All Tasks,Toutes les tâches
 tasksView.taskCount_one,{{count}} task,{{count}} tâche
 tasksView.taskCount_other,{{count}} tasks,{{count}} tâches
@@ -287,31 +350,6 @@ tasksView.unknownPatient,Unknown patient,Patient inconnu
 tasksView.due,Due {{value}},Échéance {{value}}
 tasksView.expandAria,Show task details,Afficher les détails de la tâche
 tasksView.collapseAria,Hide task details,Masquer les détails de la tâche
-topMenu.profile,Profile,Profil
-topMenu.noPatients,No patients to discharge,Aucun patient à faire sortir
-voiceCapture.titlePatient,Add Patient by Voice,Ajouter un patient par la voix
-voiceCapture.tapToRecordPatient,Tap to describe a new patient,Appuyez pour décrire un nouveau patient
-voiceCapture.examplePatient,"Try: ""Patient Test 4, 72 years old, admitted with pneumonia, Test Room B""","Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »"
-voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels."
-voiceCapture.reviewPatient,Review Patient,Vérifier le patient
-patientDialog.voiceReviewHint,"Review every field before saving. Anything Noa could not make out has been left blank, fill it in yourself. AI transcription can be wrong.","Vérifiez chaque champ avant d'enregistrer. Tout ce que Noa n'a pas pu identifier a été laissé vide, complétez-le vous-même. La transcription par IA peut être erronée."
-discharge.selectAtLeastOne,Select at least one item to create tasks.,Sélectionnez au moins un élément pour créer des tâches.
-unitView.statCount_one,{{count}} STAT,{{count}} immédiate
-unitView.statCount_other,{{count}} STAT,{{count}} immédiates
-unitView.delayedAttentionCount_one,{{count}} delayed,{{count}} en retard
-unitView.delayedAttentionCount_other,{{count}} delayed,{{count}} en retard
-unitView.personnel,Personnel,Personnel
-unitView.nurseCount_one,{{count}} nurse,{{count}} infirmier(ère)
-unitView.nurseCount_other,{{count}} nurses,{{count}} infirmier(ère)s
-unitView.noNurses,No colleagues found at this facility.,Aucun collègue trouvé dans cet établissement.
-unitView.nurse,Nurse,Infirmier(ère)
-unitView.tasksCreated,Created,Créées
-unitView.tasksAssigned,Assigned,Attribuées
-unitView.tasksCompleted,Completed,Terminées
-unitView.unassignedTasks_one,{{count}} unassigned task,{{count}} tâche non attribuée
-unitView.unassignedTasks_other,{{count}} unassigned tasks,{{count}} tâches non attribuées
-unitView.completedUnknown_one,{{count}} completed by unknown,{{count}} terminée par un(e) inconnu(e)
-unitView.completedUnknown_other,{{count}} completed by unknown,{{count}} terminées par un(e) inconnu(e)
 profile.title,Profile,Profil
 profile.nameLabel,Name,Nom
 profile.nameHint,Shown to colleagues at your facility when a task is assigned to you.,Visible par vos collègues de l'établissement lorsqu'une tâche vous est attribuée.

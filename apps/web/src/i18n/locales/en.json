@@ -268,7 +268,7 @@
     "deadline": "Deadline",
     "deadlineHint": "Leave empty for no deadline",
     "currentTask": "Current Task",
-    "room": "Room",
+    "patient": "Patient",
     "tapToSpeak": "Tap to speak",
     "commandPlaceholder": "Type your command...",
     "commandExamples": "Examples: “change to stat”, “mark completed”, “move to room 405”, “delete”",

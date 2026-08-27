@@ -28,7 +28,7 @@ const statusStyles = {
   Completed: "bg-blue-100 text-blue-800",
 };
 
-export default function TaskEditDialog({ task, patientId, nurses = [], onAssign, onCancel, onUpdate, onManualUpdate }) {
+export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], onAssign, onCancel, onUpdate, onManualUpdate }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -317,9 +317,12 @@ export default function TaskEditDialog({ task, patientId, nurses = [], onAssign,
                       {priorityLabel(t, task?.priority)}
                     </span>
                   </div>
+                  {/* The patient, not a room. Real task rows have no `room`
+                      column -- that was a demo-era field, so this line read
+                      "Room —" for every task. Tasks reference a patient. */}
                   <div className="flex">
-                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.room")}</span>
-                    <span className="text-gray-900">{task?.room || "—"}</span>
+                    <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.patient")}</span>
+                    <span className="text-gray-900">{patientLabel || t("tasksView.unknownPatient")}</span>
                   </div>
                   <div className="flex">
                     <span className="w-24 shrink-0 font-medium text-gray-500">{t("taskEdit.deadline")}</span>
