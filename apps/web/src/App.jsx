@@ -12,6 +12,7 @@ import OperationStatus from "./components/OperationStatus";
 import { useOperationStatus } from "./hooks/useOperationStatus";
 import EditPatientDialog from "./components/EditPatientDialog";
 import TaskEditDialog from "./components/TaskEditDialog";
+import TaskDeleteConfirmDialog from "./components/TaskDeleteConfirmDialog";
 import ChargeNurseDashboard from "./components/ChargeNurseDashboard";
 import TasksScreen from "./components/TasksScreen";
 import ProfileScreen from "./components/ProfileScreen";
@@ -219,6 +220,10 @@ function App() {
   // from the moment it was opened would show stale attribution/assignee
   // data after the dialog's own writes land.
   const [taskToEditId, setTaskToEditId] = useState(null);
+  // A delete that a command has been read as, waiting on the nurse's
+  // explicit second confirmation. `{ task, command }` or null. Nothing is
+  // destroyed until TaskDeleteConfirmDialog's own button is pressed.
+  const [taskPendingDelete, setTaskPendingDelete] = useState(null);
 
   // Colleagues at this facility, for the assignee picker and Unit View's
   // personnel overview. Loaded alongside patients; a failure here is
@@ -811,20 +816,41 @@ function App() {
       );
     }
 
+    // A delete is never applied straight off the back of a parse. The red
+    // banner in the dialog warns that Apply *would* delete; this hands the
+    // resolved delete to a separate confirmation step that names the task
+    // and has to be pressed on its own. It sits here rather than in
+    // TaskEditDialog so that it covers a delete the AI read but the local
+    // regex did not, and so voice and typed commands are gated identically.
     if (result.action === "delete") {
-      await deleteTask(task.id);
-      setPatients((prev) =>
-        prev.map((p) =>
-          p.id === task.patient_id ? { ...p, tasks: p.tasks.filter((tk) => tk.id !== task.id) } : p
-        )
-      );
-      setTaskToEditId(null);
+      setTaskPendingDelete({ task, command });
       return;
     }
 
     await handleManualUpdateTask(sanitiseTaskEdit(result.updates), task);
     setTaskToEditId(null);
   };
+
+  // The only caller of `deleteTask`. Throws on failure so the confirmation
+  // dialog can say so and stay open with the task still there -- a delete
+  // that silently failed would read as a delete that worked.
+  const handleConfirmDeleteTask = async () => {
+    if (!taskPendingDelete) return;
+    const { task } = taskPendingDelete;
+    await deleteTask(task.id);
+    setPatients((prev) =>
+      prev.map((p) =>
+        p.id === task.patient_id ? { ...p, tasks: p.tasks.filter((tk) => tk.id !== task.id) } : p
+      )
+    );
+    setTaskPendingDelete(null);
+    setTaskToEditId(null);
+  };
+
+  // Backing out of the confirmation leaves the task alone and the edit
+  // dialog open, command still in the box, so a mis-heard "delete" can be
+  // corrected rather than restarted.
+  const handleCancelDeleteTask = () => setTaskPendingDelete(null);
 
   // --- Note handlers (real writes) ---
 
@@ -1159,9 +1185,23 @@ function App() {
           nurses={nurses}
           currentNurseId={session?.user?.id}
           onAssign={handleAssignTask}
-          onCancel={() => setTaskToEditId(null)}
+          onCancel={() => {
+            setTaskPendingDelete(null);
+            setTaskToEditId(null);
+          }}
           onUpdate={handleAiUpdateTask}
           onManualUpdate={handleManualUpdateTask}
+        />
+      )}
+      {/* Rendered after TaskEditDialog so it layers over it: the edit
+          dialog stays on screen behind the confirmation, and reappears
+          untouched if the nurse backs out. */}
+      {taskPendingDelete && (
+        <TaskDeleteConfirmDialog
+          task={taskPendingDelete.task}
+          command={taskPendingDelete.command}
+          onCancel={handleCancelDeleteTask}
+          onConfirm={handleConfirmDeleteTask}
         />
       )}
     </>

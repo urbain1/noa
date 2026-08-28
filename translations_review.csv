@@ -34,6 +34,7 @@ errors.completeTask,Failed to mark task complete. Please try again.,Impossible d
 errors.repageTask,Failed to repage task. Please try again.,Échec du repage de la tâche. Veuillez réessayer.
 errors.escalateTask,Failed to escalate task. Please try again.,Échec de l'escalade de la tâche. Veuillez réessayer.
 errors.updateTask,Failed to update task.,Échec de la mise à jour de la tâche.
+errors.deleteTask,Failed to delete task. Please try again.,Échec de la suppression de la tâche. Veuillez réessayer.
 errors.saveNote,Failed to save note. Please try again.,Échec de l'enregistrement de la note. Veuillez réessayer.
 errors.generateHandoff,Failed to generate handoff summary. Please try again.,Échec de la génération du rapport de transmission. Veuillez réessayer.
 errors.generateSbar,Failed to generate SBAR summary. Please try again.,Échec de la génération du rapport SBAR. Veuillez réessayer.
@@ -275,6 +276,12 @@ taskEdit.commandPlaceholder,Type your command...,Saisissez votre commande...
 taskEdit.commandExamples,"Examples: “change to stat”, “mark completed”, “move the deadline to tomorrow 2pm”, “delete”","Exemples : « passer en immédiat », « marquer comme terminée », « reporter l’échéance à demain 14h », « supprimer »"
 taskEdit.yourCommand,Your command:,Votre commande :
 taskEdit.deleteWarning,Applying this will permanently delete the task.,Appliquer cette commande supprimera définitivement la tâche.
+taskEdit.deleteConfirmTitle,Delete this task?,Supprimer cette tâche ?
+taskEdit.deleteConfirmCommand,From your command:,D’après votre commande :
+taskEdit.deleteConfirmIrreversible,This cannot be undone.,Cette action est irréversible.
+taskEdit.deleteConfirmKeep,Keep task,Conserver la tâche
+taskEdit.deleteConfirmCta,Delete task,Supprimer la tâche
+taskEdit.deleteConfirmDeleting,Deleting...,Suppression...
 taskEdit.applyChanges,Apply Changes,Appliquer les modifications
 taskEdit.createdBy,Created by:,Créée par :
 taskEdit.assignedTo,Assigned to:,Assignée à :
