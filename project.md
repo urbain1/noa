@@ -22,6 +22,7 @@ Replace the ad hoc, unshareable methods nurses currently use to track tasks and 
 - **All-tasks-by-urgency screen:** cross-patient task list sorted by priority, so a nurse doesn't have to open every patient card to see what's most urgent.
 - **Handover report:** visually highlight incomplete/overdue tasks, not just list them.
 - **Language toggle:** English/French UI switch, for nurse testers in France and Switzerland. Scope should cover AI-generated content too (SBAR summaries, patient updates), not just static UI chrome, given the first French tester is now confirmed. Full design deferred to its own chat.
+- **General voice-command layer (future direction, not yet scoped):** eventually replace the current per-feature voice buttons (patient creation, task creation, task editing) with one general voice-capture entry point that interprets natural, potentially multi-action speech and routes it to the appropriate existing UI flows, always with a review/confirm step before anything executes, never acting directly on raw speech. Deliberately deferred past this beta, revisit once real nurse feedback exists on the current single-purpose captures.
 
 ## Success criteria for this beta
 Not yet defined precisely, needs your input. Placeholder: nurse testers use Noa across real shifts without reverting to their prior informal method, and surface at least one workflow problem worth fixing before the next phase.
