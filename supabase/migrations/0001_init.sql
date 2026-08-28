@@ -164,8 +164,29 @@ alter publication supabase_realtime add table notes;
 -- Required because "Automatically expose new tables" is disabled at the
 -- project level (Supabase's own recommendation). RLS above is still the
 -- real access control; these grants just turn the Data API on for
--- authenticated users. No grants to `anon`, no unauthenticated access
--- anywhere in this schema.
+-- authenticated users.
+--
+-- [Comment corrected 2026-08-28. Comment only -- not one grant below has
+-- changed, and nothing needs to be run against the database for this.]
+--
+-- This block used to claim "No grants to `anon`, no unauthenticated access
+-- anywhere in this schema." The first half is true of *this file* -- it
+-- grants nothing to `anon` -- but not of the deployed database: `anon` does
+-- hold table-level SELECT on all seven tables, from Supabase's own
+-- project-level default grants rather than from anything written here.
+--
+-- Nothing is exposed by that, and it was checked rather than assumed: an
+-- unauthenticated request gets HTTP 200 with an empty array, not `42501
+-- permission denied` (which is what `anon` does get for the RPCs, so the
+-- probe tells the two apart). Zero rows, zero count, on every table
+-- including `audit_log`, which has no SELECT policy at all. RLS is doing the
+-- work, and doing it correctly.
+--
+-- The correction matters because the old wording described a
+-- defence-in-depth layer that is not actually deployed. A future session
+-- reading it could relax an RLS policy believing a missing grant was still
+-- holding the line underneath. It is not: RLS is the only thing standing
+-- between `anon` and these tables.
 
 grant usage on schema public to authenticated;
 

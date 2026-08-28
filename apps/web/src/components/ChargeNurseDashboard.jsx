@@ -1,12 +1,28 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import TopRightMenu from "./TopRightMenu";
 import ViewSwitcher from "./ViewSwitcher";
 import { departmentLabel } from "../i18n/enums";
 import { isTaskOverdue } from "../utils/taskOverdue";
 
-function computeRiskScore(patient) {
-  const now = Date.now();
+// How often the clock-dependent figures on this screen are recomputed.
+//
+// Overdue-ness, "overdue by", risk scores and the "pending > 1 hour" term
+// are all functions of the current time as much as of the task rows, but
+// they were computed once inside a `useMemo` keyed only on `patients` and
+// `nurses`. Between two data changes the whole panel was frozen at whatever
+// the clock read when it last ran: a task could sail past its deadline and
+// Unit View would keep reporting zero overdue until something unrelated
+// happened to re-fetch. Ticking a `now` value into the memo's dependencies
+// is what un-freezes it.
+//
+// A minute matches the granularity everything here is displayed at --
+// nothing on this screen is finer-grained than "3h 20m".
+const CLOCK_TICK_MS = 60 * 1000;
+
+// `now` is passed in rather than read here, so every figure in one render
+// is measured against the same instant.
+function computeRiskScore(patient, now) {
   let score = 0;
   const tasks = patient.tasks || [];
 
@@ -50,10 +66,19 @@ function getRiskLevel(score) {
 
 export default function ChargeNurseDashboard({ patients, nurses = [], view, onSwitchView, onPatientClick, delayedTasks, onGenerateHandoff, onDischargePatient, onRepageTask, onEscalateTask, onLanguageChange, onOpenProfile }) {
   const { t } = useTranslation();
+
+  // The ticking clock the figures below are measured against. Held in state
+  // so a tick is a render, and listed in the memo's dependencies so a tick
+  // is a recompute.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), CLOCK_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   const stats = useMemo(() => {
     const allTasks = patients.flatMap((p) => p.tasks || []);
     const allNotes = patients.flatMap((p) => p.notes || []);
-    const now = Date.now();
 
     // Status counts
     const pending = allTasks.filter((t) => t.status === "Pending").length;
@@ -145,7 +170,7 @@ export default function ChargeNurseDashboard({ patients, nurses = [], view, onSw
     // Risk scores
     const flaggedPatients = patients
       .map((p) => {
-        const score = computeRiskScore(p);
+        const score = computeRiskScore(p, now);
         const risk = getRiskLevel(score);
         return risk ? { ...p, riskScore: score, risk } : null;
       })
@@ -167,7 +192,7 @@ export default function ChargeNurseDashboard({ patients, nurses = [], view, onSw
       completedUnknownCount,
       flaggedPatients,
     };
-  }, [patients, nurses]);
+  }, [patients, nurses, now]);
 
   const maxDeptTotal = Math.max(...stats.departments.map((d) => d.total), 1);
 
