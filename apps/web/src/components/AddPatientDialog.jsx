@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { codeStatusLabel } from "../i18n/enums";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
+import { errorText } from "../utils/errors";
 
 // Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
@@ -61,7 +62,10 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
           }),
       );
     } catch (err) {
-      setError(err.message || t("errors.createPatient"));
+      // FL6: the nurse gets the translated message, the console gets the
+      // provider's own text.
+      console.error("Create patient error:", err);
+      setError(errorText(err, t("errors.createPatient")));
     }
   };
 

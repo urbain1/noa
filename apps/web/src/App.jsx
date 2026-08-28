@@ -27,6 +27,7 @@ import { parseTaskEditFallback } from "./utils/taskEditParse";
 import { needsAttention } from "./utils/taskOverdue";
 import { isDischargePlanned } from "./utils/discharge";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
+import { translatedError } from "./utils/errors";
 
 // Fields the tasks table has (0001_init.sql) and the AI edit path is allowed
 // to write. Assignment is deliberately absent: it has its own picker and its
@@ -530,7 +531,9 @@ function App() {
       ));
     } catch (err) {
       if (err.code === "DISCHARGE_ALREADY_PLANNED") {
-        throw new Error(t("errors.dischargeAlreadyPlanned"));
+        // Marked as already-translated so DischargeDialog shows this rather
+        // than falling back to the generic message (FL6).
+        throw translatedError(t("errors.dischargeAlreadyPlanned"));
       }
       throw err;
     }
@@ -810,10 +813,21 @@ function App() {
     }
 
     if (!usable(result)) {
+      // Two different failures, told apart because the nurse's next move
+      // differs. A command neither Claude nor the local parser could read
+      // is something to rephrase; anything else -- the action itself
+      // failing, the Edge Function being unreachable -- is not, and saying
+      // "I didn't understand you" for a transport failure is exactly the
+      // misdiagnosis CLAUDE.md's standing lesson warns about.
+      //
+      // Either way the reason string is raw English straight from Claude or
+      // the network, so FL6 keeps it out of the UI and in the console. Only
+      // the translated one is marked as showable.
       const reason = result?.error;
-      throw new Error(
-        !reason || reason === "unreadable" || reason === "empty" ? t("errors.editNotUnderstood") : reason,
-      );
+      if (!reason || reason === "unreadable" || reason === "empty") {
+        throw translatedError(t("errors.editNotUnderstood"));
+      }
+      throw new Error(reason);
     }
 
     // A delete is never applied straight off the back of a parse. The red

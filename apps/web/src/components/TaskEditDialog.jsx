@@ -6,6 +6,7 @@ import AssigneeSelect from "./AssigneeSelect";
 import { isDeleteCommand } from "../utils/taskEditParse";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
+import { errorText } from "../utils/errors";
 
 // How long description/deadline wait after the last keystroke before
 // saving -- long enough that a fast typist doesn't fire a write per
@@ -110,7 +111,10 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
         );
       } catch (err) {
         // The inline marker says the save failed; the banner says why.
-        setError(err.message || t("errors.updateTask"));
+        // FL6: "why" is the translated message, not the provider's own
+        // English text -- that goes to the console instead.
+        console.error("Task field save error:", field, err);
+        setError(errorText(err, t("errors.updateTask")));
       }
     },
     [onManualUpdate, task, patientId, t, run]
@@ -274,11 +278,14 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
       );
     } catch (err) {
       // On success the dialog closes; on failure it stays, un-stuck, with
-      // the reason on screen. The handler throws messages that are already
-      // translated ("I didn't understand that"), so they are shown as-is --
-      // a nurse who mis-phrased a command needs to know that, not a generic
-      // failure. Anything without a message falls back to the generic one.
-      setError(err?.message || t("errors.applyChanges"));
+      // the reason on screen. `handleAiUpdateTask` marks the messages it
+      // has already translated ("Couldn't understand that change...") and
+      // those are shown as-is -- a nurse who mis-phrased a command needs to
+      // know that, not a generic failure. Everything else is a raw
+      // provider/network string: FL6 replaces it with the translated
+      // generic and keeps the original in the console.
+      console.error("Apply task edit error:", err);
+      setError(errorText(err, t("errors.applyChanges")));
     }
   };
 

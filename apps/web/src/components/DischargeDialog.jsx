@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { errorText } from "../utils/errors";
 
 // Discharge planning for one patient. The checklist and free-text notes are
 // carried over from the demo version; what changed is where the tasks go --
@@ -27,8 +28,10 @@ export default function DischargeDialog({ patient, onCancel, onConfirm }) {
     try {
       await onConfirm({ notifyPatient, needsNursingHome, notes });
     } catch (err) {
+      // FL6: the nurse gets the translated message, the console gets the
+      // provider's own text.
       console.error("Discharge planning error:", err);
-      setError(err.message || t("errors.createDischargeTasks"));
+      setError(errorText(err, t("errors.createDischargeTasks")));
       setSaving(false);
     }
   }
