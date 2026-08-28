@@ -577,7 +577,15 @@ function App() {
   const handleGenerateShiftHandoff = async () => {
     const result = await generateHandoffSummary(patients);
     if (result) {
-      setHandoffData({ summaryText: result, title: t("handoff.shiftReportTitle"), patientCount: patients.length, kind: "shift" });
+      setHandoffData({
+        summaryText: result,
+        title: t("handoff.shiftReportTitle"),
+        patientCount: patients.length,
+        kind: "shift",
+        // The same roster the narrative was generated from, so the
+        // outstanding-task list and the prose describe one moment.
+        patients,
+      });
       setShowHandoff(true);
     } else {
       alert(t("errors.generateHandoff"));
@@ -595,6 +603,7 @@ function App() {
         title: t("handoff.patientSbarTitle", { patient: patient.label }),
         patientCount: 1,
         kind: "sbar",
+        patients: [patient],
       });
       setShowHandoff(true);
     } else {
@@ -1067,6 +1076,7 @@ function App() {
         title={handoffData.title}
         patientCount={handoffData.patientCount}
         kind={handoffData.kind}
+        patients={handoffData.patients}
         nurses={nurses}
         currentNurseId={session?.user?.id}
         onClose={handleCloseHandoff}

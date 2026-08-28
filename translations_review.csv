@@ -228,6 +228,15 @@ handoff.copied,Copied!,Copié !
 handoff.sendToNurse,Send to Nurse,Envoyer à un(e) autre infirmier(ère)
 handoff.doneEditing,Done Editing,Terminer la modification
 handoff.sentTo,Handoff sent to {{name}},Transmission envoyée à {{name}}
+handoff.outstanding.title,Outstanding tasks,Tâches en cours
+handoff.outstanding.overdueCount_one,{{count}} overdue,{{count}} en retard
+handoff.outstanding.overdueCount_other,{{count}} overdue,{{count}} en retard
+handoff.outstanding.outstandingCount_one,{{count}} incomplete,{{count}} non terminée
+handoff.outstanding.outstandingCount_other,{{count}} incomplete,{{count}} non terminées
+handoff.outstanding.badgeOverdue,Overdue,En retard
+handoff.outstanding.noDeadline,No deadline,Sans échéance
+handoff.outstanding.none,Nothing outstanding — every task is complete.,Rien en cours — toutes les tâches sont terminées.
+handoff.outstanding.caption,"Read from current task data, not from the summary below.","Établi à partir des tâches actuelles, non du résumé ci-dessous."
 handoff.send.title,Send Handoff,Envoyer la transmission
 handoff.send.subtitle,Simulate sending this handoff to the incoming nurse,Simuler l'envoi de cette transmission à l'infirmier entrant
 handoff.send.nurseNameLabel,Incoming nurse name,Nom de l'infirmier entrant

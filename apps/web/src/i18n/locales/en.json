@@ -241,6 +241,17 @@
     "sendToNurse": "Send to Nurse",
     "doneEditing": "Done Editing",
     "sentTo": "Handoff sent to {{name}}",
+    "outstanding": {
+      "title": "Outstanding tasks",
+      "overdueCount_one": "{{count}} overdue",
+      "overdueCount_other": "{{count}} overdue",
+      "outstandingCount_one": "{{count}} incomplete",
+      "outstandingCount_other": "{{count}} incomplete",
+      "badgeOverdue": "Overdue",
+      "noDeadline": "No deadline",
+      "none": "Nothing outstanding — every task is complete.",
+      "caption": "Read from current task data, not from the summary below."
+    },
     "send": {
       "title": "Send Handoff",
       "subtitle": "Simulate sending this handoff to the incoming nurse",

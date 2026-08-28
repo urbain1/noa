@@ -241,6 +241,17 @@
     "sendToNurse": "Envoyer à un(e) autre infirmier(ère)",
     "doneEditing": "Terminer la modification",
     "sentTo": "Transmission envoyée à {{name}}",
+    "outstanding": {
+      "title": "Tâches en cours",
+      "overdueCount_one": "{{count}} en retard",
+      "overdueCount_other": "{{count}} en retard",
+      "outstandingCount_one": "{{count}} non terminée",
+      "outstandingCount_other": "{{count}} non terminées",
+      "badgeOverdue": "En retard",
+      "noDeadline": "Sans échéance",
+      "none": "Rien en cours — toutes les tâches sont terminées.",
+      "caption": "Établi à partir des tâches actuelles, non du résumé ci-dessous."
+    },
     "send": {
       "title": "Envoyer la transmission",
       "subtitle": "Simuler l'envoi de cette transmission à l'infirmier entrant",

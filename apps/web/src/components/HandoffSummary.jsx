@@ -1,9 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import SendHandoffDialog from "./SendHandoffDialog";
+import HandoffOutstandingTasks from "./HandoffOutstandingTasks";
 import { localeTag } from "../i18n";
 
-export default function HandoffSummary({ summaryText, title, onClose, patientCount, kind, nurses = [], currentNurseId }) {
+// `patients` is the same scope the narrative was generated from -- the whole
+// roster for the shift report, one patient for an SBAR -- captured when the
+// report was generated. The outstanding-task list is derived from it here
+// rather than read out of the narrative: the narrative is generated prose
+// and nothing should be parsing it back into data.
+export default function HandoffSummary({ summaryText, title, onClose, patientCount, kind, patients = [], nurses = [], currentNurseId }) {
   const { t, i18n } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(summaryText);
@@ -73,6 +79,12 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
       {/* Body */}
       <div className="flex-1 overflow-y-auto pb-32">
         <div className="mx-auto max-w-2xl px-4 py-4">
+          {/* Structured, scannable, and above the prose on purpose: at
+              shift change the outstanding work is what has to be acted on,
+              the narrative is the context for it. Shown in edit mode too --
+              it is derived from task rows, not part of the editable text,
+              so there is nothing here for the nurse to edit or lose. */}
+          <HandoffOutstandingTasks patients={patients} />
           {isEditing ? (
             <textarea
               value={editedText}

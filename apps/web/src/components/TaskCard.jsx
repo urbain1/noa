@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import { isTaskOverdue } from "../utils/taskOverdue";
 import { formatActionTimestamp } from "../utils/actionTimestamp";
+import { getDeadlineDisplay } from "../utils/taskDeadline";
 
 const statusStyles = {
   Pending: "bg-yellow-100 text-yellow-800",
@@ -14,55 +15,6 @@ function getTimeElapsed(t, timestamp) {
   const diff = Math.floor((Date.now() - new Date(timestamp).getTime()) / 60000);
   if (diff < 1) return t("taskCard.justNow");
   return t("taskCard.minAgo", { count: diff });
-}
-
-// Builds "3h 20m" / "3 h 20 min" from a minute count, using whichever unit
-// suffixes the active locale defines.
-function formatDuration(t, totalMinutes) {
-  if (totalMinutes < 60) {
-    return t("taskCard.unitMinutes", { count: totalMinutes });
-  }
-  if (totalMinutes < 1440) {
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    return mins > 0
-      ? `${t("taskCard.unitHours", { count: hours })} ${t("taskCard.unitMinutes", { count: mins })}`
-      : t("taskCard.unitHours", { count: hours });
-  }
-  const days = Math.floor(totalMinutes / 1440);
-  const hours = Math.floor((totalMinutes % 1440) / 60);
-  return hours > 0
-    ? `${t("taskCard.unitDays", { count: days })} ${t("taskCard.unitHours", { count: hours })}`
-    : t("taskCard.unitDays", { count: days });
-}
-
-function getDeadlineDisplay(t, deadline) {
-  if (!deadline) return null;
-
-  const now = Date.now();
-  const deadlineTime = new Date(deadline).getTime();
-  const diffMs = deadlineTime - now;
-  const diffMin = Math.round(diffMs / 60000);
-  const absDiffMin = Math.abs(diffMin);
-
-  let text;
-  let colorClass;
-
-  if (diffMin < 0) {
-    // Overdue
-    text = t("taskCard.overdueBy", { value: formatDuration(t, absDiffMin) });
-    colorClass = "text-red-600";
-  } else if (diffMin <= 120) {
-    // Approaching (2 hours or less)
-    text = t("taskCard.dueIn", { value: formatDuration(t, absDiffMin) });
-    colorClass = "text-orange-600";
-  } else {
-    // Plenty of time (more than 2 hours)
-    text = t("taskCard.dueIn", { value: formatDuration(t, absDiffMin) });
-    colorClass = "text-green-600";
-  }
-
-  return { text, colorClass };
 }
 
 export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, onEscalate }) {
