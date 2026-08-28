@@ -857,49 +857,47 @@ function App() {
 
   // --- Suggestion handlers ---
 
-  const handleSuggestionAddAsTask = (suggestion) => {
+  const handleSuggestionAddAsTask = async (suggestion) => {
     if (!suggestionData) return;
     const patientId = suggestionData.patientId;
     const details = suggestion.taskDetails || {};
-    const newTask = {
-      id: Date.now(),
-      description: details.description || suggestion.text,
-      department: details.department || "Nursing",
-      status: "Pending",
-      priority: details.priority || "Routine",
-      timestamp: new Date().toISOString(),
-      deadline: details.deadline || null,
-    };
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === patientId
-          ? { ...p, tasks: [...p.tasks, newTask] }
-          : p
-      )
-    );
-
-    // Simulate status change after 15 seconds (same as regular task creation)
-    setTimeout(() => {
-      simulateStatusChange(newTask.id);
-    }, 15000);
+    try {
+      const newTask = await createTask(nurseProfile.facility_id, patientId, session.user.id, {
+        description: details.description || suggestion.text,
+        department: details.department || "Nursing",
+        priority: details.priority || "Routine",
+        deadline: details.deadline || null,
+      });
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patientId
+            ? { ...p, tasks: [...p.tasks, newTask] }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Task creation error:", err);
+      alert(t("errors.saveTask"));
+    }
   };
 
-  const handleSuggestionAddAsNote = (suggestion) => {
+  const handleSuggestionAddAsNote = async (suggestion) => {
     if (!suggestionData) return;
     const patientId = suggestionData.patientId;
     const details = suggestion.noteDetails || {};
-    const newNote = {
-      id: Date.now(),
-      content: details.text || suggestion.text,
-      created_at: new Date().toISOString(),
-    };
-    setPatients((prev) =>
-      prev.map((p) =>
-        p.id === patientId
-          ? { ...p, notes: [...(p.notes || []), newNote] }
-          : p
-      )
-    );
+    try {
+      const newNote = await addNote(nurseProfile.facility_id, patientId, session.user.id, details.text || suggestion.text);
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === patientId
+            ? { ...p, notes: [newNote, ...(p.notes || [])] }
+            : p
+        )
+      );
+    } catch (err) {
+      console.error("Add note error:", err);
+      alert(t("errors.saveNote"));
+    }
   };
 
   const handleSuggestionDismissAll = () => {
