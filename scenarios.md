@@ -23,7 +23,7 @@ Expected: session persists (Supabase Auth), no re-login friction that discourage
 
 **SC-3: Two testers, overlapping synthetic patients**
 Two nurse-testers both use "test patient" style data that happens to overlap, since casual testers may not coordinate on unique names.
-Expected: currently unhandled, RLS was designed around assigned patients, not overlapping test data. Needs a decision before multi-tester testing starts: separate synthetic rosters per tester, or one shared test roster.
+Expected: one shared roster per facility. Decided 2026-08-21 (`decisions.md`): RLS is facility-scoped, so every nurse at a facility sees and works on the same synthetic patients. Overlap between testers at the same facility is expected; testers at different facilities never see each other's data (SC-11). Concurrent edits to the same record are covered by SC-16.
 
 **SC-4: Auth session expires mid-task-entry**
 Expected: no data loss, a clear re-login prompt, task draft preserved if possible.
@@ -34,14 +34,14 @@ Placeholder: a manager assigns a duty to a specific nurse; that nurse, and only 
 **SC-6: Direct task handoff between nurses** *(roadmap, not yet built)*
 Placeholder: nurse A sends a task with full context, not just a summary line, to nurse B's account at shift end; it appears as an actionable task in B's list.
 
-**SC-7: Urgency-sorted task view** *(roadmap, not yet built)*
-Placeholder: cross-patient list sorted by priority/deadline; verify it stays in sync with per-patient views, no drift between the two.
+**SC-7: Urgency-sorted task view** *(built: Tasks screen)*
+Cross-patient list sorted by priority/deadline. Expected: the same ordering as each patient card (both use `utils/taskSort.js`), no drift between the two.
 
-**SC-8: Incomplete tasks in handover report** *(roadmap, not yet built)*
-Placeholder: the handover report must visually distinguish incomplete/overdue tasks from completed ones, not just list them uniformly.
+**SC-8: Incomplete tasks in handover report** *(built)*
+Expected: the handover report shows an outstanding-task list above the narrative, overdue tasks highlighted, completed and cancelled tasks left out, read from task data rather than parsed from the AI text.
 
-**SC-9: Language toggle mid-session** *(roadmap, not yet built)*
-Placeholder: a French-speaking tester switches UI language mid-session. Expected: no loss of in-progress voice capture or drafts. Verify whether voice recognition language should follow the UI language choice.
+**SC-9: Language toggle mid-session** *(built)*
+A French-speaking tester switches UI language mid-session. Expected: the choice is saved per nurse and applies everywhere at once; voice recognition follows the UI language from the next recording; no loss of in-progress drafts.
 
 **SC-10: Persistent label pointing to a different real patient over time**
 A tester keeps using `Patient_Test_1` across days, but the real patient they had in mind has since changed (discharge, shift change to a different patient).
@@ -66,3 +66,11 @@ Expected: safe failure mode, requires explicit nurse selection, never auto-fires
 **SC-15: Mixed-language facility, task/note readability**
 A facility has both English- and French-speaking nurses. A French nurse creates a task or note; the AI-generated description comes back in French. An English-only nurse reading it later may not understand it, or vice versa.
 Expected: currently unsolved. Content is recorded in whatever language it was created in, not translated for other readers. Accepted for now given the beta's small, personally-known tester groups, worth revisiting if a real mixed-language facility pilot happens.
+
+**SC-16: Two nurses edit the same record at the same time**
+Nurse A opens the edit dialog for `Patient_Test_3`'s task; nurse B, at the same facility, opens the same task a moment later.
+Expected: B sees "[A] is currently editing this. Wait, or ask them to finish.", cannot edit, and that task's one-tap actions (complete, repage, escalate, assign, cancel discharge planning) are disabled for B. Other tasks and the patient itself stay editable, and adding tasks or notes is never blocked. The lock releases when A closes the dialog, closes the tab or loses connection, and after 2 minutes without input. B can "Take over" after a confirmation; A is told at once and A's dialog stops saving. Whatever A had typed stays on A's screen and is listed as not saved; "Continue editing" re-acquires, re-checks for changes, then lets A save. If someone changed the record after A opened it (including a tester on an older build, which takes no part in locking), A's save is refused and A sees who changed what, with "Save mine anyway" or "Discard mine and reload". Nothing is overwritten or lost silently. If live locking is unavailable (migration 0013 not applied), nothing is disabled and the change check still applies. See `decisions.md`, 2026-11-16.
+
+**SC-17: Patient history view**
+A nurse opens a patient card's ⋯ menu, then History.
+Expected: the patient's changes and those of its tasks and notes, newest first, 50 at a time, in the nurse's language: "Task completed by [nurse], 16 Nov 14:02", "Task modified by [nurse] (priority, deadline)". A task or note that still exists is named by its current text; a deleted one shows a generic line. No field value ever comes from the log itself. Only the nurse's own facility's history is visible. If migration 0012 isn't applied yet, the dialog says history isn't available and the card keeps working.

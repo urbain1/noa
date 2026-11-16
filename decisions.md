@@ -2,6 +2,60 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-11-16: Deployment context that every database change must respect
+
+**Facts, as of this date:**
+- Testers use a Vercel **preview** deployment of the `build-mvp` branch (last deployed commit 7d81de0). Production (`main`) is an old demo and is not used.
+- There is **one** Supabase project. A migration applied to it takes effect immediately for every tester, who are still running whatever frontend build the preview last deployed.
+- Nothing deploys the database automatically: no Supabase GitHub or Vercel integration, no GitHub Actions. Migrations run only when the founder applies them by hand in the SQL editor.
+
+**Rules that follow:**
+- Every migration must be **backward compatible** with the deployed frontend: old clients must keep creating, updating and deleting patients, tasks and notes without error. Prefer additive changes only: new nullable columns, no renames, no drops, no new NOT NULL.
+- Every migration ships with a rollback script (`supabase/rollback_NNNN.sql`) that is safe to run on its own, and, where behaviour changes, a verify script the founder can paste into the SQL editor.
+- Claude Code sessions never push, merge, touch `main`, deploy, or run Supabase CLI commands that change the remote project (`db push`, `migration up`, `functions deploy`, `link`). Work is committed locally on a feature branch.
+
+## 2026-11-16: Audit log written by Postgres triggers, column names only
+
+**Decision:** `audit_log` (created in 0001, never written to before) is now filled by AFTER INSERT/UPDATE/DELETE triggers on `patients`, `tasks` and `notes`, all calling one SECURITY DEFINER function (`audit_row_change`, `search_path` pinned to empty). Migration `0012_audit_log_triggers.sql`.
+
+**What is recorded:** who (`auth.uid()`, NULL means a system write), action (`create`/`update`/`delete`), resource type and id, `patient_id` (new column, plain uuid with no foreign key so history survives a hard delete), `facility_id`, the clock time, and in `details` the **names** of the changed columns only.
+
+**What is never recorded:** field values. No description, note content, diagnosis, label, location or contact detail. The only exception is a short list of semantic events derived from enum or boolean transitions, never copied from them: `completed`, `reopened`, `cancelled`, `discharged`, `assigned`, `unassigned`.
+
+**Why triggers:** no application code path (the current client, the older build testers still run, the Edge Function, the SQL editor) can skip them. Clients cannot write to `audit_log` at all: INSERT, UPDATE, DELETE and TRUNCATE are revoked from `authenticated` and `anon`. Revoking INSERT is a grant change, not a policy change: the 0001 policy `audit_log_insert_self` is left in place and is now inert. It checks `nurse_id` but not `facility_id`, so once reads were opened it would have let a nurse plant fake history in another facility's log.
+
+**Edge cases handled, each covered by `supabase/verify_audit_log.sql`:** no-op updates log nothing; NULL `auth.uid()` is a system write; a signed-in user with no `nurses` row is recorded as NULL with `actor_unresolved` (rather than failing a tester's write on the `nurse_id` foreign key); cascade deletes are logged even though the parent patient is already gone; tasks with no patient and rows with no facility pass through. There is no blanket exception handler.
+
+**Scope limit:** this logs writes. Logging who *read* patient data is still open and still required before real data (`SECURITY.md`).
+
+## 2026-11-16: One new RLS policy approved: nurses read their own facility's audit log
+
+**Decision:** approved in the session that built the audit log, as the discussion `CLAUDE.md` requires before any RLS change. Exactly one policy, nothing else touched:
+
+```sql
+create policy "audit_log_select_same_facility" on public.audit_log
+  for select to authenticated
+  using (facility_id = public.get_my_facility_id());
+```
+
+plus `grant select on public.audit_log to authenticated`. Same boundary as every other facility policy. It powers the per-patient History dialog (patient card, ⋯ menu). That view builds every line from column names and events, and names a task or note only by its *current* text from data the app has already loaded, never from the log.
+
+## 2026-11-16: Edit locking: per record, Presence on a private facility channel, stale-write check as the safety net
+
+**Decision:** when a nurse opens the edit dialog for a patient or a task, that one record is locked for colleagues at the same facility. Colleagues see "[name] is currently editing this. Wait, or ask them to finish." and the record's one-tap actions (complete, repage, escalate, inline assign, cancel discharge planning) are disabled. Lock scope is the single record: editing a task does not lock its patient or sibling tasks, and creating tasks or notes is never blocked. Notes have no edit UI today, so none is locked; the lock logic already supports them.
+
+**Release:** on dialog close; on tab close or lost connection (Presence drops the entry by itself); after 2 minutes without input. **Take over** asks for confirmation; the previous holder is told at once and their dialog stops saving.
+
+**Mechanism:** Supabase Realtime Presence, chosen over a lock table because it releases on disconnect with no heartbeat, TTL or cleanup job. Each tab tracks at most one entry: `nurse_id`, `record_type`, `record_id`, plus two numbers, `since` and `gen`, that order competing claims and take-overs the same way on every device. No patient data.
+
+**Facility isolation needs two more policies, approved in the same session.** A channel *name* alone isolates nothing: any signed-in user can read every facility id (`facilities_read_all`), so a public channel named after a facility could be watched or spoofed from another facility. The app joins `edit-locks:<facility_id>` as a **private** channel, and `0013_edit_lock_realtime_policies.sql` adds exactly two policies on `realtime.messages`: presence read and presence write, for `authenticated`, only when the topic matches the caller's own `get_my_facility_id()`. No policy on any public table changes. If 0013 isn't applied, the channel is refused, locking reports "unavailable", nothing is disabled, and saves rely on the check below.
+
+**Stale-write check, the safety net:** every save from an edit dialog first re-reads the row (explicit `facility_id` filter) and compares it with the row the dialog started from. If anyone changed or deleted it, nothing is overwritten: the dialog says who (from the audit log, or "someone else" without 0012), when and which fields. **Testers on the older build never join the lock channel**, so they neither see nor respect locks; during the transition this check is what protects their colleagues' edits, and theirs are only caught when a new-build nurse saves. That makes it the main protection until everyone is on the new build.
+
+**Never drop a pending edit silently** (founder's requirement): on take-over, lost lock, idle pause, disconnect or conflict, typed values stay in the fields and the dialog lists which changes were not saved. "Continue editing" re-acquires, re-runs the stale-write check, then lets the nurse save. On a conflict the nurse chooses "Save mine anyway" (writes only the fields they changed, over the colleague's version) or "Discard mine and reload". Closing a dialog while unable to save asks first.
+
+**Accepted limitation:** the check and the write are two requests, so a change landing in the round trip between them (well under a second) is not caught. Closing that would mean an `updated_at` column and trigger on the three core tables, which isn't worth the extra moving part for the beta.
+
 ## 2026-08-28 — Client-side Anthropic API key: regression after Day 3, found and fixed
 
 **What happened:** The 2026-08-25 Day 3 entry below states the client-side Claude API path was fully removed, `claudeAPI.js` calling the Edge Function exclusively, no direct-to-Anthropic path anywhere in client code. That was accurate at the time. By 2026-08-28, a client-side path had reappeared: `VITE_ANTHROPIC_API_KEY` was live in Vercel's environment variables, feeding a raw `fetch()` straight to `api.anthropic.com` from `apps/web/src/utils/claudeAPI.js`, bypassing the Edge Function entirely. Vite bakes any `VITE_`-prefixed variable into the deployed JS bundle at build time, so the key was exposed in the deployed preview bundle to anyone who opened dev tools, confirmed live, not theoretical.

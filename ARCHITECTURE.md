@@ -1,43 +1,81 @@
-# Noa — Architecture
+# Noa: Architecture
 
 ## Stack
-- **Frontend:** React 19 + Vite, Tailwind CSS. Deployed as a web app (Vercel). No native/Expo build for this phase.
+- **Frontend:** React 19 + Vite, Tailwind CSS. Deployed as a web app (Vercel). No native/Expo build for this phase. Testers use the Vercel preview of `build-mvp`, not production (see `decisions.md`, 2026-11-16).
 - **Backend:** Supabase (Postgres, Auth, Realtime, Row Level Security). No custom Express/Prisma layer, `apps/api` is not used.
-- **AI:** Claude API (Anthropic), called only from a Supabase Edge Function, never from the client. Prompts carried over from the demo, see `DEMO_TO_MVP_from_noa_demo.md` for the full list. A working reference for the proxy pattern already exists at `api/claude.js` (pre-restructure Vercel serverless function), same idea, key hidden server-side, but it forwards the client's request body unvalidated with no auth check. Use it as a structural template for the Edge Function, not a copy-paste: add a Supabase session check and constrain what the client can send before this pattern handles real facility data.
-- **Voice capture:** Web Speech API. Known limitation: unreliable on iOS Safari, and blocked entirely once the site is installed as a home-screen PWA. Keep the beta as a plain browser link on iOS testers' phones, don't prompt install. Revisit (Speechmatics, or native) only if this proves to be an actual blocker in testing.
-- **Region:** Supabase project set to EU West (London, `eu-west-2`) from creation.
+- **AI:** Claude API (Anthropic), called only from the `claude-proxy` Supabase Edge Function, which checks the caller's Supabase session. Never called from the client; no API key in the frontend bundle. The old `api/claude.js` Vercel function was removed (`decisions.md`, 2026-08-25). Prompts carried over from the demo, see `DEMO_TO_MVP_from_noa_demo.md`. The Edge Function reads the session only; it writes no rows.
+- **Voice capture:** Web Speech API, recognition language follows the nurse's UI language. Known limitation: unreliable on iOS Safari, and blocked entirely once the site is installed as a home-screen PWA. Keep the beta as a plain browser link on iOS testers' phones, don't prompt install. Revisit (Speechmatics, or native) only if this proves to be an actual blocker in testing.
+- **Languages:** English and French via react-i18next (`apps/web/src/i18n`). The language is per nurse (`nurses.preferred_language`), applied on sign-in. Every user-facing string goes through `t()`; `translations_review.csv` mirrors the two locale files in `en.json` key order.
+- **Region:** Supabase project in EU West (London, `eu-west-2`).
 
 ## Data model
-See `SCHEMA_noa_demo.md` for the base Postgres schema (patients, tasks, notes, contacts, handoffs, alerts, audit_log) and RLS policies. Written for Supabase already, reusable close to as-is, with one structural change needed now, below.
+The source of truth is `supabase/migrations/` (0001 to 0013), not `SCHEMA_noa_demo.md`, which describes the demo and includes tables that were never built (contacts, handoffs).
 
-### Facilities: new top-level tenant boundary, needed now
-- New `facilities` table (id, name, created_at). Represents a clinic, nursing home, or ward, whatever the testing site is called informally.
-- `nurses` and `patients` (and by extension tasks/notes) get an `facility_id` foreign key.
-- At signup, a nurse creates a new facility or selects an existing one from a searchable list.
-- RLS scoped by `facility_id`: every nurse at the same facility sees the same shared test patients. This relaxes the demo-era `patient_assignments` per-nurse model to facility-wide visibility. See `decisions.md`.
+Tables: `facilities`, `nurses`, `patients`, `tasks`, `notes`, `alerts`, `audit_log`.
 
-### Planned additions once roadmap features are designed
-- A `duties`/assignment layer for the ward manager screen, distinct from `tasks`.
+### Facilities: the tenant boundary
+- `facilities` (id, name). A clinic, nursing home or ward, whatever the testing site is called informally.
+- `nurses`, `patients`, `tasks`, `notes`, `alerts` and `audit_log` each carry their **own** `facility_id` (denormalised on tasks/notes/alerts to keep RLS simple), not one inherited through the patient.
+- At signup a nurse creates a facility or picks one from a searchable list.
+- RLS scopes every table by `facility_id = get_my_facility_id()` (a SECURITY DEFINER lookup, 0002). Every nurse at a facility sees the same shared test patients. CLAUDE.md also requires an explicit `facility_id` filter on every client query; new queries carry one, older ones in `lib/patients.js` rely on RLS alone (flagged for cleanup).
+
+### Nurse self-service writes
+`nurses` grants clients SELECT and INSERT only. A nurse changes their own language, notice acknowledgment and display name through narrow SECURITY DEFINER functions (`set_my_language` 0007, `acknowledge_notice` 0009, `set_my_name` 0011) rather than an UPDATE policy, which could not stop a nurse rewriting their own `facility_id`. `nurses.role` exists (nurse / charge_nurse / admin) but nothing reads it yet.
+
+### Tasks: assignment and discharge planning (0011)
+`tasks.assigned_to` and `tasks.completed_by` are data only: every nurse at the facility still sees every task. `tasks.task_type = 'discharge'` marks discharge-planning tasks, which are otherwise ordinary tasks. Nothing sets `patients.is_discharged` yet.
+
+### Audit log (0012)
+Every create, update and delete on `patients`, `tasks` and `notes` is written to `audit_log` by Postgres triggers (one SECURITY DEFINER function, `audit_row_change`). Each row holds who (`nurse_id`, NULL for system writes), action, resource type and id, `patient_id` (no foreign key, so history survives hard deletes), `facility_id`, time, and in `details` the names of the changed columns plus derived events (`completed`, `reopened`, `cancelled`, `discharged`, `assigned`, `unassigned`). Never field values. No-op updates are skipped. Clients cannot write to the table; nurses can read their own facility's rows (`audit_log_select_same_facility`). Read access to patient data is **not** logged yet.
+
+Read side: `lib/auditLog.js`. The per-patient History dialog (patient card ⋯ menu, `PatientHistoryDialog`) lists the patient, its tasks and its notes, newest first, 50 at a time; `utils/historyFormat.js` turns rows into translated lines. If 0012 isn't applied the dialog says history isn't available yet.
+
+Rollback: `supabase/rollback_0012.sql`. Verification: `supabase/verify_audit_log.sql` (paste into the SQL editor; changes nothing).
+
+## Edit locking
+Opening the edit dialog for a patient or task locks that single record for colleagues at the same facility (`decisions.md`, 2026-11-16; `scenarios.md` SC-16).
+
+- **Lock:** Supabase Realtime Presence on one **private** channel per facility, `edit-locks:<facility_id>`, authorised by two `realtime.messages` policies (0013) that match the topic to the caller's facility. Each browser tab tracks at most one entry `{ nurse_id, record_type, record_id, since, gen }`, no patient data. Claims are ordered by `gen` (take-overs), then `since`, then presence key, the same way on every device.
+- **Code:** `utils/editLock.js` (pure: ordering, the per-dialog state machine, conflict detection, a small store), `hooks/useEditLocks.js` (the channel, called once in `App`), `hooks/editLockContext.js` (what cards read), `hooks/useEditSession.js` (one dialog's lock, idle timer and stale-write guard), `EditLockBanner`, `EditLockNotice`, `TakeOverConfirmDialog`.
+- **Release:** dialog close, tab close or lost connection, 2 minutes without input. Take over needs confirmation; the previous holder is told at once.
+- **Stale-write check:** every dialog save re-reads the row and refuses to overwrite a change made since the dialog opened. This is the only protection against clients that don't take part in locking (testers on older builds) and when locking is unavailable (0013 not applied, Realtime down), in which case nothing is disabled.
+- **Pending edits** are never dropped silently: values stay in the fields and the dialog lists what wasn't saved.
+- The `supabase_realtime` publication on tasks/alerts/notes (0001) is still unused: patient and task lists do not live-update.
+
+## Tests
+Vitest + React Testing Library in `apps/web` (`npm test`). jsdom environment, one setup file (`src/test/setup.js`: jest-dom matchers, `lib/supabase` mocked so no test reaches Supabase, language reset to English), TZ fixed to UTC, tests next to the code they cover (`*.test.js(x)`). Current suites: the history line formatter, the lock state machine and stale-write detection, the edit-session hook, the History dialog. SQL is verified with `supabase/verify_audit_log.sql` against the real project. Fixtures use `Patient_Test_N` labels and invented names only.
+
+## Planned additions once roadmap features are designed
+- A ward-manager layer for duties and per-nurse visibility. Note `tasks.assigned_to` (0011) already exists as data only; it changes nothing about who sees a task.
 - A `task_transfers` table for direct nurse-to-nurse task handoff.
 
 ## What's explicitly not built yet
-- Auth roles beyond nurse / charge nurse. Ward manager role not yet modeled.
+- Auth roles in use: `nurses.role` exists but no screen or policy reads it. Ward manager role not modeled.
+- Logging of **read** access to patient data (write auditing exists, see above). Required before real data.
+- Live updates of patient/task lists between nurses (only edit locks use Realtime).
 - Any native mobile shell.
 - Push notifications.
 - Offline queue, revisit once real ward WiFi conditions are tested.
-- Audit logging wiring (`audit_log` table exists in the schema, nothing writes to it yet).
 
 ## Folder structure
 ```
 noa/
-  apps/web/        # React + Vite frontend, moved from the demo via git mv
+  apps/web/              # React + Vite frontend
+    src/components/      # one file per dialog/card
+    src/hooks/           # shared hooks (operation status, edit locks)
+    src/lib/             # Supabase data access (patients, nurses, audit log)
+    src/utils/           # pure logic (matching, sorting, history lines, locks)
+    src/i18n/            # en/fr locale files
+    src/test/            # Vitest setup
+  supabase/
+    migrations/          # 0001 to 0013, applied by hand
+    functions/           # Edge Functions, includes the Claude proxy
+    rollback_NNNN.sql    # one per migration that needs it
+    verify_audit_log.sql # SQL-editor check for 0012
   project.md
   ARCHITECTURE.md
   decisions.md
   scenarios.md
   CLAUDE.md
   SECURITY.md
-  supabase/
-    migrations/
-    functions/      # Edge Functions, includes the Claude proxy
 ```
