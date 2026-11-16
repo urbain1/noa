@@ -8,6 +8,7 @@ import { sortTasks } from "../utils/taskSort";
 import { codeStatusLabel, departmentLabel } from "../i18n/enums";
 import { getActiveDischargeTasks } from "../utils/discharge";
 import OperationStatus from "./OperationStatus";
+import PatientActionsMenu from "./PatientActionsMenu";
 import { useOperationStatus } from "../hooks/useOperationStatus";
 
 // Removed: a second, legacy discharge indicator -- a blue pill beside the
@@ -36,7 +37,7 @@ function formatAdmissionDate(dateStr, locale) {
   });
 }
 
-export default function PatientCard({ patient, isFocused, onEditPatient, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient, onCancelDischargePlanning }) {
+export default function PatientCard({ patient, isFocused, onEditPatient, onOpenHistory, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient, onCancelDischargePlanning }) {
   const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
   // Opened from the Tasks screen or Unit View: show the task list straight
@@ -226,16 +227,10 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onCompl
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600 ring-1 ring-blue-200">
             {tasks.length}
           </span>
-          <button
-            type="button"
-            onClick={() => onEditPatient(patient)}
-            className="rounded p-1 text-gray-400 transition-colors duration-150 hover:text-blue-500"
-            aria-label={t("patientCard.editPatientAria")}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
+          <PatientActionsMenu
+            onEdit={() => onEditPatient(patient)}
+            onHistory={() => onOpenHistory?.(patient)}
+          />
         </div>
       </div>
 

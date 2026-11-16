@@ -144,7 +144,9 @@
     "allergies": "Allergies : {{list}}",
     "sbarSummary": "Rapport SBAR",
     "familyUpdate": "Mise à jour famille",
-    "editPatientAria": "Modifier le patient",
+    "menuAria": "Actions sur le patient",
+    "menuEdit": "Modifier le patient",
+    "menuHistory": "Historique",
     "tasksLabel": "Tâches",
     "notesLabel": "Notes cliniques",
     "newCount": "+ {{count}} nouvelle(s)",
@@ -458,5 +460,85 @@
     "changeEmail": "Modifier l'e-mail",
     "emailConfirmationSent": "Lien de confirmation envoyé à {{email}}. Le changement prendra effet après avoir cliqué dessus.",
     "signOut": "Se déconnecter"
+  },
+  "history": {
+    "title": "Historique",
+    "closeAria": "Fermer l'historique",
+    "loading": "Chargement de l'historique...",
+    "empty": "Aucune modification enregistrée pour le moment.",
+    "unavailable": "L'historique n'est pas encore disponible. Les modifications apparaîtront ici dès que le suivi de l'historique sera activé.",
+    "error": "Impossible de charger l'historique.",
+    "retry": "Réessayer",
+    "loadMore": "Afficher plus",
+    "trackingNote": "Les modifications antérieures au début du suivi de l'historique ne sont pas affichées.",
+    "withAlso": "{{text}} (également modifié : {{fields}})",
+    "actor": {
+      "system": "le système",
+      "unknown": "un utilisateur inconnu"
+    },
+    "entry": {
+      "patient": {
+        "created": "Patient créé par {{actor}}",
+        "modified": "Patient modifié par {{actor}} ({{fields}})",
+        "changed": "Patient modifié par {{actor}}",
+        "deleted": "Patient supprimé par {{actor}}",
+        "discharged": "Sortie du patient enregistrée par {{actor}}"
+      },
+      "task": {
+        "created": "Tâche créée par {{actor}}",
+        "modified": "Tâche modifiée par {{actor}} ({{fields}})",
+        "changed": "Tâche modifiée par {{actor}}",
+        "deleted": "Tâche supprimée par {{actor}}",
+        "completed": "Tâche terminée par {{actor}}",
+        "reopened": "Tâche rouverte par {{actor}}",
+        "cancelled": "Tâche annulée par {{actor}}",
+        "assigned": "Tâche attribuée par {{actor}}",
+        "unassigned": "Attribution de la tâche retirée par {{actor}}"
+      },
+      "note": {
+        "created": "Note ajoutée par {{actor}}",
+        "modified": "Note modifiée par {{actor}} ({{fields}})",
+        "changed": "Note modifiée par {{actor}}",
+        "deleted": "Note supprimée par {{actor}}"
+      },
+      "other": {
+        "changed": "Élément modifié par {{actor}}"
+      }
+    },
+    "columns": {
+      "patient": {
+        "label": "identifiant",
+        "diagnosis": "diagnostic",
+        "codeStatus": "directives de réanimation",
+        "attendingPhysician": "médecin référent",
+        "allergies": "allergies",
+        "admissionDate": "date d'admission",
+        "locationLabel": "emplacement",
+        "age": "âge",
+        "discharge": "sortie"
+      },
+      "task": {
+        "description": "description",
+        "department": "service",
+        "status": "statut",
+        "priority": "priorité",
+        "deadline": "échéance",
+        "completion": "réalisation",
+        "assignee": "attribution",
+        "escalation": "escalade",
+        "repage": "relance",
+        "type": "type de tâche",
+        "patient": "patient",
+        "transcript": "transcription vocale",
+        "createdBy": "auteur"
+      },
+      "note": {
+        "content": "texte",
+        "type": "type de note",
+        "author": "auteur",
+        "patient": "patient"
+      },
+      "other": "un autre champ"
+    }
   }
 }

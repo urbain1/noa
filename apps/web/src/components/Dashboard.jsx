@@ -17,6 +17,7 @@ export default function Dashboard({
   onAddPatient,
   onAddPatientByVoice,
   onEditPatient,
+  onOpenHistory,
   onCompleteTask,
   onEditTask,
   onRepageTask,
@@ -131,6 +132,7 @@ export default function Dashboard({
                 patient={patient}
                 isFocused={isFocused}
                 onEditPatient={onEditPatient}
+                onOpenHistory={onOpenHistory}
                 onCompleteTask={onCompleteTask}
                 onEditTask={onEditTask}
                 onRepageTask={onRepageTask}

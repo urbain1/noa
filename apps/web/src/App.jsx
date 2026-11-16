@@ -19,6 +19,7 @@ import ProfileScreen from "./components/ProfileScreen";
 import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
+import PatientHistoryDialog from "./components/PatientHistoryDialog";
 import { supabase } from "./lib/supabase";
 import { fetchFacilityNurses } from "./lib/nurses";
 import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, deleteTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
@@ -158,6 +159,7 @@ function App() {
     setView("patients");
     setPatientFocus(null);
     setShowProfile(false);
+    setHistoryPatientId(null);
     // Don't leave the next person on this device in the previous nurse's language.
     applyLanguage(DEFAULT_LANGUAGE);
   };
@@ -225,6 +227,10 @@ function App() {
   // explicit second confirmation. `{ task, command }` or null. Nothing is
   // destroyed until TaskDeleteConfirmDialog's own button is pressed.
   const [taskPendingDelete, setTaskPendingDelete] = useState(null);
+  // The patient whose History dialog is open, by id so the dialog reads the
+  // live patient (its current tasks/notes name the lines) rather than a
+  // snapshot from when it was opened.
+  const [historyPatientId, setHistoryPatientId] = useState(null);
 
   // Colleagues at this facility, for the assignee picker and Unit View's
   // personnel overview. Loaded alongside patients; a failure here is
@@ -1154,6 +1160,8 @@ function App() {
   // A failed patient load affects every screen, not just the patient list,
   // so the banner travels with all three rather than only appearing on the
   // one the nurse happens to be on.
+  const historyPatient = historyPatientId ? patients.find((p) => p.id === historyPatientId) : null;
+
   const errorBanner = patientsError ? (
     <div className="bg-red-50 px-4 py-2 text-center text-sm text-red-600">
       {patientsError}
@@ -1215,6 +1223,14 @@ function App() {
           }}
           onUpdate={handleAiUpdateTask}
           onManualUpdate={handleManualUpdateTask}
+        />
+      )}
+      {historyPatient && (
+        <PatientHistoryDialog
+          patient={historyPatient}
+          nurses={nurses}
+          facilityId={nurseProfile.facility_id}
+          onClose={() => setHistoryPatientId(null)}
         />
       )}
       {/* Rendered after TaskEditDialog so it layers over it: the edit
@@ -1283,6 +1299,7 @@ function App() {
         onAddPatient={handleAddPatientClick}
         onAddPatientByVoice={handleAddPatientByVoice}
         onEditPatient={handleEditPatientClick}
+        onOpenHistory={(patient) => setHistoryPatientId(patient.id)}
         onCompleteTask={handleCompleteTask}
         onEditTask={handleEditTaskClick}
         onAddNote={handleAddNoteClick}

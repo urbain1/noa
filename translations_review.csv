@@ -143,7 +143,9 @@ patientCard.admitted,Admitted {{date}},Admis le {{date}}
 patientCard.allergies,Allergies: {{list}},Allergies : {{list}}
 patientCard.sbarSummary,SBAR Summary,Rapport SBAR
 patientCard.familyUpdate,Family Update,Mise à jour famille
-patientCard.editPatientAria,Edit patient,Modifier le patient
+patientCard.menuAria,Patient actions,Actions sur le patient
+patientCard.menuEdit,Edit patient,Modifier le patient
+patientCard.menuHistory,History,Historique
 patientCard.tasksLabel,Tasks,Tâches
 patientCard.notesLabel,Clinical Notes,Notes cliniques
 patientCard.newCount,+ {{count}} new,+ {{count}} nouvelle(s)
@@ -409,3 +411,61 @@ profile.emailHint,Changing this sends a confirmation link to the new address. Th
 profile.changeEmail,Change email,Modifier l'e-mail
 profile.emailConfirmationSent,Confirmation link sent to {{email}}. The change takes effect once you click it.,Lien de confirmation envoyé à {{email}}. Le changement prendra effet après avoir cliqué dessus.
 profile.signOut,Sign out,Se déconnecter
+history.title,History,Historique
+history.closeAria,Close history,Fermer l'historique
+history.loading,Loading history...,Chargement de l'historique...
+history.empty,No changes recorded yet.,Aucune modification enregistrée pour le moment.
+history.unavailable,History isn't available yet. Changes will appear here once history tracking is switched on.,L'historique n'est pas encore disponible. Les modifications apparaîtront ici dès que le suivi de l'historique sera activé.
+history.error,Couldn't load history.,Impossible de charger l'historique.
+history.retry,Try again,Réessayer
+history.loadMore,Load more,Afficher plus
+history.trackingNote,Changes made before history tracking started aren't shown.,Les modifications antérieures au début du suivi de l'historique ne sont pas affichées.
+history.withAlso,{{text}} (also changed: {{fields}}),{{text}} (également modifié : {{fields}})
+history.actor.system,the system,le système
+history.actor.unknown,an unknown user,un utilisateur inconnu
+history.entry.patient.created,Patient created by {{actor}},Patient créé par {{actor}}
+history.entry.patient.modified,Patient modified by {{actor}} ({{fields}}),Patient modifié par {{actor}} ({{fields}})
+history.entry.patient.changed,Patient modified by {{actor}},Patient modifié par {{actor}}
+history.entry.patient.deleted,Patient deleted by {{actor}},Patient supprimé par {{actor}}
+history.entry.patient.discharged,Patient discharged by {{actor}},Sortie du patient enregistrée par {{actor}}
+history.entry.task.created,Task created by {{actor}},Tâche créée par {{actor}}
+history.entry.task.modified,Task modified by {{actor}} ({{fields}}),Tâche modifiée par {{actor}} ({{fields}})
+history.entry.task.changed,Task modified by {{actor}},Tâche modifiée par {{actor}}
+history.entry.task.deleted,Task deleted by {{actor}},Tâche supprimée par {{actor}}
+history.entry.task.completed,Task completed by {{actor}},Tâche terminée par {{actor}}
+history.entry.task.reopened,Task reopened by {{actor}},Tâche rouverte par {{actor}}
+history.entry.task.cancelled,Task cancelled by {{actor}},Tâche annulée par {{actor}}
+history.entry.task.assigned,Task assigned by {{actor}},Tâche attribuée par {{actor}}
+history.entry.task.unassigned,Task unassigned by {{actor}},Attribution de la tâche retirée par {{actor}}
+history.entry.note.created,Note added by {{actor}},Note ajoutée par {{actor}}
+history.entry.note.modified,Note modified by {{actor}} ({{fields}}),Note modifiée par {{actor}} ({{fields}})
+history.entry.note.changed,Note modified by {{actor}},Note modifiée par {{actor}}
+history.entry.note.deleted,Note deleted by {{actor}},Note supprimée par {{actor}}
+history.entry.other.changed,Record changed by {{actor}},Élément modifié par {{actor}}
+history.columns.patient.label,label,identifiant
+history.columns.patient.diagnosis,diagnosis,diagnostic
+history.columns.patient.codeStatus,code status,directives de réanimation
+history.columns.patient.attendingPhysician,attending physician,médecin référent
+history.columns.patient.allergies,allergies,allergies
+history.columns.patient.admissionDate,admission date,date d'admission
+history.columns.patient.locationLabel,location,emplacement
+history.columns.patient.age,age,âge
+history.columns.patient.discharge,discharge,sortie
+history.columns.task.description,description,description
+history.columns.task.department,department,service
+history.columns.task.status,status,statut
+history.columns.task.priority,priority,priorité
+history.columns.task.deadline,deadline,échéance
+history.columns.task.completion,completion,réalisation
+history.columns.task.assignee,assignee,attribution
+history.columns.task.escalation,escalation,escalade
+history.columns.task.repage,repage,relance
+history.columns.task.type,task type,type de tâche
+history.columns.task.patient,patient,patient
+history.columns.task.transcript,voice transcript,transcription vocale
+history.columns.task.createdBy,creator,auteur
+history.columns.note.content,text,texte
+history.columns.note.type,note type,type de note
+history.columns.note.author,author,auteur
+history.columns.note.patient,patient,patient
+history.columns.other,another field,un autre champ

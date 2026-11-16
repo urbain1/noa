@@ -95,7 +95,10 @@ export async function createTask(facilityId, patientId, createdBy, fields) {
 // violation on `tasks_assigned_to_fkey`, for instance, names `assigned_to` in
 // its message but has nothing to do with a missing migration, and reporting
 // it as one would send the reader off to check a migration that is fine.
-function isMissingColumnError(error, column) {
+//
+// Exported for lib/auditLog.js, which uses the same test to recognise that
+// migration 0012 (audit_log.patient_id) hasn't been applied yet.
+export function isMissingColumnError(error, column) {
   if (!error) return false
   if (error.code !== '42703' && error.code !== 'PGRST204') return false
   return typeof error.message !== 'string' || error.message.includes(column)

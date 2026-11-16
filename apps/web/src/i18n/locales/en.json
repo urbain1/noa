@@ -144,7 +144,9 @@
     "allergies": "Allergies: {{list}}",
     "sbarSummary": "SBAR Summary",
     "familyUpdate": "Family Update",
-    "editPatientAria": "Edit patient",
+    "menuAria": "Patient actions",
+    "menuEdit": "Edit patient",
+    "menuHistory": "History",
     "tasksLabel": "Tasks",
     "notesLabel": "Clinical Notes",
     "newCount": "+ {{count}} new",
@@ -458,5 +460,85 @@
     "changeEmail": "Change email",
     "emailConfirmationSent": "Confirmation link sent to {{email}}. The change takes effect once you click it.",
     "signOut": "Sign out"
+  },
+  "history": {
+    "title": "History",
+    "closeAria": "Close history",
+    "loading": "Loading history...",
+    "empty": "No changes recorded yet.",
+    "unavailable": "History isn't available yet. Changes will appear here once history tracking is switched on.",
+    "error": "Couldn't load history.",
+    "retry": "Try again",
+    "loadMore": "Load more",
+    "trackingNote": "Changes made before history tracking started aren't shown.",
+    "withAlso": "{{text}} (also changed: {{fields}})",
+    "actor": {
+      "system": "the system",
+      "unknown": "an unknown user"
+    },
+    "entry": {
+      "patient": {
+        "created": "Patient created by {{actor}}",
+        "modified": "Patient modified by {{actor}} ({{fields}})",
+        "changed": "Patient modified by {{actor}}",
+        "deleted": "Patient deleted by {{actor}}",
+        "discharged": "Patient discharged by {{actor}}"
+      },
+      "task": {
+        "created": "Task created by {{actor}}",
+        "modified": "Task modified by {{actor}} ({{fields}})",
+        "changed": "Task modified by {{actor}}",
+        "deleted": "Task deleted by {{actor}}",
+        "completed": "Task completed by {{actor}}",
+        "reopened": "Task reopened by {{actor}}",
+        "cancelled": "Task cancelled by {{actor}}",
+        "assigned": "Task assigned by {{actor}}",
+        "unassigned": "Task unassigned by {{actor}}"
+      },
+      "note": {
+        "created": "Note added by {{actor}}",
+        "modified": "Note modified by {{actor}} ({{fields}})",
+        "changed": "Note modified by {{actor}}",
+        "deleted": "Note deleted by {{actor}}"
+      },
+      "other": {
+        "changed": "Record changed by {{actor}}"
+      }
+    },
+    "columns": {
+      "patient": {
+        "label": "label",
+        "diagnosis": "diagnosis",
+        "codeStatus": "code status",
+        "attendingPhysician": "attending physician",
+        "allergies": "allergies",
+        "admissionDate": "admission date",
+        "locationLabel": "location",
+        "age": "age",
+        "discharge": "discharge"
+      },
+      "task": {
+        "description": "description",
+        "department": "department",
+        "status": "status",
+        "priority": "priority",
+        "deadline": "deadline",
+        "completion": "completion",
+        "assignee": "assignee",
+        "escalation": "escalation",
+        "repage": "repage",
+        "type": "task type",
+        "patient": "patient",
+        "transcript": "voice transcript",
+        "createdBy": "creator"
+      },
+      "note": {
+        "content": "text",
+        "type": "note type",
+        "author": "author",
+        "patient": "patient"
+      },
+      "other": "another field"
+    }
   }
 }
