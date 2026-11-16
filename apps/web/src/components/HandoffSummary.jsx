@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import SendHandoffDialog from "./SendHandoffDialog";
 import HandoffOutstandingTasks from "./HandoffOutstandingTasks";
+import { renderOutstandingText } from "../utils/outstandingTasks";
 import { localeTag } from "../i18n";
 
 // `patients` is the same scope the narrative was generated from -- the whole
@@ -44,8 +45,18 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
     }
   }, [sentConfirmation]);
 
+  // Appended after whatever the nurse currently has in the narrative --
+  // their edits included, never overwritten -- so Copy and Send carry the
+  // outstanding list too, not just the prose. Built from the same grouping
+  // the on-screen panel above uses (utils/outstandingTasks.js).
+  const outstandingText = useMemo(
+    () => renderOutstandingText(t, patients),
+    [t, patients],
+  );
+  const fullText = `${editedText}\n\n${outstandingText}`;
+
   const handleCopy = () => {
-    navigator.clipboard.writeText(editedText);
+    navigator.clipboard.writeText(fullText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -136,6 +147,7 @@ export default function HandoffSummary({ summaryText, title, onClose, patientCou
         <SendHandoffDialog
           nurses={nurses}
           currentNurseId={currentNurseId}
+          text={fullText}
           onCancel={() => setShowSendDialog(false)}
           onSend={(details) => {
             setShowSendDialog(false);

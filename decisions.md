@@ -2,6 +2,22 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-08-28 — Client-side Anthropic API key: regression after Day 3, found and fixed
+
+**What happened:** The 2026-08-25 Day 3 entry below states the client-side Claude API path was fully removed, `claudeAPI.js` calling the Edge Function exclusively, no direct-to-Anthropic path anywhere in client code. That was accurate at the time. By 2026-08-28, a client-side path had reappeared: `VITE_ANTHROPIC_API_KEY` was live in Vercel's environment variables, feeding a raw `fetch()` straight to `api.anthropic.com` from `apps/web/src/utils/claudeAPI.js`, bypassing the Edge Function entirely. Vite bakes any `VITE_`-prefixed variable into the deployed JS bundle at build time, so the key was exposed in the deployed preview bundle to anyone who opened dev tools, confirmed live, not theoretical.
+
+**How it surfaced:** Not from reading the code first, from checking whether `.env` had ever been committed to git and whether the key showed up live in Vercel. `git log --all --full-history -- .env` was clean, always empty, never committed. Checking Vercel's dashboard directly is what showed `VITE_ANTHROPIC_API_KEY` present.
+
+**Fix, confirmed:**
+- Old key revoked at console.anthropic.com. Only `noa-beta-server` (new key, 90-day expiry) remains.
+- `VITE_ANTHROPIC_API_KEY` removed from Vercel entirely. Only `ANTHROPIC_API_KEY` (server-side, no `VITE_` prefix), `VITE_SUPABASE_URL`, and `VITE_SUPABASE_PUBLISHABLE_KEY` remain.
+- `grep -rn "VITE_ANTHROPIC_API_KEY\|api.anthropic.com" apps/web/src` returns nothing. No client-side path to Anthropic exists in the code.
+- `.gitignore` already covered `.env`, confirmed separately, unrelated to this specific exposure since `.env` itself was never the vector here.
+
+**Standing lesson:** A `decisions.md` entry marking something "done" is a snapshot, not a permanent guarantee. This regression's exact reintroduction point (merge, rebase, restored old code) wasn't traced. Hard rules in `CLAUDE.md` like "never call the Anthropic API from client-side code" are worth re-verifying with a direct grep periodically, not just trusting a past entry that said it was handled.
+
+**Supersedes:** Nothing formally. The 2026-08-25 Day 3 entry remains accurate for what was true then. This entry documents that the state didn't hold and has now been re-confirmed.
+
 ## 2026-08-25 — Patient location: synthetic label, not real room/bed number
 **Decision:** Added an optional `location_label` field to patients (e.g. "Test Room A"), instead of real room/bed number fields as originally considered.
 **Why:** Real room/bed numbers are explicitly prohibited as patient identifiers in `SECURITY.md` and `CLAUDE.md`, they double as the hospital's own lookup key. A synthetic label gives the same organizational usability nurses actually want without the re-identification risk, following the same pattern as the `Patient_Test_N` label itself.

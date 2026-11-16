@@ -2,7 +2,7 @@ import { useTranslation } from "react-i18next";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import { isTaskOverdue } from "../utils/taskOverdue";
 import { getDeadlineDisplay } from "../utils/taskDeadline";
-import { sortTasks } from "../utils/taskSort";
+import { outstandingGroups } from "../utils/outstandingTasks";
 
 // The structured half of the handover report (scenarios.md SC-8): what is
 // still outstanding, listed rather than narrated, so a nurse taking over can
@@ -19,16 +19,8 @@ import { sortTasks } from "../utils/taskSort";
 // Cancelled. Confirmed stays on the list -- the department has acknowledged
 // it, but nobody has done it yet, and a handover that dropped acknowledged
 // work would be hiding exactly the tasks most likely to be assumed handled.
-
-function isOutstanding(task) {
-  return task.status !== "Completed" && task.status !== "Cancelled";
-}
-
-// One flat row, so a patient's own tasks keep the app's single ordering
-// (urgent, then overdue, then the rest, earliest deadline first).
-function outstandingFor(patient) {
-  return sortTasks((patient.tasks || []).filter(isOutstanding));
-}
+// The grouping itself lives in utils/outstandingTasks.js, shared with the
+// plain-text rendering appended to Copy/Send, so the two can't disagree.
 
 function TaskRow({ task }) {
   const { t } = useTranslation();
@@ -90,9 +82,7 @@ export default function HandoffOutstandingTasks({ patients = [] }) {
   // Deliberately not memoised on `patients`: overdue-ness is a function of
   // the clock as much as of the data, so it is recomputed on every render
   // rather than frozen until a patient row happens to change.
-  const groups = patients
-    .map((patient) => ({ patient, tasks: outstandingFor(patient) }))
-    .filter((group) => group.tasks.length > 0);
+  const groups = outstandingGroups(patients);
 
   const totalOutstanding = groups.reduce((n, g) => n + g.tasks.length, 0);
   const totalOverdue = groups.reduce(

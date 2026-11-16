@@ -202,7 +202,7 @@ voiceCapture.createTask,Create Task,Créer la tâche
 voiceCapture.titlePatient,Add Patient by Voice,Ajouter un patient par la voix
 voiceCapture.tapToRecordPatient,Tap to describe a new patient,Appuyez pour décrire un nouveau patient
 voiceCapture.examplePatient,"Try: ""Patient Test 4, 72 years old, admitted with pneumonia, Test Room B""","Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »"
-voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels."
+voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number. A real age, diagnosis and admission date together can identify someone on their own — change any detail you don't need for testing.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels. Un âge, un diagnostic et une date d'admission réels peuvent à eux seuls identifier une personne — modifiez tout détail dont vous n'avez pas besoin pour vos tests."
 voiceCapture.reviewPatient,Review Patient,Vérifier le patient
 patientMatch.multipleFound,Multiple Patients Found,Plusieurs patients trouvés
 patientMatch.foundCount,Found {{count}} patients matching '{{query}}'.,{{count}} patients correspondent à « {{query}} ».

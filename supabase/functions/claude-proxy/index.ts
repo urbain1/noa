@@ -434,6 +434,7 @@ FORMAT RULES:
 - Flag Stat priority items with "[STAT]" prefix
 - For tasks with a deadline, show the deadline as a relative time: "[DUE in Xh Ym]" or "[OVERDUE by Xh Ym]"
 - Overdue tasks should be called out prominently in the Recommendation section as requiring immediate follow-up
+- When a section lists more than one task (Recommendation especially, but any section this applies to), put each task on its own line, prefixed with "- ", one task per line -- never merge multiple tasks into a single flowing sentence. A section with only one task, or no task-specific detail, still reads as prose.
 - If a patient has no pending or delayed tasks, say "No outstanding tasks at this time"
 - Use standard medical abbreviations where appropriate (e.g., POD for post-operative day, NKDA for no known drug allergies)
 - Always include code status and allergies in the Situation line

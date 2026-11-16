@@ -18,7 +18,12 @@ const METHODS = [
 // These are suggestions, not a restriction. The incoming nurse is very often
 // not a Noa user at all, so the free-text field stays the source of truth
 // and stays fully usable on its own; picking a colleague just fills it in.
-export default function SendHandoffDialog({ nurses = [], currentNurseId, onCancel, onSend }) {
+// `text` is the full message this send simulates -- narrative plus the
+// outstanding-task list appended after it (see HandoffSummary), the same
+// content Copy puts on the clipboard. There is no real transmission channel
+// behind this dialog yet, so `text` travels with the rest of `onSend`'s
+// payload for whatever eventually sends it, rather than being dropped here.
+export default function SendHandoffDialog({ nurses = [], currentNurseId, text, onCancel, onSend }) {
   const { t } = useTranslation();
   const [nurseName, setNurseName] = useState("");
   const [selectedNurseId, setSelectedNurseId] = useState(null);
@@ -145,6 +150,7 @@ export default function SendHandoffDialog({ nurses = [], currentNurseId, onCance
                 // fully supported case.
                 nurseId: selectedNurseId,
                 sendMethod,
+                text,
               })
             }
             disabled={!nurseName.trim()}

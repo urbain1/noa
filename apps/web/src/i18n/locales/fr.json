@@ -211,7 +211,7 @@
     "titlePatient": "Ajouter un patient par la voix",
     "tapToRecordPatient": "Appuyez pour décrire un nouveau patient",
     "examplePatient": "Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »",
-    "patientSyntheticHint": "Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels.",
+    "patientSyntheticHint": "Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels. Un âge, un diagnostic et une date d'admission réels peuvent à eux seuls identifier une personne — modifiez tout détail dont vous n'avez pas besoin pour vos tests.",
     "reviewPatient": "Vérifier le patient"
   },
   "patientMatch": {
