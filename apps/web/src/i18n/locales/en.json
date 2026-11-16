@@ -540,5 +540,36 @@
       },
       "other": "another field"
     }
+  },
+  "editLock": {
+    "lockedBy": "{{name}} is currently editing this. Wait, or ask them to finish.",
+    "lockedBySelf": "You're already editing this in another window.",
+    "aColleague": "A colleague",
+    "takeOver": "Take over",
+    "takeOverTitle": "Take over editing?",
+    "takeOverBody": "{{name}} is editing this right now. If you take over, their screen stops saving straight away and they're told you took over. Anything they haven't saved stays on their screen, not in Noa.",
+    "takeOverBodySelf": "You're editing this in another window. If you take over here, that window stops saving.",
+    "takenOver": "{{name}} took over editing. This window no longer saves.",
+    "takenOverSelf": "You took over in another window. This window no longer saves.",
+    "pausedIdle": "Editing paused after 2 minutes without activity, so colleagues can edit this.",
+    "pausedOffline": "Connection lost. Editing is paused until you're back online.",
+    "waitingForConnection": "Waiting for the connection...",
+    "continueEditing": "Continue editing",
+    "notSaved": "Not saved: {{fields}}",
+    "saveMine": "Save my changes",
+    "changedBy": "{{name}} changed this after you opened it: {{fields}} ({{time}}).",
+    "changedBySelf": "You changed this in another window after opening it here: {{fields}} ({{time}}).",
+    "changedBySomeone": "Someone else changed this after you opened it: {{fields}}.",
+    "keepMine": "Save mine anyway",
+    "discardMine": "Discard mine and reload",
+    "deletedBy": "This was deleted by {{name}}. Changes can't be saved.",
+    "deletedBySelf": "You deleted this in another window. Changes can't be saved.",
+    "deletedBySomeone": "This was deleted by someone else. Changes can't be saved.",
+    "connecting": "Checking whether a colleague is editing this...",
+    "rechecking": "Checking for changes made in the meantime...",
+    "unavailable": "Live edit locking isn't available right now. Changes made by others are still checked before saving.",
+    "closeUnsaved": "Your changes were not saved ({{fields}}). Close anyway?",
+    "deleteBlockedConflict": "This task changed after you opened it. Nothing was deleted. Check the changes first.",
+    "deleteBlockedLock": "You no longer hold this task for editing. Nothing was deleted."
   }
 }

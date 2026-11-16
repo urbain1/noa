@@ -29,6 +29,10 @@ import { needsAttention } from "./utils/taskOverdue";
 import { isDischargePlanned } from "./utils/discharge";
 import { applyLanguage, currentLanguage, DEFAULT_LANGUAGE } from "./i18n";
 import { translatedError } from "./utils/errors";
+import { useEditLocks } from "./hooks/useEditLocks";
+import { EditLockContext } from "./hooks/editLockContext";
+import { otherHolder } from "./utils/editLock";
+import { lockedByMessage } from "./utils/editLockText";
 
 // Fields the tasks table has (0001_init.sql) and the AI edit path is allowed
 // to write. Assignment is deliberately absent: it has its own picker and its
@@ -237,6 +241,43 @@ function App() {
   // non-fatal -- the app still works, assignment just shows nobody to
   // assign to, which is visible rather than silent.
   const [nurses, setNurses] = useState([]);
+
+  // Edit locks (decisions.md, 2026-11-16): one private presence channel per
+  // facility for this tab, shared with every card and dialog through
+  // EditLockContext. If it can't be joined (migration 0013 not applied,
+  // Realtime unreachable) it reports "unavailable" and nothing is locked or
+  // disabled; edit dialogs still check for conflicting changes before saving.
+  const lockStore = useEditLocks({ facilityId: nurseProfile?.facility_id, nurseId: session?.user?.id });
+  const currentNurseId = session?.user?.id || null;
+  const lockContext = useMemo(
+    () => ({ store: lockStore, nurses, currentNurseId }),
+    [lockStore, nurses, currentNurseId]
+  );
+
+  // One-tap actions re-check the lock at the moment they run, not only when
+  // the button was drawn: a colleague may have opened the record since.
+  // Returns true (and says why) when the action must not go ahead.
+  const blockedByLock = (recordType, recordId) => {
+    const holder = otherHolder(lockStore.getSnapshot(), recordType, recordId);
+    if (!holder) return false;
+    alert(lockedByMessage(t, holder, nurses, currentNurseId));
+    return true;
+  };
+
+  // An edit dialog read a fresh copy of its row: keep App's copy in step so
+  // cards behind the dialog show the same values.
+  const handleRowRefreshed = (recordType, row) => {
+    if (!row) return;
+    if (recordType === "patient") {
+      setPatients((prev) => prev.map((p) => (p.id === row.id ? { ...p, ...row, tasks: p.tasks, notes: p.notes } : p)));
+    } else if (recordType === "task") {
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === row.patient_id ? { ...p, tasks: p.tasks.map((tk) => (tk.id === row.id ? row : tk)) } : p
+        )
+      );
+    }
+  };
 
   const loadNurses = async () => {
     try {
@@ -562,6 +603,7 @@ function App() {
   // count elsewhere already excludes Cancelled, so no other view needs to
   // change to reflect this.
   const handleCancelDischargePlanning = async (patient, taskIds) => {
+    if (taskIds.some((id) => blockedByLock("task", id))) return;
     try {
       const cancelled = await cancelDischargeTasks(taskIds);
       const cancelledIds = new Set(cancelled.map((t) => t.id));
@@ -692,12 +734,15 @@ function App() {
     setPatientToEdit(patient);
   };
 
+  // Returns the saved row: the edit dialog's stale-write check uses it as its
+  // new baseline.
   const handleEditPatientSave = async (patientId, fields) => {
     const updated = await updatePatient(patientId, fields);
     setPatients((prev) =>
       prev.map((p) => (p.id === patientId ? { ...p, ...updated } : p))
     );
     setPatientToEdit(null);
+    return updated;
   };
 
   // --- Task handlers (real writes) ---
@@ -707,6 +752,7 @@ function App() {
   // Tasks completed before 0011 have no completer recorded and are shown as
   // "unknown" rather than being credited to the creator.
   const handleCompleteTask = async (task) => {
+    if (blockedByLock("task", task.id)) return;
     try {
       const updated = await completeTask(task.id, session.user.id);
       setPatients((prev) =>
@@ -725,7 +771,12 @@ function App() {
   // Assign a task to a colleague at the same facility, or clear it back to
   // unassigned with null. Assignment is data only: it changes nothing about
   // who can see the task (see lib/patients.js assignTask).
+  // Resolves to the saved row, or undefined when it failed (already reported
+  // here). The task edit dialog relies on that to know the assignment landed.
+  // From the edit dialog itself this tab holds the lock, so the lock check
+  // only stops assignments made from elsewhere while a colleague edits.
   const handleAssignTask = async (task, nurseId) => {
+    if (blockedByLock("task", task.id)) return undefined;
     try {
       const updated = await assignTask(task.id, nurseId);
       setPatients((prev) =>
@@ -735,11 +786,13 @@ function App() {
             : p
         )
       );
+      return updated;
     } catch (err) {
       console.error("Assign task error:", err);
       alert(err.code === "MISSING_MIGRATION_0011"
         ? t("errors.assignUnavailable")
         : t("errors.assignTask"));
+      return undefined;
     }
   };
 
@@ -748,6 +801,7 @@ function App() {
   };
 
   const handleRepageTask = async (task) => {
+    if (blockedByLock("task", task.id)) return;
     try {
       const updated = await repageTask(task);
       setPatients((prev) =>
@@ -764,6 +818,7 @@ function App() {
   };
 
   const handleEscalateTask = async (task) => {
+    if (blockedByLock("task", task.id)) return;
     try {
       const updated = await escalateTask(task);
       setPatients((prev) =>
@@ -783,6 +838,9 @@ function App() {
   // an explicit Save click, so it must not close the dialog -- the nurse
   // keeps editing after each field lands. Only the dialog's own Cancel/X
   // closes it.
+  //
+  // Returns the saved row: the dialog's stale-write check uses it as its new
+  // baseline.
   const handleManualUpdateTask = async (updates, task) => {
     // The nurse id goes with the edit so that setting status to Completed
     // here records the same completer as the Complete button (FL1).
@@ -794,6 +852,7 @@ function App() {
           : p
       )
     );
+    return updated;
   };
 
   // The AI mode of the task edit dialog. `TaskEditDialog` has always called
@@ -813,7 +872,11 @@ function App() {
   //     nothing usable, per CLAUDE.md's fallback rule. That parser also
   //     resolves deadlines in the nurse's own timezone, which the deployed
   //     prompt (given UTC) does not.
-  const handleAiUpdateTask = async (command, task) => {
+  //
+  // `guard` is the edit dialog's stale-write guard. This call already runs
+  // inside it; it is kept with a pending delete so the delete is checked
+  // again when the nurse confirms it.
+  const handleAiUpdateTask = async (command, task, _patientId, guard) => {
     // "Usable" is deliberately stricter than "no error": the action can
     // answer with `{}`, which reads as success and changes nothing.
     const usable = (r) =>
@@ -852,7 +915,7 @@ function App() {
     // TaskEditDialog so that it covers a delete the AI read but the local
     // regex did not, and so voice and typed commands are gated identically.
     if (result.action === "delete") {
-      setTaskPendingDelete({ task, command });
+      setTaskPendingDelete({ task, command, guard });
       return;
     }
 
@@ -863,10 +926,24 @@ function App() {
   // The only caller of `deleteTask`. Throws on failure so the confirmation
   // dialog can say so and stay open with the task still there -- a delete
   // that silently failed would read as a delete that worked.
+  //
+  // The delete goes through the edit dialog's guard: it is refused if this
+  // tab no longer holds the lock or the task changed after the dialog
+  // opened, and the confirmation says so instead of deleting.
   const handleConfirmDeleteTask = async () => {
     if (!taskPendingDelete) return;
-    const { task } = taskPendingDelete;
-    await deleteTask(task.id);
+    const { task, guard } = taskPendingDelete;
+    const remove = async () => {
+      await deleteTask(task.id);
+      return null;
+    };
+    try {
+      await (guard ? guard(remove) : remove());
+    } catch (err) {
+      if (err?.code === "EDIT_CONFLICT") throw translatedError(t("editLock.deleteBlockedConflict"));
+      if (err?.code === "EDIT_NOT_HELD") throw translatedError(t("editLock.deleteBlockedLock"));
+      throw err;
+    }
     setPatients((prev) =>
       prev.map((p) =>
         p.id === task.patient_id ? { ...p, tasks: p.tasks.filter((tk) => tk.id !== task.id) } : p
@@ -1205,6 +1282,8 @@ function App() {
       {patientToEdit && (
         <EditPatientDialog
           patient={patientToEdit}
+          facilityId={nurseProfile.facility_id}
+          onRowRefreshed={handleRowRefreshed}
           onCancel={() => setPatientToEdit(null)}
           onSave={handleEditPatientSave}
         />
@@ -1216,6 +1295,8 @@ function App() {
           patientLabel={patients.find((p) => p.id === taskToEdit.patient_id)?.label}
           nurses={nurses}
           currentNurseId={session?.user?.id}
+          facilityId={nurseProfile.facility_id}
+          onRowRefreshed={handleRowRefreshed}
           onAssign={handleAssignTask}
           onCancel={() => {
             setTaskPendingDelete(null);
@@ -1249,7 +1330,7 @@ function App() {
 
   if (view === "unit") {
     return (
-      <>
+      <EditLockContext.Provider value={lockContext}>
         {errorBanner}
         <ChargeNurseDashboard
           {...sharedScreenProps}
@@ -1257,13 +1338,13 @@ function App() {
           onPatientClick={(patientId) => handleOpenPatient(patientId, "unit")}
         />
         {modals}
-      </>
+      </EditLockContext.Provider>
     );
   }
 
   if (view === "tasks") {
     return (
-      <>
+      <EditLockContext.Provider value={lockContext}>
         {errorBanner}
         <TasksScreen
           {...sharedScreenProps}
@@ -1275,12 +1356,12 @@ function App() {
           onAssignTask={handleAssignTask}
         />
         {modals}
-      </>
+      </EditLockContext.Provider>
     );
   }
 
   return (
-    <>
+    <EditLockContext.Provider value={lockContext}>
       {errorBanner}
       <Dashboard
         {...sharedScreenProps}
@@ -1307,7 +1388,7 @@ function App() {
         onGeneratePatientUpdate={handleGeneratePatientUpdate}
       />
       {modals}
-    </>
+    </EditLockContext.Provider>
   );
 }
 

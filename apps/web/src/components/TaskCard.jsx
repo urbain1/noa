@@ -3,6 +3,8 @@ import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import { isTaskOverdue } from "../utils/taskOverdue";
 import { formatActionTimestamp } from "../utils/actionTimestamp";
 import { getDeadlineDisplay } from "../utils/taskDeadline";
+import { useEditLockView } from "../hooks/editLockContext";
+import EditLockNotice from "./EditLockNotice";
 
 const statusStyles = {
   Pending: "bg-yellow-100 text-yellow-800",
@@ -25,6 +27,12 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
   const overdue = isTaskOverdue(task);
   const repagedText = formatActionTimestamp(t, i18n.language, task.last_repaged_at, "repaged");
   const escalatedText = formatActionTimestamp(t, i18n.language, task.escalated_at, "escalated");
+  // A colleague has this task open for editing: its one-tap actions wait.
+  // Edit stays available; the dialog shows who holds it and offers Take over.
+  const { holderOf, nurses, currentNurseId } = useEditLockView();
+  const lockHolder = holderOf("task", task.id);
+  const locked = Boolean(lockHolder);
+  const lockedClass = "disabled:cursor-not-allowed disabled:opacity-50";
 
   // Layout is one wrapping column, not a two-column row.
   //
@@ -50,7 +58,8 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
         {!isCompleted && (
           <button
             onClick={() => onComplete?.(task)}
-            className="rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white"
+            disabled={locked}
+            className={`rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-600 transition-colors hover:bg-blue-600 hover:text-white ${lockedClass}`}
           >
             {t("taskCard.complete")}
           </button>
@@ -80,8 +89,9 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
           {overdue && (
             <button
               onClick={() => onRepage?.(task)}
+              disabled={locked}
               title={repagedText || undefined}
-              className="rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-600 hover:text-white"
+              className={`rounded-md bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700 transition-colors hover:bg-orange-600 hover:text-white ${lockedClass}`}
             >
               {t("taskCard.repage")}
             </button>
@@ -89,8 +99,9 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
           {overdue && (
             <button
               onClick={() => onEscalate?.(task)}
+              disabled={locked}
               title={escalatedText || undefined}
-              className="rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-600 hover:text-white"
+              className={`rounded-md bg-red-50 px-2.5 py-1 text-xs font-semibold text-red-700 transition-colors hover:bg-red-600 hover:text-white ${lockedClass}`}
             >
               {t("taskCard.escalate")}
             </button>
@@ -102,6 +113,7 @@ export default function TaskCard({ task, isNew, onComplete, onEdit, onRepage, on
           unbroken token (a drug name, a pasted identifier) that would
           otherwise widen the card past the viewport. */}
       <p className="mt-2 break-words font-medium leading-snug text-gray-900">{task.description}</p>
+      <EditLockNotice holder={lockHolder} nurses={nurses} currentNurseId={currentNurseId} className="mt-2" />
 
       {/* Metadata last: when it was raised, when it is due, and what has
           been done about it. */}

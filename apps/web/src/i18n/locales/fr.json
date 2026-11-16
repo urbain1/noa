@@ -540,5 +540,36 @@
       },
       "other": "un autre champ"
     }
+  },
+  "editLock": {
+    "lockedBy": "{{name}} est en train de modifier cet élément. Patientez, ou demandez-lui de terminer.",
+    "lockedBySelf": "Vous modifiez déjà cet élément dans une autre fenêtre.",
+    "aColleague": "Un(e) collègue",
+    "takeOver": "Prendre la main",
+    "takeOverTitle": "Prendre la main sur la modification ?",
+    "takeOverBody": "{{name}} modifie cet élément en ce moment. Si vous prenez la main, son écran cesse aussitôt d'enregistrer et la personne en est informée. Ce qu'elle n'a pas encore enregistré reste sur son écran, pas dans Noa.",
+    "takeOverBodySelf": "Vous modifiez cet élément dans une autre fenêtre. Si vous prenez la main ici, cette fenêtre cesse d'enregistrer.",
+    "takenOver": "{{name}} a pris la main sur la modification. Cette fenêtre n'enregistre plus.",
+    "takenOverSelf": "Vous avez pris la main dans une autre fenêtre. Cette fenêtre n'enregistre plus.",
+    "pausedIdle": "Modification suspendue après 2 minutes d'inactivité, pour que vos collègues puissent modifier cet élément.",
+    "pausedOffline": "Connexion perdue. La modification est suspendue jusqu’au retour de la connexion.",
+    "waitingForConnection": "En attente de la connexion...",
+    "continueEditing": "Reprendre la modification",
+    "notSaved": "Non enregistré : {{fields}}",
+    "saveMine": "Enregistrer mes modifications",
+    "changedBy": "{{name}} a modifié cet élément après son ouverture : {{fields}} ({{time}}).",
+    "changedBySelf": "Vous avez modifié cet élément dans une autre fenêtre après l'avoir ouvert ici : {{fields}} ({{time}}).",
+    "changedBySomeone": "Quelqu'un d'autre a modifié cet élément après son ouverture : {{fields}}.",
+    "keepMine": "Enregistrer les miennes quand même",
+    "discardMine": "Abandonner les miennes et recharger",
+    "deletedBy": "Cet élément a été supprimé par {{name}}. Les modifications ne peuvent pas être enregistrées.",
+    "deletedBySelf": "Vous avez supprimé cet élément dans une autre fenêtre. Les modifications ne peuvent pas être enregistrées.",
+    "deletedBySomeone": "Cet élément a été supprimé par quelqu'un d'autre. Les modifications ne peuvent pas être enregistrées.",
+    "connecting": "Vérification qu'aucun collègue ne modifie cet élément...",
+    "rechecking": "Vérification des modifications faites entre-temps...",
+    "unavailable": "Le verrouillage en direct n'est pas disponible pour le moment. Les modifications faites par d'autres sont quand même vérifiées avant l'enregistrement.",
+    "closeUnsaved": "Vos modifications n'ont pas été enregistrées ({{fields}}). Fermer quand même ?",
+    "deleteBlockedConflict": "Cette tâche a été modifiée après son ouverture. Rien n'a été supprimé. Vérifiez d'abord les modifications.",
+    "deleteBlockedLock": "Vous n'avez plus la main sur cette tâche. Rien n'a été supprimé."
   }
 }

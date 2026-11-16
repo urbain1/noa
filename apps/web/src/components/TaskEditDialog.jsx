@@ -6,7 +6,11 @@ import AssigneeSelect from "./AssigneeSelect";
 import { isDeleteCommand } from "../utils/taskEditParse";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
+import { useEditSession } from "../hooks/useEditSession";
+import { fetchTaskRow } from "../lib/patients";
 import { errorText } from "../utils/errors";
+import { columnLabels } from "../utils/historyFormat";
+import EditLockBanner from "./EditLockBanner";
 
 // How long description/deadline wait after the last keystroke before
 // saving -- long enough that a fast typist doesn't fire a write per
@@ -56,7 +60,45 @@ function toLocalDatetimeValue(deadline) {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
-export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, onAssign, onCancel, onUpdate, onManualUpdate }) {
+// Manual-mode fields, named by their tasks column. Values are held the way
+// the inputs need them (deadline in local "YYYY-MM-DDTHH:mm"); `toDb` gives
+// the value that would be written.
+const MANUAL_FIELDS = ["description", "status", "department", "priority", "deadline", "assigned_to"];
+
+function fieldsFromTask(task) {
+  return {
+    description: task?.description || "",
+    status: task?.status || "Pending",
+    department: task?.department || "Other",
+    priority: task?.priority || "Routine",
+    deadline: toLocalDatetimeValue(task?.deadline),
+    assigned_to: task?.assigned_to || null,
+  };
+}
+
+function toDb(field, value) {
+  if (field === "deadline") return value ? new Date(value).toISOString() : null;
+  if (field === "assigned_to") return value || null;
+  return value;
+}
+
+// Deadlines are compared to the minute: the input has no seconds, a stored
+// deadline may.
+function sameDbValue(field, a, b) {
+  if (field === "deadline") {
+    if (!a || !b) return !a && !b;
+    return Math.floor(Date.parse(a) / 60000) === Math.floor(Date.parse(b) / 60000);
+  }
+  return (a ?? null) === (b ?? null);
+}
+
+// Fields whose value in the form isn't what `row` (the last saved state)
+// holds: what would be lost if the dialog vanished now.
+function unsavedFieldsOf(fields, row) {
+  return MANUAL_FIELDS.filter((f) => !sameDbValue(f, toDb(f, fields[f]), row?.[f] ?? null));
+}
+
+export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, facilityId, onRowRefreshed, onAssign, onCancel, onUpdate, onManualUpdate }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
@@ -64,13 +106,27 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
   const [editMode, setEditMode] = useState("manual"); // "manual" or "ai"
-  const [manualFields, setManualFields] = useState({
-    description: task?.description || "",
-    status: task?.status || "Pending",
-    department: task?.department || "Other",
-    priority: task?.priority || "Routine",
-    deadline: toLocalDatetimeValue(task?.deadline),
+  const [manualFields, setManualFields] = useState(() => fieldsFromTask(task));
+  // Fields with a debounced save waiting to fire (description, deadline).
+  const [pending, setPending] = useState({});
+  const [closing, setClosing] = useState(false);
+
+  // Lock + stale-write protection (hooks/useEditSession.js). Every write
+  // below goes through `guard`; when it refuses (lock taken over, paused,
+  // or the task changed under us) the typed value stays in the field and the
+  // banner lists it as not saved. Nothing is dropped without the nurse
+  // choosing to.
+  const session = useEditSession({
+    recordType: "task",
+    recordId: task.id,
+    facilityId,
+    initialRow: task,
+    loadRow: () => fetchTaskRow(facilityId, task.id),
+    onFreshRow: (row) => onRowRefreshed?.("task", row),
+    onBaselineReplaced: (row) => setManualFields(fieldsFromTask(row)),
+    hasUnsaved: (baselineRow) => unsavedFieldsOf(manualFields, baselineRow).length > 0,
   });
+  const { guard, canEdit } = session;
 
   // Per-field auto-save state, on the same primitive every other async
   // operation in the app uses. Operations are keyed by DB column name
@@ -79,9 +135,10 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   const ops = useOperationStatus();
   const isProcessing = ops.isRunning("applyCommand");
   const debounceTimers = useRef({});
-  const lastCommitted = useRef({
-    description: task?.description || "",
-    deadline: task?.deadline || null,
+  // The last saved row, for debounce callbacks that fire after renders.
+  const baselineRef = useRef(session.baseline);
+  useEffect(() => {
+    baselineRef.current = session.baseline;
   });
 
   useEffect(() => {
@@ -94,30 +151,42 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   const { run } = ops;
 
   // The one place that actually writes a field. `dbValue` is already in the
-  // shape the database expects (deadline as ISO, everything else as-is).
+  // shape the database expects (deadline as ISO, assignee as id or null).
+  // Resolves true once the value is saved, false otherwise.
   const commitField = useCallback(
     async (field, dbValue) => {
       setError(null);
       try {
-        await run(
+        const saved = await run(
           field,
           {
-            messageKey: "common.saving",
+            messageKey: field === "assigned_to" ? "status.assigning" : "common.saving",
             doneKey: "common.saved",
             errorKey: "status.failed",
             surface: "inline",
           },
-          () => onManualUpdate({ [field]: dbValue }, task, patientId),
+          () =>
+            guard(() =>
+              field === "assigned_to"
+                ? onAssign(task, dbValue)
+                : onManualUpdate({ [field]: dbValue }, task, patientId)
+            ),
         );
+        // onAssign reports its own failures (alert) and resolves undefined.
+        return Boolean(saved);
       } catch (err) {
+        // Refused by the lock or by a change made by someone else: the
+        // banner says why and the value stays in the field.
+        if (err?.code === "EDIT_NOT_HELD" || err?.code === "EDIT_CONFLICT") return false;
         // The inline marker says the save failed; the banner says why.
         // FL6: "why" is the translated message, not the provider's own
         // English text -- that goes to the console instead.
         console.error("Task field save error:", field, err);
         setError(errorText(err, t("errors.updateTask")));
+        return false;
       }
     },
-    [onManualUpdate, task, patientId, t, run]
+    [guard, onAssign, onManualUpdate, task, patientId, t, run]
   );
 
   // Selects/status/department/priority save the moment they change -- a
@@ -128,77 +197,111 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   const scheduleField = useCallback(
     (field, dbValue) => {
       clearTimeout(debounceTimers.current[field]);
+      setPending((prev) => ({ ...prev, [field]: true }));
       debounceTimers.current[field] = setTimeout(() => {
-        if (dbValue === lastCommitted.current[field]) return;
-        lastCommitted.current[field] = dbValue;
+        debounceTimers.current[field] = null;
+        setPending((prev) => ({ ...prev, [field]: false }));
+        if (sameDbValue(field, dbValue, baselineRef.current?.[field] ?? null)) return;
         commitField(field, dbValue);
       }, DEBOUNCE_MS);
     },
     [commitField]
   );
 
+  const setField = (field, value) => setManualFields((prev) => ({ ...prev, [field]: value }));
+
   const handleDescriptionChange = (value) => {
-    setManualFields((prev) => ({ ...prev, description: value }));
+    setField("description", value);
     scheduleField("description", value);
   };
 
   const handleDeadlineChange = (value) => {
-    setManualFields((prev) => ({ ...prev, deadline: value }));
-    scheduleField("deadline", value ? new Date(value).toISOString() : null);
+    setField("deadline", value);
+    scheduleField("deadline", toDb("deadline", value));
   };
 
   const handleStatusChange = (value) => {
-    setManualFields((prev) => ({ ...prev, status: value }));
+    setField("status", value);
     commitField("status", value);
   };
 
   const handleDepartmentChange = (value) => {
-    setManualFields((prev) => ({ ...prev, department: value }));
+    setField("department", value);
     commitField("department", value);
   };
 
   const handlePriorityChange = (value) => {
-    setManualFields((prev) => ({ ...prev, priority: value }));
+    setField("priority", value);
     commitField("priority", value);
   };
 
-  // Flushes any pending debounced save immediately rather than dropping it
-  // -- closing right after typing shouldn't lose the edit just because the
-  // debounce window hadn't elapsed yet.
-  const handleClose = () => {
-    Object.entries(debounceTimers.current).forEach(([field, timer]) => {
-      if (!timer) return;
-      clearTimeout(timer);
-      const raw = field === "deadline" ? manualFields.deadline : manualFields[field];
-      const dbValue = field === "deadline" ? (raw ? new Date(raw).toISOString() : null) : raw;
-      if (dbValue !== lastCommitted.current[field]) {
-        onManualUpdate({ [field]: dbValue }, task, patientId).catch(() => {});
-      }
-    });
-    onCancel();
+  // Everything typed but not saved. While saving is possible, fields still
+  // waiting on their debounce or mid-save aren't listed: they're on their way.
+  const unsavedFields = unsavedFieldsOf(manualFields, session.baseline);
+  const blockedFields = canEdit
+    ? unsavedFields.filter((f) => !pending[f] && !ops.isRunning(f))
+    : unsavedFields;
+
+  // Writes the given fields one by one; true only if every one was saved.
+  const saveFields = async (fields, values = manualFields) => {
+    let allSaved = true;
+    for (const field of fields) {
+      const ok = await commitField(field, toDb(field, values[field]));
+      allSaved = allSaved && ok;
+    }
+    return allSaved;
   };
 
-  // onAssign (App.jsx handleAssignTask) already reports its own failures via
-  // alert() and never rejects -- same contract AssigneeSelect relies on --
-  // so there's nothing to catch here, only the pending state to track.
-  const assignTo = (nurseId) =>
-    ops.run(
-      "assigned_to",
-      {
-        messageKey: "status.assigning",
-        doneKey: "common.saved",
-        errorKey: "status.failed",
-        surface: "inline",
-      },
-      () => onAssign(task, nurseId),
-    );
+  const handleSaveUnsaved = () => saveFields(blockedFields);
 
-  const handleAssigneeChange = (nurseId) => assignTo(nurseId);
+  // "Save mine anyway": take the colleague's version for every field I
+  // didn't change, keep mine for the ones I did, then write only mine.
+  const handleKeepMine = () => {
+    const fresh = session.conflict?.fresh;
+    if (!fresh) return;
+    const mine = unsavedFieldsOf(manualFields, session.baseline);
+    const merged = fieldsFromTask(fresh);
+    for (const f of mine) merged[f] = manualFields[f];
+    if (!session.keepMine()) return;
+    setManualFields(merged);
+    saveFields(mine, merged);
+  };
+
+  // Closing never drops a typed value silently. Pending debounced saves are
+  // written now, and the dialog only closes once they have landed. If saving
+  // isn't possible (lock lost, paused, conflict), the nurse is asked first.
+  const handleClose = async () => {
+    if (closing) return;
+    Object.values(debounceTimers.current).forEach((timer) => timer && clearTimeout(timer));
+    debounceTimers.current = {};
+    setPending({});
+
+    const unsaved = unsavedFieldsOf(manualFields, baselineRef.current);
+    if (unsaved.length === 0) {
+      onCancel();
+      return;
+    }
+    if (canEdit) {
+      setClosing(true);
+      const allSaved = await saveFields(unsaved);
+      setClosing(false);
+      // If anything was refused, stay open: the banner lists what wasn't saved.
+      if (allSaved) onCancel();
+      return;
+    }
+    const fieldsText = columnLabels(t, "task", unsaved).join(", ");
+    if (window.confirm(t("editLock.closeUnsaved", { fields: fieldsText }))) onCancel();
+  };
+
+  const handleAssigneeChange = (nurseId) => {
+    setField("assigned_to", nurseId || null);
+    return commitField("assigned_to", nurseId || null);
+  };
 
   const assigningToMe = ops.isRunning("assigned_to");
   const handleAssignToMe = () => {
-    if (!currentNurseId || assigningToMe) return;
-    assignTo(currentNurseId);
+    if (!currentNurseId || assigningToMe || !canEdit) return;
+    handleAssigneeChange(currentNurseId);
   };
 
   const finalCommand = voiceTranscript.trim() || textCommand.trim();
@@ -268,15 +371,21 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     }
     setIsRecording(false);
 
-    if (!finalCommand) return;
+    if (!finalCommand || !canEdit) return;
     setError(null);
     try {
+      // The stale-write check runs before the command is applied. `guard` is
+      // also handed over so that a command read as a delete is checked again
+      // at the moment the nurse confirms it (App.handleConfirmDeleteTask).
       await ops.run(
         "applyCommand",
         { messageKey: "status.applyingChanges", errorKey: "status.failed", surface: "button" },
-        () => onUpdate(finalCommand, task, patientId),
+        () => guard(() => onUpdate(finalCommand, task, patientId, guard)),
       );
     } catch (err) {
+      // Refused by the lock or a conflicting change: the banner explains and
+      // the command stays in the box.
+      if (err?.code === "EDIT_NOT_HELD" || err?.code === "EDIT_CONFLICT") return;
       // On success the dialog closes; on failure it stays, un-stuck, with
       // the reason on screen. `handleAiUpdateTask` marks the messages it
       // has already translated ("Couldn't understand that change...") and
@@ -297,6 +406,9 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
       <div
         className="relative flex w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
+        onPointerDownCapture={session.touch}
+        onKeyDownCapture={session.touch}
+        onInputCapture={session.touch}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
@@ -314,6 +426,19 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
         {/* Body */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          {/* Lock and change-detection state: who else is editing, what
+              wasn't saved and why, and the way back. Above the mode toggle so
+              it shows in both modes. */}
+          <EditLockBanner
+            session={session}
+            recordType="task"
+            unsavedColumns={blockedFields}
+            onKeepMine={handleKeepMine}
+            onDiscardMine={session.discardMine}
+            onSaveUnsaved={handleSaveUnsaved}
+            busy={closing}
+          />
+
           {/* Mode toggle */}
           <div className="flex rounded-lg bg-gray-100 p-1">
             <button
@@ -378,8 +503,9 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                 <textarea
                   value={manualFields.description}
                   onChange={(e) => handleDescriptionChange(e.target.value)}
+                  disabled={!canEdit}
                   rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none disabled:bg-gray-50 disabled:text-gray-600"
                 />
               </div>
 
@@ -392,7 +518,8 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                 <select
                   value={manualFields.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
                 >
                   {STATUS_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{statusLabel(t, opt)}</option>
@@ -409,7 +536,8 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                 <select
                   value={manualFields.department}
                   onChange={(e) => handleDepartmentChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
                 >
                   {DEPARTMENT_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{departmentLabel(t, opt)}</option>
@@ -426,7 +554,8 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                 <select
                   value={manualFields.priority}
                   onChange={(e) => handlePriorityChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
                 >
                   {PRIORITY_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{priorityLabel(t, opt)}</option>
@@ -444,7 +573,8 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                   type="datetime-local"
                   value={manualFields.deadline}
                   onChange={(e) => handleDeadlineChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  disabled={!canEdit}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-600"
                 />
                 <p className="mt-1 text-xs text-gray-400">{t("taskEdit.deadlineHint")}</p>
               </div>
@@ -460,16 +590,17 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                     <div className="flex-1">
                       <AssigneeSelect
                         compact
-                        value={task?.assigned_to || ""}
+                        value={manualFields.assigned_to || ""}
                         nurses={nurses}
                         onChange={handleAssigneeChange}
+                        disabled={!canEdit}
                       />
                     </div>
-                    {currentNurseId && task?.assigned_to !== currentNurseId && (
+                    {currentNurseId && manualFields.assigned_to !== currentNurseId && (
                       <button
                         type="button"
                         onClick={handleAssignToMe}
-                        disabled={assigningToMe}
+                        disabled={assigningToMe || !canEdit}
                         className="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {assigningToMe ? t("status.assigning") : t("taskEdit.assignToMe")}
@@ -628,14 +759,15 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={handleClose}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
+            disabled={closing}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {editMode === "manual" ? t("common.close") : t("common.cancel")}
+            {closing ? t("common.saving") : editMode === "manual" ? t("common.close") : t("common.cancel")}
           </button>
           {editMode === "ai" && (
             <button
               onClick={handleApply}
-              disabled={!finalCommand || isProcessing}
+              disabled={!finalCommand || isProcessing || !canEdit}
               className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isProcessing ? (

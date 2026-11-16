@@ -16,6 +16,37 @@ export async function fetchPatients() {
   return data
 }
 
+// Fresh single-row reads for the edit dialogs' stale-write check
+// (hooks/useEditSession.js): the row as it is in the database right now,
+// compared with the row the dialog started from before anything is saved.
+// Return null when the row no longer exists (deleted by someone else).
+//
+// Unlike the older queries in this file, these carry an explicit
+// facility_id filter as CLAUDE.md requires, on top of RLS.
+export async function fetchPatientRow(facilityId, patientId) {
+  const { data, error } = await supabase
+    .from('patients')
+    .select('*')
+    .eq('id', patientId)
+    .eq('facility_id', facilityId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+export async function fetchTaskRow(facilityId, taskId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', taskId)
+    .eq('facility_id', facilityId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function createPatient(facilityId, fields) {
   const { data, error } = await supabase
     .from('patients')

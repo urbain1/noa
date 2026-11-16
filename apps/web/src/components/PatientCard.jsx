@@ -9,6 +9,8 @@ import { codeStatusLabel, departmentLabel } from "../i18n/enums";
 import { getActiveDischargeTasks } from "../utils/discharge";
 import OperationStatus from "./OperationStatus";
 import PatientActionsMenu from "./PatientActionsMenu";
+import EditLockNotice from "./EditLockNotice";
+import { useEditLockView } from "../hooks/editLockContext";
 import { useOperationStatus } from "../hooks/useOperationStatus";
 
 // Removed: a second, legacy discharge indicator -- a blue pill beside the
@@ -51,6 +53,11 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
   const patientUpdateLoading = ops.isRunning("patientUpdate");
   const [dischargeDetailOpen, setDischargeDetailOpen] = useState(false);
   const [cancellingDischarge, setCancellingDischarge] = useState(false);
+  // Edit locks: this patient record, and (for cancelling discharge planning,
+  // which writes its tasks) each discharge task. Only the records being
+  // edited are affected; adding tasks and notes is never blocked.
+  const { holderOf, nurses, currentNurseId } = useEditLockView();
+  const patientLockHolder = holderOf("patient", patient.id);
 
   const tasks = patient.tasks || [];
   const notes = patient.notes || [];
@@ -153,6 +160,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
 
   const activeDischargeTasks = useMemo(() => getActiveDischargeTasks(patient.tasks), [patient.tasks]);
   const dischargePlanned = activeDischargeTasks.length > 0;
+  const dischargeTaskLockHolder = activeDischargeTasks.map((task) => holderOf("task", task.id)).find(Boolean) || null;
   const dischargePlannedAt = dischargePlanned
     ? activeDischargeTasks.reduce(
         (earliest, task) => (task.created_at < earliest ? task.created_at : earliest),
@@ -169,7 +177,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
     : null;
 
   const handleCancelDischargePlanning = () => {
-    if (!onCancelDischargePlanning || cancellingDischarge) return;
+    if (!onCancelDischargePlanning || cancellingDischarge || dischargeTaskLockHolder) return;
     setCancellingDischarge(true);
     Promise.resolve(onCancelDischargePlanning(patient, activeDischargeTasks.map((t) => t.id))).finally(() => {
       setCancellingDischarge(false);
@@ -222,6 +230,7 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
               {t("patientCard.allergies", { list: patient.allergies.join(", ") })}
             </p>
           )}
+          <EditLockNotice holder={patientLockHolder} nurses={nurses} currentNurseId={currentNurseId} className="mt-2" />
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-600 ring-1 ring-blue-200">
@@ -311,10 +320,11 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
               </li>
             ))}
           </ul>
+          <EditLockNotice holder={dischargeTaskLockHolder} nurses={nurses} currentNurseId={currentNurseId} className="mt-2" />
           <button
             type="button"
             onClick={handleCancelDischargePlanning}
-            disabled={cancellingDischarge}
+            disabled={cancellingDischarge || Boolean(dischargeTaskLockHolder)}
             className="mt-2.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200 transition-colors hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancellingDischarge ? t("common.saving") : t("patientCard.cancelDischargePlanning")}

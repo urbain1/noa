@@ -469,3 +469,32 @@ history.columns.note.type,note type,type de note
 history.columns.note.author,author,auteur
 history.columns.note.patient,patient,patient
 history.columns.other,another field,un autre champ
+editLock.lockedBy,"{{name}} is currently editing this. Wait, or ask them to finish.","{{name}} est en train de modifier cet élément. Patientez, ou demandez-lui de terminer."
+editLock.lockedBySelf,You're already editing this in another window.,Vous modifiez déjà cet élément dans une autre fenêtre.
+editLock.aColleague,A colleague,Un(e) collègue
+editLock.takeOver,Take over,Prendre la main
+editLock.takeOverTitle,Take over editing?,Prendre la main sur la modification ?
+editLock.takeOverBody,"{{name}} is editing this right now. If you take over, their screen stops saving straight away and they're told you took over. Anything they haven't saved stays on their screen, not in Noa.","{{name}} modifie cet élément en ce moment. Si vous prenez la main, son écran cesse aussitôt d'enregistrer et la personne en est informée. Ce qu'elle n'a pas encore enregistré reste sur son écran, pas dans Noa."
+editLock.takeOverBodySelf,"You're editing this in another window. If you take over here, that window stops saving.","Vous modifiez cet élément dans une autre fenêtre. Si vous prenez la main ici, cette fenêtre cesse d'enregistrer."
+editLock.takenOver,{{name}} took over editing. This window no longer saves.,{{name}} a pris la main sur la modification. Cette fenêtre n'enregistre plus.
+editLock.takenOverSelf,You took over in another window. This window no longer saves.,Vous avez pris la main dans une autre fenêtre. Cette fenêtre n'enregistre plus.
+editLock.pausedIdle,"Editing paused after 2 minutes without activity, so colleagues can edit this.","Modification suspendue après 2 minutes d'inactivité, pour que vos collègues puissent modifier cet élément."
+editLock.pausedOffline,Connection lost. Editing is paused until you're back online.,Connexion perdue. La modification est suspendue jusqu’au retour de la connexion.
+editLock.waitingForConnection,Waiting for the connection...,En attente de la connexion...
+editLock.continueEditing,Continue editing,Reprendre la modification
+editLock.notSaved,Not saved: {{fields}},Non enregistré : {{fields}}
+editLock.saveMine,Save my changes,Enregistrer mes modifications
+editLock.changedBy,{{name}} changed this after you opened it: {{fields}} ({{time}}).,{{name}} a modifié cet élément après son ouverture : {{fields}} ({{time}}).
+editLock.changedBySelf,You changed this in another window after opening it here: {{fields}} ({{time}}).,Vous avez modifié cet élément dans une autre fenêtre après l'avoir ouvert ici : {{fields}} ({{time}}).
+editLock.changedBySomeone,Someone else changed this after you opened it: {{fields}}.,Quelqu'un d'autre a modifié cet élément après son ouverture : {{fields}}.
+editLock.keepMine,Save mine anyway,Enregistrer les miennes quand même
+editLock.discardMine,Discard mine and reload,Abandonner les miennes et recharger
+editLock.deletedBy,This was deleted by {{name}}. Changes can't be saved.,Cet élément a été supprimé par {{name}}. Les modifications ne peuvent pas être enregistrées.
+editLock.deletedBySelf,You deleted this in another window. Changes can't be saved.,Vous avez supprimé cet élément dans une autre fenêtre. Les modifications ne peuvent pas être enregistrées.
+editLock.deletedBySomeone,This was deleted by someone else. Changes can't be saved.,Cet élément a été supprimé par quelqu'un d'autre. Les modifications ne peuvent pas être enregistrées.
+editLock.connecting,Checking whether a colleague is editing this...,Vérification qu'aucun collègue ne modifie cet élément...
+editLock.rechecking,Checking for changes made in the meantime...,Vérification des modifications faites entre-temps...
+editLock.unavailable,Live edit locking isn't available right now. Changes made by others are still checked before saving.,Le verrouillage en direct n'est pas disponible pour le moment. Les modifications faites par d'autres sont quand même vérifiées avant l'enregistrement.
+editLock.closeUnsaved,Your changes were not saved ({{fields}}). Close anyway?,Vos modifications n'ont pas été enregistrées ({{fields}}). Fermer quand même ?
+editLock.deleteBlockedConflict,This task changed after you opened it. Nothing was deleted. Check the changes first.,Cette tâche a été modifiée après son ouverture. Rien n'a été supprimé. Vérifiez d'abord les modifications.
+editLock.deleteBlockedLock,You no longer hold this task for editing. Nothing was deleted.,Vous n'avez plus la main sur cette tâche. Rien n'a été supprimé.

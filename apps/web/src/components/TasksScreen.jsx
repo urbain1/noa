@@ -4,6 +4,7 @@ import TaskCard from "./TaskCard";
 import TopRightMenu from "./TopRightMenu";
 import ViewSwitcher from "./ViewSwitcher";
 import AssigneeSelect from "./AssigneeSelect";
+import { useEditLockView } from "../hooks/editLockContext";
 import { departmentLabel, priorityLabel, statusLabel } from "../i18n/enums";
 import { sortTasks, taskSortGroup, SORT_GROUP_URGENT, SORT_GROUP_OVERDUE } from "../utils/taskSort";
 import { isTaskOverdue } from "../utils/taskOverdue";
@@ -54,6 +55,10 @@ function formatDeadline(deadline, tag) {
 // different ways to act on a task.
 function TaskRow({ task, patient, nurses, expanded, onToggle, onOpenPatient, onOpenTask, onComplete, onEdit, onRepage, onEscalate, onAssign }) {
   const { t, i18n } = useTranslation();
+  // While a colleague edits this task, the inline picker waits like the
+  // card's other one-tap actions (the card itself shows who is editing).
+  const { holderOf } = useEditLockView();
+  const locked = Boolean(holderOf("task", task.id));
   const group = taskSortGroup(task);
   const deadlineText = formatDeadline(task.deadline, localeTag(i18n.language));
   const overdue = isTaskOverdue(task);
@@ -150,6 +155,7 @@ function TaskRow({ task, patient, nurses, expanded, onToggle, onOpenPatient, onO
               value={task.assigned_to || ""}
               nurses={nurses}
               onChange={(nurseId) => onAssign(task, nurseId)}
+              disabled={locked}
             />
           </div>
         </div>

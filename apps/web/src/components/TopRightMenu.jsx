@@ -6,6 +6,8 @@ import { formatActionTimestamp } from "../utils/actionTimestamp";
 import { isDischargePlanned } from "../utils/discharge";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
+import { useEditLockView } from "../hooks/editLockContext";
+import EditLockNotice from "./EditLockNotice";
 
 // Real Supabase patient rows carry `label`, `location_label` and
 // `diagnosis`. The demo-era `name`/`room` fields these lists used to read
@@ -31,6 +33,7 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
   // looking. App deliberately doesn't also toast it.
   const ops = useOperationStatus();
   const handoffLoading = ops.isRunning("shiftHandoff");
+  const { holderOf, nurses, currentNurseId } = useEditLockView();
 
   const handleGenerateHandoff = () => {
     if (handoffLoading) return;
@@ -221,6 +224,8 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                 {delayedTasks.map((task) => {
                   const repagedText = formatActionTimestamp(t, i18n.language, task.last_repaged_at, "repaged");
                   const escalatedText = formatActionTimestamp(t, i18n.language, task.escalated_at, "escalated");
+                  // A colleague is editing this task: its one-tap actions wait.
+                  const lockHolder = holderOf("task", task.id);
                   return (
                     <div key={task.id} className="px-4 py-3">
                       <p className="text-sm font-medium text-gray-900">{task.description}</p>
@@ -232,19 +237,22 @@ export default function TopRightMenu({ patients, delayedTasks, onGenerateHandoff
                       <div className="flex gap-2 mt-2">
                         <button
                           onClick={() => onRepageTask(task)}
+                          disabled={Boolean(lockHolder)}
                           title={repagedText || undefined}
-                          className="rounded-lg border-2 border-orange-400 bg-white px-3 py-1.5 text-xs font-semibold text-orange-600 hover:bg-orange-50"
+                          className="rounded-lg border-2 border-orange-400 bg-white px-3 py-1.5 text-xs font-semibold text-orange-600 hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {t("topMenu.repage")}
                         </button>
                         <button
                           onClick={() => onEscalateTask(task)}
+                          disabled={Boolean(lockHolder)}
                           title={escalatedText || undefined}
-                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600"
+                          className="rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {t("topMenu.escalate")}
                         </button>
                       </div>
+                      <EditLockNotice holder={lockHolder} nurses={nurses} currentNurseId={currentNurseId} className="mt-2" />
                       {(repagedText || escalatedText) && (
                         <div className="mt-1.5 flex flex-wrap gap-x-2 text-[11px] text-gray-400">
                           {repagedText && <span>{repagedText}</span>}

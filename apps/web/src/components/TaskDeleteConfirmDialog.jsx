@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { errorText } from "../utils/errors";
 
 // The second, explicit confirmation for the one action in the app that
 // destroys a row: the AI edit dialog's "delete this task" command.
@@ -30,8 +31,11 @@ export default function TaskDeleteConfirmDialog({ task, command, onCancel, onCon
     try {
       await onConfirm();
     } catch (err) {
+      // A delete refused by the edit lock or by a change made since the
+      // dialog opened arrives already translated ("Nothing was deleted...")
+      // and is shown as-is; anything else gets the generic message (FL6).
       console.error("Delete task error:", err);
-      setError(t("errors.deleteTask"));
+      setError(errorText(err, t("errors.deleteTask")));
       setDeleting(false);
     }
   }

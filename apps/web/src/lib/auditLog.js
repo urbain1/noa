@@ -36,6 +36,30 @@ function unavailableError(cause) {
   return err
 }
 
+// Who last changed one record, and when, for the edit dialogs' stale-write
+// message ("Nurse X changed this after you opened it"). Returns
+// { nurse_id, created_at } or null when there is nothing to say: no audit
+// row, or the audit log isn't readable yet (0012 not applied), in which case
+// the message falls back to "someone else".
+export async function fetchLastChange(facilityId, resourceId) {
+  if (!facilityId || !resourceId) return null
+
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select('nurse_id, created_at')
+    .eq('facility_id', facilityId)
+    .eq('resource_id', resourceId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    if (isAuditUnavailable(error)) return null
+    throw error
+  }
+  return data
+}
+
 // One page of a patient's history, newest first: the patient row itself
 // plus every task and note that belongs (or belonged) to it. Deleted tasks
 // and notes are still here, because audit_log.patient_id has no foreign key.
