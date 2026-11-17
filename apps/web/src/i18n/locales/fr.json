@@ -624,6 +624,7 @@
     "choosePatientNone": "Aucun patient n'a été nommé.",
     "suggested": "Correspondances possibles",
     "allPatients": "Tous les patients",
+    "otherTasks": "Autres tâches",
     "createThisPatient": "Créer {{label}}",
     "createNewPatient": "Créer un nouveau patient",
     "chooseTaskTitle": "Quelle tâche ?",

@@ -118,7 +118,7 @@
     { "id": "en-41", "split": "tune", "tags": ["ambiguous_task"],
       "transcript": "the BMP for patient 5 is done",
       "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_5", "task": null, "fields": { "status": "Completed" } } ] } },
-    { "id": "en-42", "split": "holdout", "tags": ["ambiguous_task", "synonym"],
+    { "id": "en-42", "split": "tune", "tags": ["ambiguous_task", "synonym", "generic_term", "was_holdout"],
       "transcript": "the bloods for patient 4 are back",
       "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_4", "task": null, "fields": { "status": "Completed" } } ] } },
     { "id": "en-43", "split": "tune", "tags": ["nonexistent_patient"],
@@ -193,6 +193,18 @@
       "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_12", "fields": { "diagnosis": { "all": ["pneumonia"] } } } ] } },
     { "id": "en-65", "split": "tune", "tags": ["edit_patient", "not_a_delete"],
       "transcript": "remove penicillin from patient 1's allergies",
-      "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_1", "fields": { "allergies_remove": ["penicillin"] } } ] } }
+      "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_1", "fields": { "allergies_remove": ["penicillin"] } } ] } },
+    { "id": "en-66", "split": "tune", "tags": ["ambiguous_task", "generic_term", "edit_task"],
+      "transcript": "the scan for patient 1 is done",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_1", "task": null, "fields": { "status": "Completed" } } ] } },
+    { "id": "en-67", "split": "tune", "tags": ["generic_term", "edit_task"],
+      "transcript": "the lab work for patient 3 is back",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_3", "task": "A-t1", "fields": { "status": "Completed" } } ] } },
+    { "id": "en-68", "split": "holdout", "tags": ["ambiguous_task", "generic_term", "edit_task"],
+      "transcript": "mark the labs for patient 4 as completed",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_4", "task": null, "fields": { "status": "Completed" } } ] } },
+    { "id": "en-69", "split": "holdout", "tags": ["generic_term", "edit_task"],
+      "transcript": "the imaging for patient 3 is done",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_3", "task": "A-t2", "fields": { "status": "Completed" } } ] } }
   ]
 }

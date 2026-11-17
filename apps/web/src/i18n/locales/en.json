@@ -624,6 +624,7 @@
     "choosePatientNone": "No patient was named.",
     "suggested": "Possible matches",
     "allPatients": "All patients",
+    "otherTasks": "Other tasks",
     "createThisPatient": "Create {{label}}",
     "createNewPatient": "Create a new patient",
     "chooseTaskTitle": "Which task?",

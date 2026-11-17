@@ -18,6 +18,9 @@
 //   - The model never sees a database id. Tasks are shown under short
 //     aliases (t1, t2, ...) and mapped back here; an alias that is not in
 //     the list is rejected.
+//   - The model never decides which task is meant. It lists every task the
+//     words could refer to and the code below accepts a task only when that
+//     list has exactly one entry. Otherwise the nurse picks.
 //   - The model never computes a date. It describes the deadline that was
 //     said and `resolveDeadline` does the arithmetic in the nurse's timezone.
 //   - Whatever the model returns is validated field by field. Anything that
@@ -26,7 +29,7 @@
 export const VOICE_MODEL = "claude-sonnet-5-5";
 export const VOICE_EFFORT = "low";
 export const VOICE_MAX_TOKENS = 4096;
-export const PROMPT_VERSION = "2026-11-16.1";
+export const PROMPT_VERSION = "2026-11-17.1";
 
 export const MAX_ACTIONS = 5;
 
@@ -576,7 +579,7 @@ Each ACTION:
   "confidence": "high" | "medium" | "low",
   "patient_spoken": the patient reference exactly as it appears in the transcript, or null,
   "patient_label": "Patient_Test_N" or null,
-  "task_id": an id from the TASKS list, or null,
+  "task_candidates": [ids from the TASKS list] (edit_task only, otherwise []),
   "task_spoken": the words the nurse used for the task, or null,
   "fields": { only the fields that were actually said }
 }
@@ -650,10 +653,13 @@ You do not choose a patient. You report the reference.
 
 # Tasks (edit_task)
 
-- task_id must be an id from the TASKS list, belonging to the patient the nurse named, and only when exactly ONE of that patient's listed tasks matches what was said.
-- Match by meaning, not spelling: "bloods", "blood count", "CBC", "NFS", "numération", "bilan sanguin" can all mean a Complete Blood Count; "chest film", "CXR", "radio du thorax" a chest X-ray; "physio", "PT", "kiné" physical therapy.
-- If no listed task of that patient matches, or two or more could match, task_id is null. Never choose between candidates, and never take a task from another patient. The nurse will pick.
-- If the patient is not in the PATIENTS list, task_id is null.
+You do not decide which task is meant. You list the candidates, and the app decides: it uses a task only when your list has exactly one entry. With none or several, the nurse picks from a list. So a complete list is what matters, not a best guess.
+
+- task_candidates: every task in the TASKS list that belongs to the patient the nurse named AND that the nurse's words could refer to.
+- A specific name matches the task of that name, by meaning and not by spelling: "CBC", "blood count", "NFS", "numération" are a Complete Blood Count; "BMP" a Basic Metabolic Panel; "chest film", "CXR", "radio du thorax" a chest X-ray; "physio", "PT", "kiné" physical therapy; "ECBU" a urine culture.
+- A general word matches EVERY task of that kind the patient has, not the most likely one: "the bloods", "blood work", "the blood tests", "the labs", "le bilan", "le bilan sanguin", "la prise de sang", "la bio" match every blood or laboratory task; "the scan", "the imaging", "l'imagerie", "le scanner ou la radio" match every imaging task; "the test", "l'examen" match every test. List them all.
+- Two tasks with the same description are both candidates.
+- Only tasks of the patient the nurse named. Never a task of another patient, even if it matches the words perfectly. If that patient is not in the PATIENTS list, or has no matching task, the list is [].
 - task_spoken: the words used for the task ("the CBC", "la radio").
 - Status words: "done", "completed", "finished", "results are back", "fait", "terminé", "c'est fait" mean "Completed". "reopen", "not done after all", "rouvrir", "finalement pas fait" mean "Pending". "confirmed", "acknowledged", "the lab has it", "confirmé" mean "Confirmed". "delayed", "running late", "en retard", "retardé" mean "Delayed".
 
@@ -712,30 +718,30 @@ PATIENTS: Patient_Test_20 | Demo Bay 1 ; Patient_Test_21 | Demo Bay 2 ; Patient_
 TASKS: t1 | Patient_Test_20 | Electrocardiogram | Pending | Routine | Nursing | - ; t2 | Patient_Test_21 | Blood glucose check | Pending | Routine | Nursing | - ; t3 | Patient_Test_21 | Blood glucose check | Delayed | Routine | Nursing | - ; t4 | Patient_Test_22 | Abdominal ultrasound | Completed | Routine | Radiology | -
 
 Transcript: make the ECG for patient twenty stat and give it to Robin
-{"actions":[{"type":"edit_task","words":"make the ECG for patient twenty stat and give it to Robin","confidence":"high","patient_spoken":"patient twenty","patient_label":"Patient_Test_20","task_id":"t1","task_spoken":"the ECG","fields":{"priority":"Stat","assignee":"Robin"}}],"unparsed":[]}
+{"actions":[{"type":"edit_task","words":"make the ECG for patient twenty stat and give it to Robin","confidence":"high","patient_spoken":"patient twenty","patient_label":"Patient_Test_20","task_candidates":["t1"],"task_spoken":"the ECG","fields":{"priority":"Stat","assignee":"Robin"}}],"unparsed":[]}
 
 Transcript: new patient test 23 81 years old admitted with a hip fracture allergic to latex and for the same patient order a pelvic x-ray by 4pm
-{"actions":[{"type":"create_patient","words":"new patient test 23 81 years old admitted with a hip fracture allergic to latex","confidence":"high","patient_spoken":"patient test 23","patient_label":"Patient_Test_23","task_id":null,"task_spoken":null,"fields":{"age":81,"diagnosis":"Hip fracture","allergies":["latex"]}},{"type":"create_task","words":"for the same patient order a pelvic x-ray by 4pm","confidence":"high","patient_spoken":"the same patient","patient_label":"Patient_Test_23","task_id":null,"task_spoken":null,"fields":{"description":"Pelvic X-ray","department":"Radiology","deadline":{"kind":"at","day_offset":0,"time":"16:00","part":null}}}],"unparsed":[]}
+{"actions":[{"type":"create_patient","words":"new patient test 23 81 years old admitted with a hip fracture allergic to latex","confidence":"high","patient_spoken":"patient test 23","patient_label":"Patient_Test_23","task_candidates":[],"task_spoken":null,"fields":{"age":81,"diagnosis":"Hip fracture","allergies":["latex"]}},{"type":"create_task","words":"for the same patient order a pelvic x-ray by 4pm","confidence":"high","patient_spoken":"the same patient","patient_label":"Patient_Test_23","task_candidates":[],"task_spoken":null,"fields":{"description":"Pelvic X-ray","department":"Radiology","deadline":{"kind":"at","day_offset":0,"time":"16:00","part":null}}}],"unparsed":[]}
 
 Transcript: the glucose check for patient 21 is done
-{"actions":[{"type":"edit_task","words":"the glucose check for patient 21 is done","confidence":"high","patient_spoken":"patient 21","patient_label":"Patient_Test_21","task_id":null,"task_spoken":"the glucose check","fields":{"status":"Completed"}}],"unparsed":[]}
-(Two tasks of that patient match, so task_id is null.)
+{"actions":[{"type":"edit_task","words":"the glucose check for patient 21 is done","confidence":"high","patient_spoken":"patient 21","patient_label":"Patient_Test_21","task_candidates":["t2","t3"],"task_spoken":"the glucose check","fields":{"status":"Completed"}}],"unparsed":[]}
+(Two tasks of that patient match. Both are listed, and the app will ask the nurse which one.)
 
 Transcript: delete the ultrasound for patient 22 and add a note for patient test to one that she is nauseous
-{"actions":[{"type":"unsupported","words":"delete the ultrasound for patient 22","confidence":"high","patient_spoken":"patient 22","patient_label":"Patient_Test_22","task_id":null,"task_spoken":"the ultrasound","fields":{"reason":"delete"}},{"type":"create_note","words":"add a note for patient test to one that she is nauseous","confidence":"medium","patient_spoken":"patient test to one","patient_label":"Patient_Test_21","task_id":null,"task_spoken":null,"fields":{"text":"Patient is nauseous."}}],"unparsed":[]}
+{"actions":[{"type":"unsupported","words":"delete the ultrasound for patient 22","confidence":"high","patient_spoken":"patient 22","patient_label":"Patient_Test_22","task_candidates":[],"task_spoken":"the ultrasound","fields":{"reason":"delete"}},{"type":"create_note","words":"add a note for patient test to one that she is nauseous","confidence":"medium","patient_spoken":"patient test to one","patient_label":"Patient_Test_21","task_candidates":[],"task_spoken":null,"fields":{"text":"Patient is nauseous."}}],"unparsed":[]}
 
 Transcript: ok where did I put my pen right so yeah
 {"actions":[],"unparsed":[]}
 
 Transcript (French nurse): rouvrir l'échographie du patient 22 et me l'assigner puis noter pour le patient vingt qu'il a refusé son traitement ce matin
-{"actions":[{"type":"edit_task","words":"rouvrir l'échographie du patient 22 et me l'assigner","confidence":"high","patient_spoken":"patient 22","patient_label":"Patient_Test_22","task_id":"t4","task_spoken":"l'échographie","fields":{"status":"Pending","assign_to_self":true}},{"type":"create_note","words":"noter pour le patient vingt qu'il a refusé son traitement ce matin","confidence":"high","patient_spoken":"le patient vingt","patient_label":"Patient_Test_20","task_id":null,"task_spoken":null,"fields":{"text":"Le patient a refusé son traitement ce matin."}}],"unparsed":[]}
+{"actions":[{"type":"edit_task","words":"rouvrir l'échographie du patient 22 et me l'assigner","confidence":"high","patient_spoken":"patient 22","patient_label":"Patient_Test_22","task_candidates":["t4"],"task_spoken":"l'échographie","fields":{"status":"Pending","assign_to_self":true}},{"type":"create_note","words":"noter pour le patient vingt qu'il a refusé son traitement ce matin","confidence":"high","patient_spoken":"le patient vingt","patient_label":"Patient_Test_20","task_candidates":[],"task_spoken":null,"fields":{"text":"Le patient a refusé son traitement ce matin."}}],"unparsed":[]}
 
 Transcript (French nurse): demander un ionogramme en urgence pour le patient cette pour demain matin et préparer la sortie du patient 21 avec une place en EHPAD
-{"actions":[{"type":"create_task","words":"demander un ionogramme en urgence pour le patient cette pour demain matin","confidence":"medium","patient_spoken":"le patient cette","patient_label":"Patient_Test_7","task_id":null,"task_spoken":null,"fields":{"description":"Ionogramme sanguin","department":"Lab","priority":"Stat","deadline":{"kind":"at","day_offset":1,"time":null,"part":"morning"}}},{"type":"start_discharge_planning","words":"préparer la sortie du patient 21 avec une place en EHPAD","confidence":"high","patient_spoken":"patient 21","patient_label":"Patient_Test_21","task_id":null,"task_spoken":null,"fields":{"needs_nursing_home":true}}],"unparsed":[]}
+{"actions":[{"type":"create_task","words":"demander un ionogramme en urgence pour le patient cette pour demain matin","confidence":"medium","patient_spoken":"le patient cette","patient_label":"Patient_Test_7","task_candidates":[],"task_spoken":null,"fields":{"description":"Ionogramme sanguin","department":"Lab","priority":"Stat","deadline":{"kind":"at","day_offset":1,"time":null,"part":"morning"}}},{"type":"start_discharge_planning","words":"préparer la sortie du patient 21 avec une place en EHPAD","confidence":"high","patient_spoken":"patient 21","patient_label":"Patient_Test_21","task_candidates":[],"task_spoken":null,"fields":{"needs_nursing_home":true}}],"unparsed":[]}
 (There is no Patient_Test_7 in the list. The label still says 7, because that is what was said.)
 
 Transcript (French nurse): supprime la note du patient 20 et ouvre la relève
-{"actions":[{"type":"unsupported","words":"supprime la note du patient 20","confidence":"high","patient_spoken":"patient 20","patient_label":"Patient_Test_20","task_id":null,"task_spoken":null,"fields":{"reason":"delete"}},{"type":"open_handoff","words":"ouvre la relève","confidence":"high","patient_spoken":null,"patient_label":null,"task_id":null,"task_spoken":null,"fields":{"scope":"unit"}}],"unparsed":[]}`;
+{"actions":[{"type":"unsupported","words":"supprime la note du patient 20","confidence":"high","patient_spoken":"patient 20","patient_label":"Patient_Test_20","task_candidates":[],"task_spoken":null,"fields":{"reason":"delete"}},{"type":"open_handoff","words":"ouvre la relève","confidence":"high","patient_spoken":null,"patient_label":null,"task_candidates":[],"task_spoken":null,"fields":{"scope":"unit"}}],"unparsed":[]}`;
 
 const LANGUAGE_NAMES = { en: "English", fr: "French" };
 
@@ -804,7 +810,7 @@ function normaliseLabel(value) {
 }
 
 function unsupported(base, reason) {
-  return { ...base, type: "unsupported", task_id: null, fields: {}, reason };
+  return { ...base, type: "unsupported", task_id: null, task_candidates: [], fields: {}, reason };
 }
 
 /**
@@ -825,6 +831,7 @@ function validateAction(raw, input) {
       label: normaliseLabel(raw.patient_label),
     },
     task_id: null,
+    task_candidates: [],
     task_spoken: cleanString(raw.task_spoken, 120),
     fields: {},
   };
@@ -873,12 +880,27 @@ function validateAction(raw, input) {
     delete f.assign_to_self;
   }
 
-  // Task: an alias from the list, on the patient the nurse named.
-  if (spec.task && typeof raw.task_id === "string") {
-    const task = input.context.taskByAlias.get(raw.task_id.trim());
-    if (task && action.patient.label && task.patientLabel === action.patient.label) {
-      action.task_id = task.id;
+  // Task: the model lists candidates, this decides. A task is accepted only
+  // when the model named exactly one, it is in the list, and it belongs to
+  // the patient the nurse named. A list that also names something invalid
+  // (an unknown alias, another patient's task) is a model unsure of its
+  // target: nothing is accepted and the nurse picks.
+  if (spec.task) {
+    const named = Array.isArray(raw.task_candidates)
+      ? raw.task_candidates
+      : typeof raw.task_id === "string"
+        ? [raw.task_id]
+        : [];
+    const valid = [];
+    for (const alias of named.slice(0, 20)) {
+      const task = typeof alias === "string" ? input.context.taskByAlias.get(alias.trim()) : null;
+      if (task && action.patient.label && task.patientLabel === action.patient.label && !valid.includes(task.id)) {
+        valid.push(task.id);
+      }
     }
+    // Passed on so the task picker can list them first. Never used to select.
+    action.task_candidates = valid;
+    if (valid.length === 1 && named.length === 1) action.task_id = valid[0];
   }
 
   const missingRequired = (spec.required || []).some((name) => !(name in action.fields));

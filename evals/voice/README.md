@@ -14,12 +14,12 @@ ANTHROPIC_API_KEY=... npm run eval:voice
 - The runner never prints the key, the request headers or the environment.
 - Nothing under `apps/web/src` imports anything in this folder.
 - Options: `--lang en|fr`, `--tag delete`, `--only en-01,fr-07`, `--split tune|holdout`, `--effort low|medium|high`, `--concurrency N`, `--show-holdout`, `--record "note"`, `--dry` (prints the prompt, calls nothing). Pass them after `--`: `npm run eval:voice -- --lang fr`.
-- A full run is about 112 calls. Exit code 0 means the targets were met.
+- A full run is about 120 calls. Exit code 0 means the targets were met.
 
 ## Files
 
 - `fixtures.json`: two synthetic facilities (patients, tasks, nurse names). `Patient_Test_N` labels and invented names only.
-- `cases.en.json`, `cases.fr.json`: 56 utterances each. Every case has a `split`: `tune` (75 cases) or `holdout` (37 cases).
+- `cases.en.json`, `cases.fr.json`: 60 utterances each. Every case has a `split`: `tune` (80 cases) or `holdout` (40 cases). A held-out case whose failure has been read is moved to `tune` and tagged `was_holdout`, and fresh held-out cases are written for its class before the next run.
 - `score.mjs`: the scoring rules.
 - `run.mjs`: the runner.
 - `RESULTS.md`: one row per full run. Add one with `--record "what changed"`.

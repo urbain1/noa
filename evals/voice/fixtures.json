@@ -24,7 +24,8 @@
       { "id": "A-t11", "patient_id": "A-p4", "description": "Basic Metabolic Panel", "status": "Pending", "priority": "Stat", "department": "Lab", "assignee": null },
       { "id": "A-t12", "patient_id": "A-p13", "description": "12-lead Electrocardiogram", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": "Dana Quill" },
       { "id": "A-t13", "patient_id": "A-p1", "description": "CT abdomen", "status": "Delayed", "priority": "Routine", "department": "Radiology", "assignee": null },
-      { "id": "A-t14", "patient_id": "A-p12", "description": "Vital signs every 4 hours", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": null }
+      { "id": "A-t14", "patient_id": "A-p12", "description": "Vital signs every 4 hours", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": null },
+      { "id": "A-t15", "patient_id": "A-p1", "description": "Abdominal ultrasound", "status": "Pending", "priority": "Routine", "department": "Radiology", "assignee": null }
     ],
     "nurses": ["Amara Vale", "Bo Linden", "Chidi Marsh", "Dana Quill", "Dana Frost"]
   },
@@ -50,7 +51,8 @@
       { "id": "B-t10", "patient_id": "B-p5", "description": "Glycémie capillaire", "status": "Delayed", "priority": "Routine", "department": "Nursing", "assignee": null },
       { "id": "B-t11", "patient_id": "B-p8", "description": "Scanner abdominal", "status": "Completed", "priority": "Routine", "department": "Radiology", "assignee": "Luc Perrin" },
       { "id": "B-t12", "patient_id": "B-p8", "description": "Examen cytobactériologique des urines (ECBU)", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
-      { "id": "B-t13", "patient_id": "B-p2", "description": "IRM cérébrale", "status": "Delayed", "priority": "Routine", "department": "Radiology", "assignee": null }
+      { "id": "B-t13", "patient_id": "B-p2", "description": "IRM cérébrale", "status": "Delayed", "priority": "Routine", "department": "Radiology", "assignee": null },
+      { "id": "B-t14", "patient_id": "B-p2", "description": "Radiographie du bassin", "status": "Pending", "priority": "Routine", "department": "Radiology", "assignee": null }
     ],
     "nurses": ["Élodie Fontaine", "Marc Besson", "Inès Carrel", "Luc Perrin", "Luc Morel"]
   }

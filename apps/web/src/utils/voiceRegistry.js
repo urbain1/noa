@@ -72,10 +72,14 @@ export function buildQueueEntries(actions, patients, facilityId) {
     const { patientId, candidateIds } = resolutions[i];
     const patient = patientId ? patients.find((p) => p.id === patientId) : null;
     const task = needsTask(action) && patient ? resolveTask(action, patient, facilityId) : null;
+    // Tasks the parser listed as possible matches, kept only if they really
+    // are this patient's. Shown first in the task picker, never selected.
+    const patientTaskIds = new Set((patient?.tasks || []).map((tk) => tk.id));
     return {
       action,
       patientId,
       taskId: task ? task.id : null,
+      taskCandidateIds: needsTask(action) ? (action.task_candidates || []).filter((id) => patientTaskIds.has(id)) : [],
       candidateIds,
       dependsOn: needsPatient(action) ? dependencies[i] : null,
     };
@@ -112,6 +116,7 @@ export function sanitiseVoiceResult(result) {
       confidence: ["high", "medium", "low"].includes(raw.confidence) ? raw.confidence : "low",
       patient,
       task_id: null,
+      task_candidates: [],
       task_spoken: typeof raw.task_spoken === "string" ? raw.task_spoken : null,
       fields: {},
     };
@@ -134,6 +139,7 @@ export function sanitiseVoiceResult(result) {
       ...base,
       type: raw.type,
       task_id: needsTask(raw) && typeof raw.task_id === "string" ? raw.task_id : null,
+      task_candidates: needsTask(raw) && Array.isArray(raw.task_candidates) ? raw.task_candidates.filter((id) => typeof id === "string") : [],
       fields,
     });
   }

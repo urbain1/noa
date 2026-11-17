@@ -161,6 +161,41 @@ describe("validation: tasks", () => {
     expect(validate([action({ patient_label: null })]).actions[0].task_id).toBeNull();
   });
 
+  it("accepts a task only when the model listed exactly one candidate", () => {
+    const one = validate([action({ task_id: undefined, task_candidates: ["t1"] })]).actions[0];
+    expect(one.task_id).toBe("uuid-t-cbc");
+    expect(one.task_candidates).toEqual(["uuid-t-cbc"]);
+  });
+
+  it("accepts none when several candidates were listed, and passes them on for the picker", () => {
+    const twoTasks = normaliseInput({
+      transcript: "the bloods for patient 3 are back",
+      now: "2026-11-16T14:30:00Z",
+      timeZone: "Europe/London",
+      context: { ...CONTEXT, tasks: [CONTEXT.tasks[0], { ...CONTEXT.tasks[0], id: "uuid-t-bmp", description: "Basic Metabolic Panel" }] },
+    });
+    const out = validateVoiceCommandOutput({ actions: [action({ task_id: undefined, task_candidates: ["t1", "t2"], fields: { status: "Completed" } })] }, twoTasks);
+    expect(out.actions[0].task_id).toBeNull();
+    expect(out.actions[0].task_candidates).toEqual(["uuid-t-cbc", "uuid-t-bmp"]);
+  });
+
+  it("accepts none when the list also names something invalid: the model is unsure of its target", () => {
+    // t1 is right, t2 is another patient's task, t99 does not exist.
+    expect(validate([action({ task_id: undefined, task_candidates: ["t1", "t2"] })]).actions[0].task_id).toBeNull();
+    expect(validate([action({ task_id: undefined, task_candidates: ["t1", "t99"] })]).actions[0].task_id).toBeNull();
+    expect(validate([action({ task_id: undefined, task_candidates: ["t1", "t2"] })]).actions[0].task_candidates).toEqual(["uuid-t-cbc"]);
+  });
+
+  it("accepts none for an empty or malformed candidate list", () => {
+    for (const bad of [[], "t1", null, [null, 3], {}]) {
+      expect(validate([action({ task_id: undefined, task_candidates: bad })]).actions[0].task_id).toBeNull();
+    }
+  });
+
+  it("counts the same candidate listed twice as two candidates, not one", () => {
+    expect(validate([action({ task_id: undefined, task_candidates: ["t1", "t1"] })]).actions[0].task_id).toBeNull();
+  });
+
   it("ignores a task id on an action type that has no task", () => {
     const out = validate([action({ type: "create_note", fields: { text: "Slept well." } })]);
     expect(out.actions[0].task_id).toBeNull();
@@ -470,6 +505,14 @@ describe("parseVoiceCommand", () => {
     expect(request.messages[0].content).toContain("make the CBC for patient 3 stat");
     expect(out.ok).toBe(true);
     expect(out.actions[0]).toMatchObject({ type: "edit_task", task_id: "uuid-t-cbc", fields: { priority: "Stat" } });
+  });
+
+  it("asks the model for candidate tasks, not for a decision", async () => {
+    const callClaude = vi.fn().mockResolvedValue(answer('{"actions":[],"unparsed":[]}'));
+    await parseVoiceCommand(payload, callClaude);
+    const { system } = callClaude.mock.calls[0][0];
+    expect(system).toContain('"task_candidates"');
+    expect(system).not.toContain('"task_id"');
   });
 
   it("reads the text block by type when a thinking block comes first", async () => {

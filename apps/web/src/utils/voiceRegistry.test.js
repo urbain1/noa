@@ -68,7 +68,7 @@ describe("sanitiseVoiceResult", () => {
 
   it("passes a valid answer through", () => {
     const out = sanitiseVoiceResult({ ok: true, actions: [act()], dropped: [], unparsed: [], context_truncated: false });
-    expect(out.actions).toEqual([act({ task_spoken: null })]);
+    expect(out.actions).toEqual([act({ task_spoken: null, task_candidates: [] })]);
     expect(out).toMatchObject({ dropped: [], unparsed: [], contextTruncated: false });
   });
 
@@ -92,6 +92,12 @@ describe("sanitiseVoiceResult", () => {
     const out = sanitiseVoiceResult({ actions: seven, dropped: [{ type: "create_note", words: "earlier" }] });
     expect(out.actions).toHaveLength(5);
     expect(out.dropped.map((d) => d.words)).toEqual(["w5", "w6", "earlier"]);
+  });
+
+  it("passes the parser's candidate tasks through for the picker", () => {
+    const out = sanitiseVoiceResult({ actions: [act({ task_id: null, task_candidates: ["task-a", "task-b", 7] })] });
+    expect(out.actions[0].task_candidates).toEqual(["task-a", "task-b"]);
+    expect(sanitiseVoiceResult({ actions: [act({ type: "create_note", task_candidates: ["task-a"], fields: { text: "x" } })] }).actions[0].task_candidates).toEqual([]);
   });
 
   it("survives garbage", () => {

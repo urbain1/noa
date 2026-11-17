@@ -236,7 +236,7 @@ describe("VoiceQueue", () => {
   it("shows the task picker instead of guessing when the task was not resolved", async () => {
     const twoTasks = [patient(2), patient(3, { tasks: [task("task-a", "patient-3", { description: "Basic Metabolic Panel" }), task("task-b", "patient-3", { description: "Basic Metabolic Panel", status: "Delayed" })] })];
     fetchTaskRow.mockImplementation(async (_f, id) => twoTasks[1].tasks.find((tk) => tk.id === id) || null);
-    render(<Harness initialPatients={twoTasks} actions={[act("edit_task", "Patient_Test_3", { task_spoken: "the BMP", fields: { status: "Completed" } })]} />);
+    render(<Harness initialPatients={twoTasks} actions={[act("edit_task", "Patient_Test_3", { task_spoken: "the BMP", task_candidates: ["task-a", "task-b", "someone-elses-task"], fields: { status: "Completed" } })]} />);
     expect(screen.getByText("Which task?")).toBeInTheDocument();
     expect(screen.getByText("Noa heard “the BMP” for Patient_Test_3 and could not match exactly one task.")).toBeInTheDocument();
     expect(api.updateTask).not.toHaveBeenCalled();

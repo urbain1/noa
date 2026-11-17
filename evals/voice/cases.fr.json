@@ -193,6 +193,18 @@
       "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_8", "fields": { "diagnosis": { "all": ["pneumopathie"] } } } ] } },
     { "id": "fr-60", "split": "tune", "tags": ["edit_patient", "not_a_delete"],
       "transcript": "retirer la pénicilline des allergies du patient 1",
-      "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_1", "fields": { "allergies_remove": ["penicilline"] } } ] } }
+      "expect": { "actions": [ { "type": "edit_patient", "patient": "Patient_Test_1", "fields": { "allergies_remove": ["penicilline"] } } ] } },
+    { "id": "fr-61", "split": "tune", "tags": ["ambiguous_task", "generic_term", "edit_task"],
+      "transcript": "l'imagerie du patient 2 est faite",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_2", "task": null, "fields": { "status": "Completed" } } ] } },
+    { "id": "fr-62", "split": "tune", "tags": ["generic_term", "edit_task"],
+      "transcript": "la prise de sang du patient 1 est faite",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_1", "task": "B-t1", "fields": { "status": "Completed" } } ] } },
+    { "id": "fr-63", "split": "holdout", "tags": ["ambiguous_task", "generic_term", "edit_task"],
+      "transcript": "le bilan sanguin du patient 4 est revenu",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_4", "task": null, "fields": { "status": "Completed" } } ] } },
+    { "id": "fr-64", "split": "holdout", "tags": ["generic_term", "edit_task"],
+      "transcript": "l'imagerie du patient 1 est faite",
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_1", "task": "B-t2", "fields": { "status": "Completed" } } ] } }
   ]
 }

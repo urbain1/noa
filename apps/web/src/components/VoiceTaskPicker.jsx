@@ -15,9 +15,31 @@ const statusStyles = {
 // named none, named one that is not this patient's, or several could match.
 // Never a guess: the nurse taps the task. Lists every task of this one
 // patient except cancelled ones, in the same order as the patient card.
-export default function VoiceTaskPicker({ step, patient, heard, onPick, onSkip }) {
+// `candidateIds` are the tasks the parser thought the words could refer to
+// (two blood tests for "the bloods"): listed first, never selected.
+export default function VoiceTaskPicker({ step, patient, heard, candidateIds = [], onPick, onSkip }) {
   const { t } = useTranslation();
   const tasks = sortTasks((patient.tasks || []).filter((task) => task.status !== "Cancelled"));
+  const suggested = tasks.filter((task) => candidateIds.includes(task.id));
+  const others = tasks.filter((task) => !candidateIds.includes(task.id));
+
+  const row = (task) => (
+    <button
+      key={task.id}
+      type="button"
+      onClick={() => onPick(task)}
+      className="w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50"
+    >
+      <span className="block text-sm font-medium text-gray-900">{task.description}</span>
+      <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+        <span className={`rounded-full px-2 py-0.5 font-semibold ${statusStyles[task.status] || "bg-gray-100 text-gray-800"}`}>
+          {statusLabel(t, task.status)}
+        </span>
+        <span className={task.priority === "Stat" ? "font-semibold text-red-600" : ""}>{priorityLabel(t, task.priority)}</span>
+        <span>{departmentLabel(t, task.department)}</span>
+      </span>
+    </button>
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -35,23 +57,14 @@ export default function VoiceTaskPicker({ step, patient, heard, onPick, onSkip }
         </p>
 
         <div className="mt-3 max-h-64 space-y-2 overflow-y-auto">
-          {tasks.map((task) => (
-            <button
-              key={task.id}
-              type="button"
-              onClick={() => onPick(task)}
-              className="w-full rounded-lg border border-gray-200 bg-gray-50 p-3 text-left transition-colors hover:border-blue-300 hover:bg-blue-50"
-            >
-              <span className="block text-sm font-medium text-gray-900">{task.description}</span>
-              <span className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                <span className={`rounded-full px-2 py-0.5 font-semibold ${statusStyles[task.status] || "bg-gray-100 text-gray-800"}`}>
-                  {statusLabel(t, task.status)}
-                </span>
-                <span className={task.priority === "Stat" ? "font-semibold text-red-600" : ""}>{priorityLabel(t, task.priority)}</span>
-                <span>{departmentLabel(t, task.department)}</span>
-              </span>
-            </button>
-          ))}
+          {suggested.length > 0 && others.length > 0 && (
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t("voiceQueue.suggested")}</p>
+          )}
+          {suggested.map(row)}
+          {suggested.length > 0 && others.length > 0 && (
+            <p className="pt-1 text-xs font-semibold uppercase tracking-wide text-gray-400">{t("voiceQueue.otherTasks")}</p>
+          )}
+          {others.map(row)}
         </div>
 
         <button

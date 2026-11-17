@@ -152,6 +152,7 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
         step={step}
         patient={patient}
         heard={action.task_spoken}
+        candidateIds={item.taskCandidateIds}
         onPick={(picked) => dispatch({ type: "bind", index, taskId: picked.id })}
         onSkip={step.onSkip}
       />

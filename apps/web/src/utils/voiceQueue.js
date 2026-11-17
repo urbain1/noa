@@ -22,7 +22,7 @@ const OPEN = ITEM_STATUS.PENDING;
 
 /**
  * @param {Array<{ action: object, patientId?: string|null, taskId?: string|null,
- *   candidateIds?: string[], dependsOn?: number|null }>} entries
+ *   candidateIds?: string[], taskCandidateIds?: string[], dependsOn?: number|null }>} entries
  */
 export function createQueue(entries) {
   return {
@@ -34,6 +34,7 @@ export function createQueue(entries) {
       patientId: entry.patientId ?? null,
       taskId: entry.taskId ?? null,
       candidateIds: entry.candidateIds || [],
+      taskCandidateIds: entry.taskCandidateIds || [],
       dependsOn: entry.dependsOn ?? null,
       applied: null,
       error: null,

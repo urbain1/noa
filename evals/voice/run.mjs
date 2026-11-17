@@ -175,6 +175,15 @@ async function main() {
   });
   console.error = realError;
 
+  // No call got through (no credit, a bad key, the API down): that is not a
+  // result about the parser. Say so, record nothing, and stop.
+  const reached = outcomes.filter((o) => !(o.result?.ok === false && o.result.error === "model_error"));
+  if (reached.length === 0) {
+    console.error(`\nNo API call succeeded: ${outcomes[0]?.result?.detail || "unknown error"}`);
+    console.error("Nothing was measured and nothing was recorded. This does not count as a run.");
+    process.exit(2);
+  }
+
   const groups = {};
   const bump = (key, o) => {
     const g = (groups[key] ||= { total: 0, pass: 0, safety: emptySafety(), unreadable: 0 });
