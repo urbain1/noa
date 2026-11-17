@@ -20,6 +20,7 @@ import AuthScreen from "./components/AuthScreen";
 import FacilityScreen from "./components/FacilityScreen";
 import NoticeScreen from "./components/NoticeScreen";
 import PatientHistoryDialog from "./components/PatientHistoryDialog";
+import VoiceQueue from "./components/VoiceQueue";
 import { supabase } from "./lib/supabase";
 import { fetchFacilityNurses } from "./lib/nurses";
 import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, deleteTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
@@ -164,6 +165,7 @@ function App() {
     setPatientFocus(null);
     setShowProfile(false);
     setHistoryPatientId(null);
+    setVoiceRun(null);
     // Don't leave the next person on this device in the previous nurse's language.
     applyLanguage(DEFAULT_LANGUAGE);
   };
@@ -322,6 +324,11 @@ function App() {
   // button, so matching can be skipped entirely; null for the header/floating
   // mic button, which still needs to match a spoken/typed patient.
   const [voiceCapturePatient, setVoiceCapturePatient] = useState(null);
+  // A universal voice command being walked through: the parser's sanitised
+  // answer, handed over by the capture screen once the nurse pressed Start.
+  // `{ parsed, transcript }` or null. Nothing in it has been written; each
+  // action is confirmed in its own dialog (components/VoiceQueue.jsx).
+  const [voiceRun, setVoiceRun] = useState(null);
   // Tasks needing a nurse's attention: overdue (deadline passed, not
   // Completed/Confirmed) or Stat-priority and still pending -- see
   // utils/taskOverdue.js. This is what feeds the three-dot menu's badge and
@@ -542,7 +549,14 @@ function App() {
   const handleDischargeConfirm = async (options) => {
     const patient = selectedPatientForDischarge;
     if (!patient) return;
+    const created = await planDischarge(patient, options);
+    if (created) setSelectedPatientForDischarge(null);
+  };
 
+  // The discharge-planning write itself, for an explicit patient: shared by
+  // the dialog above and by a voice command's discharge step. Resolves to
+  // the created tasks, or undefined when nothing was selected.
+  const planDischarge = async (patient, options) => {
     const trimmedNotes = options.notes.trim();
     const drafts = [];
 
@@ -566,7 +580,7 @@ function App() {
       });
     }
 
-    if (drafts.length === 0) return;
+    if (drafts.length === 0) return undefined;
 
     let newTasks, tagged;
     try {
@@ -595,7 +609,7 @@ function App() {
       alert(t("errors.dischargeTasksUntagged"));
     }
 
-    setSelectedPatientForDischarge(null);
+    return newTasks;
   };
 
   // Cancels an active discharge-planning set: sets its tasks to the existing
@@ -1036,6 +1050,65 @@ function App() {
     setSuggestionData(null);
   };
 
+  // --- Universal voice command (components/VoiceQueue.jsx) ---
+  //
+  // The writes the queue's dialogs call once the nurse confirms a step. They
+  // are the same data-layer functions every other path uses, each with an
+  // explicit facility filter, and each keeps App's copy of the roster in
+  // step. They throw on failure so the step's dialog can say so and stay
+  // open. No follow-up suggestions are triggered from here: a suggestion
+  // popup in the middle of a walk-through would interrupt it.
+  const voiceApi = {
+    createPatient: async (fields) => {
+      const row = await createPatient(nurseProfile.facility_id, fields);
+      setPatients((prev) => [{ ...row, tasks: [], notes: [] }, ...prev]);
+      return row;
+    },
+    updatePatient: async (patientId, payload) => {
+      const updated = await updatePatient(patientId, payload, nurseProfile.facility_id);
+      setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, ...updated } : p)));
+      return updated;
+    },
+    createTask: async (patientId, fields, rawTranscript) => {
+      const row = await createTask(nurseProfile.facility_id, patientId, session.user.id, {
+        description: fields.description,
+        department: fields.department,
+        priority: fields.priority,
+        deadline: fields.deadline,
+        assignedTo: fields.assignedTo,
+        rawTranscript,
+      });
+      setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, tasks: [row, ...p.tasks] } : p)));
+      return row;
+    },
+    updateTask: async (task, updates) => {
+      const updated = await updateTask(task.id, updates, session.user.id, nurseProfile.facility_id);
+      setPatients((prev) =>
+        prev.map((p) => (p.id === task.patient_id ? { ...p, tasks: p.tasks.map((tk) => (tk.id === task.id ? updated : tk)) } : p))
+      );
+      return updated;
+    },
+    addNote: async (patientId, text) => {
+      const note = await addNote(nurseProfile.facility_id, patientId, session.user.id, text);
+      setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, notes: [note, ...p.notes] } : p)));
+      return note;
+    },
+    startDischarge: (patient, options) => planDischarge(patient, options),
+  };
+
+  // The summary was closed. A report the nurse confirmed opening is opened
+  // now, because it replaces the whole screen.
+  const handleVoiceFinished = ({ handoff }) => {
+    setVoiceRun(null);
+    if (!handoff) return;
+    if (handoff.scope === "patient") {
+      const patient = patients.find((p) => p.id === handoff.patientId);
+      if (patient) handleGeneratePatientHandoff(patient);
+    } else {
+      handleGenerateShiftHandoff();
+    }
+  };
+
   // --- Navigation handlers ---
 
   // Switching top-level screens by hand clears any "came from" context: the
@@ -1200,7 +1273,14 @@ function App() {
         mode={voiceMode}
         onTaskCreated={handleTaskCreated}
         onPatientParsed={handlePatientParsed}
+        onCommandReady={(run) => {
+          setShowVoice(false);
+          setVoiceCapturePatient(null);
+          setVoiceMode("task");
+          setVoiceRun(run);
+        }}
         allPatients={patients}
+        nurses={nurses}
         knownPatient={voiceCapturePatient}
       />
     );
@@ -1306,6 +1386,18 @@ function App() {
           onManualUpdate={handleManualUpdateTask}
         />
       )}
+      {voiceRun && (
+        <VoiceQueue
+          parsed={voiceRun.parsed}
+          patients={patients}
+          nurses={nurses}
+          facilityId={nurseProfile.facility_id}
+          currentNurseId={session?.user?.id}
+          api={voiceApi}
+          onRowRefreshed={handleRowRefreshed}
+          onFinished={handleVoiceFinished}
+        />
+      )}
       {historyPatient && (
         <PatientHistoryDialog
           patient={historyPatient}
@@ -1367,9 +1459,11 @@ function App() {
         {...sharedScreenProps}
         patientFocus={patientFocus}
         onReturnFromPatient={handleReturnFromPatient}
+        // The main-page mic is the universal voice command. The per-patient
+        // "+ Add Task" capture below is unchanged.
         onVoiceClick={() => {
           setVoiceCapturePatient(null);
-          setVoiceMode("task");
+          setVoiceMode("command");
           setShowVoice(true);
         }}
         onOpenVoiceCapture={(patient) => {

@@ -4,14 +4,21 @@ import { parseNoteInput } from "../utils/claudeAPI";
 import { localeTag } from "../i18n";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
+import { errorText } from "../utils/errors";
+import VoiceStepHeader from "./VoiceStepHeader";
 
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
 
-export default function AddNoteDialog({ patientName, onCancel, onSave }) {
+// `voiceStep` makes this dialog one step of a universal voice command
+// (VoiceQueue), pre-filled through `initialText`. In that mode the note is
+// saved exactly as shown: the clean-up pass through `parseNoteInput` is
+// skipped, because it would store something other than what the nurse just
+// confirmed. Without `voiceStep` the dialog behaves exactly as before.
+export default function AddNoteDialog({ patientName, onCancel, onSave, initialText = "", voiceStep }) {
   const { t, i18n } = useTranslation();
   const [isRecording, setIsRecording] = useState(false);
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText);
   const ops = useOperationStatus();
   const isProcessing = ops.isRunning("saveNote");
   const [error, setError] = useState(null);
@@ -95,10 +102,12 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
           // Categorisation is best-effort; failing to reach Claude must not
           // cost the nurse the note they just dictated.
           let result = null;
-          try {
-            result = await parseNoteInput(finalInput);
-          } catch (err) {
-            console.error("Note categorisation failed, saving as Assessment:", err);
+          if (!voiceStep) {
+            try {
+              result = await parseNoteInput(finalInput);
+            } catch (err) {
+              console.error("Note categorisation failed, saving as Assessment:", err);
+            }
           }
           await onSave(result || { text: finalInput, category: "Assessment" });
         },
@@ -107,14 +116,20 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
       // Previously this both re-called onSave and left the button spinning
       // for good, because nothing ever cleared isProcessing.
       console.error("Note creation error:", err);
-      setError(err.message || t("errors.saveNote"));
+      if (voiceStep) {
+        // FL6, for the new path: the translated message, never the provider's.
+        setError(errorText(err, t("errors.saveNote")));
+        voiceStep.onError?.(err);
+      } else {
+        setError(err.message || t("errors.saveNote"));
+      }
     }
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={onCancel}
+      onClick={voiceStep ? undefined : onCancel}
     >
       <div
         className="relative flex w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
@@ -127,9 +142,9 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
             <p className="text-sm text-gray-500">{patientName}</p>
           </div>
           <button
-            onClick={onCancel}
+            onClick={voiceStep ? voiceStep.onClose : onCancel}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
-            aria-label={t("noteDialog.closeAria")}
+            aria-label={voiceStep ? t("voiceQueue.closeAria") : t("noteDialog.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -139,6 +154,7 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
 
         {/* Body */}
         <div className="flex flex-col gap-4 px-6 pb-2">
+          <VoiceStepHeader step={voiceStep} />
           {/* Mic button */}
           <div className="flex flex-col items-center gap-2">
             <button
@@ -178,10 +194,11 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
         {/* Footer */}
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
-            onClick={onCancel}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
+            onClick={voiceStep ? () => voiceStep.onSkip() : onCancel}
+            disabled={isProcessing}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t("common.cancel")}
+            {voiceStep ? t("voiceQueue.skip") : t("common.cancel")}
           </button>
           <button
             onClick={handleSave}
@@ -190,6 +207,8 @@ export default function AddNoteDialog({ patientName, onCancel, onSave }) {
           >
             {isProcessing ? (
               <OperationStatus operations={ops.operations} name="saveNote" variant="button" />
+            ) : voiceStep ? (
+              t("voiceQueue.confirm")
             ) : (
               t("noteDialog.saveNote")
             )}

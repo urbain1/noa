@@ -68,20 +68,31 @@ export async function createPatient(facilityId, fields) {
   return data
 }
 
+// Adds the explicit facility filter CLAUDE.md requires, when the caller
+// passes its facility id. The voice command queue and undo always do; the
+// older callers are unchanged and still rely on RLS alone (flagged for
+// cleanup in ARCHITECTURE.md).
+function scoped(query, facilityId) {
+  return facilityId ? query.eq('facility_id', facilityId) : query
+}
+
 // Label is intentionally excluded: fixed once set, per the
 // retire-don't-reuse rule in SECURITY.md.
-export async function updatePatient(patientId, fields) {
-  const { data, error } = await supabase
-    .from('patients')
-    .update({
-      diagnosis: fields.diagnosis || null,
-      code_status: fields.codeStatus,
-      allergies: fields.allergies && fields.allergies.length > 0 ? fields.allergies : null,
-      admission_date: fields.admissionDate || null,
-      location_label: fields.locationLabel || null,
-      age: fields.age ?? null,
-    })
-    .eq('id', patientId)
+export async function updatePatient(patientId, fields, facilityId = null) {
+  const { data, error } = await scoped(
+    supabase
+      .from('patients')
+      .update({
+        diagnosis: fields.diagnosis || null,
+        code_status: fields.codeStatus,
+        allergies: fields.allergies && fields.allergies.length > 0 ? fields.allergies : null,
+        admission_date: fields.admissionDate || null,
+        location_label: fields.locationLabel || null,
+        age: fields.age ?? null,
+      })
+      .eq('id', patientId),
+    facilityId
+  )
     .select()
     .single()
 
@@ -93,6 +104,10 @@ export async function updatePatient(patientId, fields) {
 // upstream voice parsing can still produce 'Urgent', which has no real
 // column value, so anything other than an exact 'Stat' is stored as
 // 'Routine'.
+//
+// `fields.assignedTo` is optional and only sent when given, so a task can be
+// created already assigned in one insert (the voice command's "order X and
+// assign it to Y"). Callers that do not pass it send exactly what they did.
 export async function createTask(facilityId, patientId, createdBy, fields) {
   const { data, error } = await supabase
     .from('tasks')
@@ -105,6 +120,7 @@ export async function createTask(facilityId, patientId, createdBy, fields) {
       priority: fields.priority === 'Stat' ? 'Stat' : 'Routine',
       deadline: fields.deadline || null,
       raw_transcript: fields.rawTranscript || null,
+      ...(fields.assignedTo ? { assigned_to: fields.assignedTo } : {}),
     })
     .select()
     .single()
@@ -178,7 +194,7 @@ export async function completeTask(taskId, completedBy = null) {
 // attribution. Moving a task off Completed clears both completion fields --
 // a reopened task carrying a completer would assert a completion that was
 // undone, and Unit View reads those fields as current state.
-export async function updateTask(taskId, fields, completedBy = null) {
+export async function updateTask(taskId, fields, completedBy = null, facilityId = null) {
   const updates = {}
   if (fields.description !== undefined) updates.description = fields.description
   if (fields.department !== undefined) updates.department = fields.department
@@ -198,10 +214,7 @@ export async function updateTask(taskId, fields, completedBy = null) {
   // which stays a valid state for any task (0011).
   if (fields.assignedTo !== undefined) updates.assigned_to = fields.assignedTo
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .update(updates)
-    .eq('id', taskId)
+  const { data, error } = await scoped(supabase.from('tasks').update(updates).eq('id', taskId), facilityId)
     .select()
     .single()
 
@@ -210,10 +223,7 @@ export async function updateTask(taskId, fields, completedBy = null) {
     console.warn('[patients] completed_by column missing -- migration 0011 not applied. Updating without attribution.')
     const withoutCompletedBy = { ...updates }
     delete withoutCompletedBy.completed_by
-    const retry = await supabase
-      .from('tasks')
-      .update(withoutCompletedBy)
-      .eq('id', taskId)
+    const retry = await scoped(supabase.from('tasks').update(withoutCompletedBy).eq('id', taskId), facilityId)
       .select()
       .single()
     if (retry.error) throw retry.error
@@ -233,11 +243,8 @@ export async function updateTask(taskId, fields, completedBy = null) {
 // RLS (tasks_facility_scope) is what stops this touching another facility's
 // task -- there is no client-side facility filter to add here, and adding
 // one would not be the boundary anyway.
-export async function deleteTask(taskId) {
-  const { error } = await supabase
-    .from('tasks')
-    .delete()
-    .eq('id', taskId)
+export async function deleteTask(taskId, facilityId = null) {
+  const { error } = await scoped(supabase.from('tasks').delete().eq('id', taskId), facilityId)
 
   if (error) throw error
   return taskId

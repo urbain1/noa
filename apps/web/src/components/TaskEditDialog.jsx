@@ -11,6 +11,9 @@ import { fetchTaskRow } from "../lib/patients";
 import { errorText } from "../utils/errors";
 import { columnLabels } from "../utils/historyFormat";
 import EditLockBanner from "./EditLockBanner";
+import VoiceStepHeader from "./VoiceStepHeader";
+import VoiceChangeList from "./VoiceChangeList";
+import { toLocalDatetimeValue } from "../utils/datetimeLocal";
 
 // How long description/deadline wait after the last keystroke before
 // saving -- long enough that a fast typist doesn't fire a write per
@@ -29,6 +32,9 @@ const DEPARTMENT_OPTIONS = [
   "Nursing",
   "Physical Therapy",
   "Social Work",
+  // Tasks can already carry this department (the capture fallback assigns
+  // it); without the option the select showed such a task as "Radiology".
+  "Transport",
   "Other",
 ];
 const PRIORITY_OPTIONS = ["Stat", "Routine"];
@@ -50,14 +56,6 @@ function nurseName(nurses, id) {
   const nurse = nurses.find((n) => n.id === id);
   if (!nurse) return null;
   return nurse.name || nurse.email;
-}
-
-// `datetime-local` inputs want "YYYY-MM-DDTHH:mm" in the browser's own
-// timezone, not the UTC ISO string the column stores.
-function toLocalDatetimeValue(deadline) {
-  if (!deadline) return "";
-  const date = new Date(deadline);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
 // Manual-mode fields, named by their tasks column. Values are held the way
@@ -98,15 +96,28 @@ function unsavedFieldsOf(fields, row) {
   return MANUAL_FIELDS.filter((f) => !sameDbValue(f, toDb(f, fields[f]), row?.[f] ?? null));
 }
 
-export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, facilityId, onRowRefreshed, onAssign, onCancel, onUpdate, onManualUpdate }) {
+// `voiceStep` + `proposal` make this dialog one step of a universal voice
+// command (VoiceQueue), in PROPOSAL MODE:
+//   - `proposal(row)` returns the field values the command asks for; they
+//     are laid over the fresh row when the dialog opens and again whenever
+//     the row is re-read, so the stored values never silently replace them.
+//   - Nothing auto-saves. Changing a field only changes the form. One
+//     Confirm writes every changed field in a single guarded update; Skip
+//     writes nothing.
+//   - The lock and the stale-write check apply exactly as in a normal edit:
+//     a colleague's lock shows the banner (wait, take over, or skip).
+// Without `voiceStep` the dialog behaves exactly as before.
+export default function TaskEditDialog({ task, patientId, patientLabel, nurses = [], currentNurseId, facilityId, onRowRefreshed, onAssign, onCancel, onUpdate, onManualUpdate, proposal, voiceStep }) {
   const { t, i18n } = useTranslation();
+  const proposing = Boolean(voiceStep);
+  const withProposal = (row) => (proposal ? { ...fieldsFromTask(row), ...proposal(row) } : fieldsFromTask(row));
   const [isRecording, setIsRecording] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [textCommand, setTextCommand] = useState("");
   const [error, setError] = useState(null);
   const recognitionRef = useRef(null);
   const [editMode, setEditMode] = useState("manual"); // "manual" or "ai"
-  const [manualFields, setManualFields] = useState(() => fieldsFromTask(task));
+  const [manualFields, setManualFields] = useState(() => withProposal(task));
   // Fields with a debounced save waiting to fire (description, deadline).
   const [pending, setPending] = useState({});
   const [closing, setClosing] = useState(false);
@@ -123,7 +134,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     initialRow: task,
     loadRow: () => fetchTaskRow(facilityId, task.id),
     onFreshRow: (row) => onRowRefreshed?.("task", row),
-    onBaselineReplaced: (row) => setManualFields(fieldsFromTask(row)),
+    onBaselineReplaced: (row) => setManualFields(withProposal(row)),
     hasUnsaved: (baselineRow) => unsavedFieldsOf(manualFields, baselineRow).length > 0,
   });
   const { guard, canEdit } = session;
@@ -210,37 +221,41 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
   const setField = (field, value) => setManualFields((prev) => ({ ...prev, [field]: value }));
 
+  // In proposal mode a change only changes the form: nothing is written
+  // until the nurse confirms the step.
   const handleDescriptionChange = (value) => {
     setField("description", value);
-    scheduleField("description", value);
+    if (!proposing) scheduleField("description", value);
   };
 
   const handleDeadlineChange = (value) => {
     setField("deadline", value);
-    scheduleField("deadline", toDb("deadline", value));
+    if (!proposing) scheduleField("deadline", toDb("deadline", value));
   };
 
   const handleStatusChange = (value) => {
     setField("status", value);
-    commitField("status", value);
+    if (!proposing) commitField("status", value);
   };
 
   const handleDepartmentChange = (value) => {
     setField("department", value);
-    commitField("department", value);
+    if (!proposing) commitField("department", value);
   };
 
   const handlePriorityChange = (value) => {
     setField("priority", value);
-    commitField("priority", value);
+    if (!proposing) commitField("priority", value);
   };
 
   // Everything typed but not saved. While saving is possible, fields still
   // waiting on their debounce or mid-save aren't listed: they're on their way.
   const unsavedFields = unsavedFieldsOf(manualFields, session.baseline);
-  const blockedFields = canEdit
-    ? unsavedFields.filter((f) => !pending[f] && !ops.isRunning(f))
-    : unsavedFields;
+  const blockedFields = proposing
+    ? unsavedFields
+    : canEdit
+      ? unsavedFields.filter((f) => !pending[f] && !ops.isRunning(f))
+      : unsavedFields;
 
   // Writes the given fields one by one; true only if every one was saved.
   const saveFields = async (fields, values = manualFields) => {
@@ -264,7 +279,10 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
     for (const f of mine) merged[f] = manualFields[f];
     if (!session.keepMine()) return;
     setManualFields(merged);
-    saveFields(mine, merged);
+    // In proposal mode this only re-bases the proposal on the colleague's
+    // version: their other changes are kept, and the write still waits for
+    // Confirm.
+    if (!proposing) saveFields(mine, merged);
   };
 
   // Closing never drops a typed value silently. Pending debounced saves are
@@ -272,6 +290,12 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   // isn't possible (lock lost, paused, conflict), the nurse is asked first.
   const handleClose = async () => {
     if (closing) return;
+    // As a voice step, closing ends the queue. Nothing has been written, and
+    // the summary lists this action as not done.
+    if (proposing) {
+      voiceStep.onClose();
+      return;
+    }
     Object.values(debounceTimers.current).forEach((timer) => timer && clearTimeout(timer));
     debounceTimers.current = {};
     setPending({});
@@ -295,8 +319,60 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
   const handleAssigneeChange = (nurseId) => {
     setField("assigned_to", nurseId || null);
+    if (proposing) return Promise.resolve(true);
     return commitField("assigned_to", nurseId || null);
   };
+
+  // Proposal mode's only write: every changed field, in one guarded update.
+  // The row before and the row after go back to the queue, which keeps them
+  // in memory so the change can be undone.
+  const confirming = ops.isRunning("confirmStep");
+  const handleVoiceConfirm = async () => {
+    if (!canEdit || confirming) return;
+    const before = baselineRef.current;
+    const changed = unsavedFieldsOf(manualFields, before);
+    if (changed.length === 0) return;
+    const updates = {};
+    for (const field of changed) {
+      updates[field === "assigned_to" ? "assignedTo" : field] = toDb(field, manualFields[field]);
+    }
+    setError(null);
+    try {
+      const after = await ops.run(
+        "confirmStep",
+        { messageKey: "common.saving", errorKey: "status.failed", surface: "button" },
+        () => guard(() => onManualUpdate(updates, task, patientId)),
+      );
+      voiceStep.onConfirmed({ before, after, columns: changed });
+    } catch (err) {
+      // Refused by the lock or a conflicting change: the banner explains.
+      if (err?.code === "EDIT_NOT_HELD" || err?.code === "EDIT_CONFLICT") return;
+      console.error("Voice task edit error:", err);
+      setError(errorText(err, t("errors.updateTask")));
+      voiceStep.onError?.(err);
+    }
+  };
+
+  const displayOf = (field, value) => {
+    if (field === "status") return statusLabel(t, value);
+    if (field === "priority") return priorityLabel(t, value);
+    if (field === "department") return departmentLabel(t, value);
+    if (field === "assigned_to") return nurseName(nurses, value) || t("tasksView.unassigned");
+    if (field === "deadline") {
+      return value
+        ? new Date(value).toLocaleString(localeTag(i18n.language), { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+        : t("common.none");
+    }
+    return value;
+  };
+  const voiceChanges = proposing
+    ? unsavedFields.map((field) => ({
+        field: columnLabels(t, "task", [field])[0],
+        from: displayOf(field, session.baseline?.[field] ?? null),
+        to: displayOf(field, toDb(field, manualFields[field])),
+      }))
+    : null;
+  const nothingToChange = proposing && session.ready && unsavedFields.length === 0 && !voiceStep.assigneeHeard;
 
   const assigningToMe = ops.isRunning("assigned_to");
   const handleAssignToMe = () => {
@@ -401,7 +477,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={handleClose}
+      onClick={proposing ? undefined : handleClose}
     >
       <div
         className="relative flex w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl"
@@ -416,7 +492,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
           <button
             onClick={handleClose}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
-            aria-label={t("taskEdit.closeAria")}
+            aria-label={proposing ? t("voiceQueue.closeAria") : t("taskEdit.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -426,21 +502,29 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
 
         {/* Body */}
         <div className="flex flex-col gap-5 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          <VoiceStepHeader step={voiceStep} />
+          {proposing && patientLabel && (
+            <p className="text-sm font-semibold text-gray-900">{patientLabel}</p>
+          )}
+          {proposing && session.ready && <VoiceChangeList changes={voiceChanges} />}
+
           {/* Lock and change-detection state: who else is editing, what
               wasn't saved and why, and the way back. Above the mode toggle so
-              it shows in both modes. */}
+              it shows in both modes. In proposal mode the changes are waiting
+              on Confirm, not interrupted, so there is no "save my changes". */}
           <EditLockBanner
             session={session}
             recordType="task"
             unsavedColumns={blockedFields}
             onKeepMine={handleKeepMine}
             onDiscardMine={session.discardMine}
-            onSaveUnsaved={handleSaveUnsaved}
-            busy={closing}
+            onSaveUnsaved={proposing ? undefined : handleSaveUnsaved}
+            busy={closing || confirming}
           />
 
-          {/* Mode toggle */}
-          <div className="flex rounded-lg bg-gray-100 p-1">
+          {/* Mode toggle. A voice step is a proposal to confirm, so it has
+              no second command box. */}
+          <div className={proposing ? "hidden" : "flex rounded-lg bg-gray-100 p-1"}>
             <button
               type="button"
               onClick={() => setEditMode("manual")}
@@ -608,6 +692,11 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
                     )}
                   </div>
                   <OperationStatus operations={ops.operations} name="assigned_to" className="mt-1" />
+                  {proposing && voiceStep.assigneeHeard && (
+                    <p role="note" className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900 ring-1 ring-amber-200">
+                      {t("voiceQueue.assigneeHeard", { name: voiceStep.assigneeHeard })}
+                    </p>
+                  )}
                 </div>
               )}
 
@@ -756,6 +845,30 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
             not a Cancel it would be misleading to keep next to a
             non-functional Save. AI mode still needs both: the typed/spoken
             command isn't applied until Apply Changes. */}
+        {proposing ? (
+          <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
+            <button
+              onClick={() => voiceStep.onSkip(nothingToChange ? "nothing_to_change" : undefined)}
+              disabled={confirming}
+              className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {nothingToChange ? t("voiceQueue.next") : t("voiceQueue.skip")}
+            </button>
+            {!nothingToChange && (
+              <button
+                onClick={handleVoiceConfirm}
+                disabled={!canEdit || confirming || unsavedFields.length === 0}
+                className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {confirming ? (
+                  <OperationStatus operations={ops.operations} name="confirmStep" variant="button" />
+                ) : (
+                  t("voiceQueue.confirm")
+                )}
+              </button>
+            )}
+          </div>
+        ) : (
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
             onClick={handleClose}
@@ -778,6 +891,7 @@ export default function TaskEditDialog({ task, patientId, patientLabel, nurses =
             </button>
           )}
         </div>
+        )}
       </div>
     </div>
   );

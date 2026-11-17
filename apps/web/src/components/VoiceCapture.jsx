@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { parseVoiceToTask, parsePatientFromVoice } from "../utils/claudeAPI";
+import { parseVoiceToTask, parsePatientFromVoice, parseVoiceCommand } from "../utils/claudeAPI";
+import { buildVoiceContext } from "../utils/voiceContext";
+import { VOICE_TRANSCRIPT_MAX, describeAction, sanitiseVoiceResult } from "../utils/voiceRegistry";
 import { localeTag } from "../i18n";
 import { findMatchingPatients } from "../utils/roomMatcher";
 import { parsePatientTranscriptFallback } from "../utils/patientVoiceParse";
@@ -109,11 +111,32 @@ function parseTranscriptFallback(text) {
   };
 }
 
-// `mode` selects what this capture produces: a task (default) or a draft
-// patient. Recording, transcription, editing the transcript and the Claude
-// round-trip are identical either way -- only the parse target and what
-// happens with the result differ, so there is one voice screen, not two.
-export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, allPatients, knownPatient, mode = "task" }) {
+// Causes that mean the multi-action parser cannot run at all right now (the
+// Edge Function is unreachable, predates the action, or errored). They put
+// the screen in LIMITED MODE. `unreadable` is different: the parser ran and
+// returned nothing usable, which is something to rephrase.
+const LIMITED_MODE_CAUSES = ["unknown_action", "unreachable", "server_error"];
+
+// `mode` selects what this capture produces: a task (default), a draft
+// patient, or a universal voice command. Recording, transcription and
+// editing the transcript are identical in all three -- only the parse target
+// and what happens with the result differ, so there is one voice screen.
+//
+// mode="command" is the main-page button (decisions.md, 2026-11-16): free
+// speech, several actions. The parser's answer is shown as "what Noa
+// understood", the nurse can fix the text and run it again, and Start hands
+// the actions to the review queue (`onCommandReady`). Nothing is written
+// here. Typing works as well as speaking, since Web Speech is unreliable on
+// iOS Safari.
+//
+// If the parser cannot run, the screen says so in a visible notice and
+// offers the EXISTING single-task path on the same text ("Create one
+// task"). It never falls back silently, and the real cause is in the
+// console (utils/claudeAPI.js parseVoiceCommand).
+//
+// mode="task" with `knownPatient` (a patient card's "+ Add Task") is
+// untouched by any of this.
+export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, onCommandReady, allPatients, nurses = [], knownPatient, mode = "task" }) {
   const { t, i18n } = useTranslation();
   const [transcript, setTranscript] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -128,7 +151,14 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
   // transcript while it runs, so the mic and the textarea are disabled for
   // its duration -- that is the whole block, no overlay needed.
   const ops = useOperationStatus();
-  const operationName = mode === "patient" ? "extractPatient" : "createTask";
+  const isCommandMode = mode === "command";
+  // Command mode: the parser's sanitised answer and the exact text it was
+  // read from, so an edited transcript is recognisably out of date.
+  const [command, setCommand] = useState(null); // { parsed, text } or null
+  // null | "limited" (parser unavailable, one task only) | "unreadable"
+  const [fallback, setFallback] = useState(null);
+  const operationName = ["parseCommand", "extractPatient", "createTask"].find((name) => ops.isRunning(name))
+    || (mode === "patient" ? "extractPatient" : isCommandMode ? "parseCommand" : "createTask");
   const isProcessing = ops.isRunning(operationName);
   const recognitionRef = useRef(null);
   // Speech already committed to the transcript, across every recognition
@@ -327,6 +357,60 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
     }
   };
 
+  // Command mode: read the transcript into actions. Nothing is written.
+  const handleParseCommand = async () => {
+    stopRecording();
+
+    const spoken = transcript.trim();
+    if (!spoken) {
+      alert(t("errors.recordFirst"));
+      return;
+    }
+    if (spoken.length > VOICE_TRANSCRIPT_MAX) {
+      setError(t("voiceCapture.tooLong", { max: VOICE_TRANSCRIPT_MAX }));
+      return;
+    }
+
+    setError(null);
+    setCommand(null);
+    setFallback(null);
+
+    try {
+      await ops.run(
+        "parseCommand",
+        { messageKey: "status.readingCommand", errorKey: "status.failed", surface: "button" },
+        async () => {
+          const outcome = await parseVoiceCommand(spoken, buildVoiceContext(allPatients, nurses));
+          if (outcome.ok) {
+            setCommand({ parsed: sanitiseVoiceResult(outcome.result), text: spoken });
+          } else if (outcome.cause === "too_long") {
+            setError(t("voiceCapture.tooLong", { max: VOICE_TRANSCRIPT_MAX }));
+          } else if (LIMITED_MODE_CAUSES.includes(outcome.cause)) {
+            // Said on screen, not just logged: the nurse must know that
+            // what follows is one task, not the several things they said.
+            setFallback("limited");
+          } else {
+            setFallback("unreadable");
+          }
+        },
+      );
+    } catch (err) {
+      // parseVoiceCommand never throws; this is for anything unexpected.
+      console.error("[VoiceCapture] voice command failed:", err);
+      setFallback("limited");
+    }
+  };
+
+  const commandIsCurrent = Boolean(command) && command.text === transcript.trim();
+  const commandActions = commandIsCurrent ? command.parsed.actions : [];
+  const overLimit = isCommandMode && transcript.trim().length > VOICE_TRANSCRIPT_MAX;
+
+  const handleStartCommand = () => {
+    if (!commandIsCurrent || commandActions.length === 0) return;
+    stopRecording();
+    onCommandReady({ parsed: command.parsed, transcript: command.text });
+  };
+
   const handleCreateTask = async () => {
     stopRecording();
 
@@ -471,7 +555,9 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
         <h1 className="font-display text-xl font-bold tracking-tight text-gray-900">
           {isPatientMode
             ? t("voiceCapture.titlePatient")
-            : knownPatient
+            : isCommandMode
+              ? t("voiceCapture.titleCommand")
+              : knownPatient
               ? t("voiceCapture.titleForPatient", { patient: knownPatient.label })
               : t("voiceCapture.title")}
         </h1>
@@ -504,15 +590,31 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
               ? t("common.listening")
               : isPatientMode
                 ? t("voiceCapture.tapToRecordPatient")
-                : t("voiceCapture.tapToRecord")}
+                : isCommandMode
+                  ? t("voiceCapture.tapToRecordCommand")
+                  : t("voiceCapture.tapToRecord")}
           </p>
-          <p className="text-sm text-gray-400 italic mt-2">
-            {isPatientMode
-              ? t("voiceCapture.examplePatient")
-              : knownPatient
-                ? t("voiceCapture.exampleForPatient")
-                : t("voiceCapture.exampleGeneral")}
-          </p>
+          {isCommandMode ? (
+            // Two or three example commands, and the same reminder every
+            // voice entry point carries: synthetic labels only (SECURITY.md).
+            <div className="mt-2 w-full text-sm text-gray-500">
+              <p className="text-center">{t("voiceCapture.commandExamplesTitle")}</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-6 italic text-gray-400">
+                <li>{t("voiceCapture.commandExample1")}</li>
+                <li>{t("voiceCapture.commandExample2")}</li>
+                <li>{t("voiceCapture.commandExample3")}</li>
+              </ul>
+              <p className="mt-2 text-center text-xs text-gray-400">{t("voiceCapture.commandSyntheticHint")}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 italic mt-2">
+              {isPatientMode
+                ? t("voiceCapture.examplePatient")
+                : knownPatient
+                  ? t("voiceCapture.exampleForPatient")
+                  : t("voiceCapture.exampleGeneral")}
+            </p>
+          )}
           {isPatientMode && (
             // The same rule the Add Patient form states, at the point the
             // nurse is about to speak: synthetic labels only, never a real
@@ -546,11 +648,96 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
               absorbedRef.current = sessionFinalRef.current.length;
               setTranscript(e.target.value);
             }}
-            placeholder={t("voiceCapture.transcriptPlaceholder")}
+            placeholder={isCommandMode ? t("voiceCapture.commandPlaceholder") : t("voiceCapture.transcriptPlaceholder")}
             disabled={isProcessing}
             className="w-full min-h-[120px] p-4 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none disabled:bg-gray-50 disabled:text-gray-500"
           />
+          {isCommandMode && (
+            <p className={`mt-1 text-right text-xs ${overLimit ? "font-semibold text-red-600" : "text-gray-400"}`}>
+              {overLimit
+                ? t("voiceCapture.tooLong", { max: VOICE_TRANSCRIPT_MAX })
+                : t("voiceCapture.charCount", { count: transcript.trim().length, max: VOICE_TRANSCRIPT_MAX })}
+            </p>
+          )}
         </div>
+
+        {/* Limited mode: the multi-action parser cannot run. Visible, and
+            nothing happens until the nurse presses "Create one task". */}
+        {isCommandMode && fallback === "limited" && (
+          <div role="alert" className="w-full rounded-lg bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+            <p className="font-semibold">{t("voiceCapture.limitedTitle")}</p>
+            <p className="mt-1">{t("voiceCapture.limitedBody")}</p>
+            <button
+              type="button"
+              onClick={handleParseCommand}
+              disabled={isProcessing || !transcript.trim() || overLimit}
+              className="mt-2 text-xs font-semibold underline disabled:opacity-50"
+            >
+              {t("voiceCapture.runAgain")}
+            </button>
+          </div>
+        )}
+
+        {isCommandMode && fallback === "unreadable" && (
+          <div role="alert" className="w-full rounded-lg bg-red-50 p-4 text-sm text-red-700">
+            <p>{t("voiceCapture.unreadable")}</p>
+            <button type="button" onClick={() => setFallback("limited")} className="mt-2 text-xs font-semibold underline">
+              {t("voiceCapture.orCreateOneTask")}
+            </button>
+          </div>
+        )}
+
+        {/* What Noa understood. Read-only: the dialogs that follow are where
+            each action is checked and confirmed. */}
+        {isCommandMode && command && !fallback && (
+          <div className="w-full rounded-xl bg-white p-4 shadow-md">
+            <h2 className="text-sm font-semibold text-gray-700">{t("voiceCapture.understoodTitle")}</h2>
+            {!commandIsCurrent ? (
+              <p className="mt-2 text-sm text-amber-800">{t("voiceCapture.editedHint")}</p>
+            ) : command.parsed.actions.length === 0 ? (
+              <p className="mt-2 text-sm text-gray-600">{t("voiceCapture.nothingUnderstood")}</p>
+            ) : (
+              <>
+                <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-gray-900">
+                  {command.parsed.actions.map((action, i) => (
+                    <li key={i} className="break-words">
+                      {describeAction(t, action)}
+                      {action.confidence === "low" && (
+                        <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                          {t("voiceCapture.lowConfidence")}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+                <p className="mt-2 text-xs text-gray-500">{t("voiceCapture.understoodHint")}</p>
+              </>
+            )}
+            {commandIsCurrent && command.parsed.unparsed.length > 0 && (
+              <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                <p className="font-semibold">{t("voiceCapture.notUnderstoodTitle")}</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {command.parsed.unparsed.map((words, i) => (
+                    <li key={i} className="break-words">{words}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {commandIsCurrent && command.parsed.dropped.length > 0 && (
+              <div className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                <p className="font-semibold">{t("voiceCapture.droppedTitle")}</p>
+                <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                  {command.parsed.dropped.map((d, i) => (
+                    <li key={i} className="break-words">{d.words}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {commandIsCurrent && command.parsed.contextTruncated && (
+              <p className="mt-3 text-xs text-gray-500">{t("voiceCapture.contextTruncated")}</p>
+            )}
+          </div>
+        )}
 
         {/* Create Task + Cancel buttons */}
         <div className="flex w-full gap-2">
@@ -566,8 +753,16 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
             {t("common.cancel")}
           </button>
           <button
-            onClick={isPatientMode ? handleCapturePatient : handleCreateTask}
-            disabled={!transcript.trim() || isProcessing}
+            onClick={
+              isPatientMode
+                ? handleCapturePatient
+                : !isCommandMode || fallback === "limited"
+                  ? handleCreateTask
+                  : commandIsCurrent && commandActions.length > 0
+                    ? handleStartCommand
+                    : handleParseCommand
+            }
+            disabled={!transcript.trim() || isProcessing || overLimit}
             className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-none px-6 py-3.5 text-base font-semibold shadow-md transition-all duration-200 active:scale-[0.98] ${
               transcript.trim()
                 ? "bg-blue-600 text-white hover:bg-blue-700 cursor-pointer"
@@ -578,8 +773,16 @@ export default function VoiceCapture({ onClose, onTaskCreated, onPatientParsed, 
               <OperationStatus operations={ops.operations} name={operationName} variant="button" />
             ) : isPatientMode ? (
               t("voiceCapture.reviewPatient")
-            ) : (
+            ) : !isCommandMode ? (
               t("voiceCapture.createTask")
+            ) : fallback === "limited" ? (
+              t("voiceCapture.createOneTask")
+            ) : commandIsCurrent && commandActions.length > 0 ? (
+              t("voiceCapture.start")
+            ) : command || fallback === "unreadable" ? (
+              t("voiceCapture.runAgain")
+            ) : (
+              t("voiceCapture.reviewActions")
             )}
           </button>
         </div>

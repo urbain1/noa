@@ -4,6 +4,7 @@ import { codeStatusLabel } from "../i18n/enums";
 import OperationStatus from "./OperationStatus";
 import { useOperationStatus } from "../hooks/useOperationStatus";
 import { errorText } from "../utils/errors";
+import VoiceStepHeader from "./VoiceStepHeader";
 
 // Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
@@ -13,7 +14,13 @@ const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
 // second way of creating a patient: a patient is only ever created by the
 // nurse confirming these fields here. Fields the parser couldn't extract
 // arrive undefined and stay blank -- nothing is invented to fill them.
-export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
+//
+// `voiceStep` makes this dialog one step of a universal voice command
+// (VoiceQueue): it shows where the nurse is in the queue, Cancel becomes
+// Skip, and the close button ends the queue. Without it the dialog behaves
+// exactly as before. `existingLabels` lets a step warn that the label is
+// already in use.
+export default function AddPatientDialog({ initialFields, onCancel, onSave, voiceStep, existingLabels }) {
   const { t } = useTranslation();
   const fromVoice = Boolean(initialFields);
   const [label, setLabel] = useState(initialFields?.label || "");
@@ -66,13 +73,14 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
       // provider's own text.
       console.error("Create patient error:", err);
       setError(errorText(err, t("errors.createPatient")));
+      voiceStep?.onError?.(err);
     }
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={saving ? undefined : onCancel}
+      onClick={saving || voiceStep ? undefined : onCancel}
     >
       <div
         className="relative flex w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
@@ -83,10 +91,10 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
         <div className="flex items-center justify-between px-6 pt-6 pb-4">
           <h2 className="text-xl font-bold text-gray-900">{t("patientDialog.addTitle")}</h2>
           <button
-            onClick={onCancel}
+            onClick={voiceStep ? voiceStep.onClose : onCancel}
             disabled={saving}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700 disabled:opacity-40"
-            aria-label={t("patientDialog.closeAria")}
+            aria-label={voiceStep ? t("voiceQueue.closeAria") : t("patientDialog.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -96,9 +104,15 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
 
         {/* Body */}
         <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          <VoiceStepHeader step={voiceStep} />
           {fromVoice && (
             <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-800">
               {t("patientDialog.voiceReviewHint")}
+            </p>
+          )}
+          {existingLabels?.includes(label.trim()) && (
+            <p role="alert" className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 ring-1 ring-amber-200">
+              {t("voiceQueue.duplicateLabel")}
             </p>
           )}
           <div>
@@ -201,18 +215,18 @@ export default function AddPatientDialog({ initialFields, onCancel, onSave }) {
         {/* Footer */}
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
-            onClick={onCancel}
+            onClick={voiceStep ? () => voiceStep.onSkip() : onCancel}
             disabled={saving}
             className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {t("common.cancel")}
+            {voiceStep ? t("voiceQueue.skip") : t("common.cancel")}
           </button>
           <button
             onClick={handleSave}
             disabled={!label.trim() || saving}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {t("patientDialog.addButton")}
+            {voiceStep ? t("voiceQueue.confirm") : t("patientDialog.addButton")}
           </button>
         </div>
       </div>

@@ -6,6 +6,8 @@ import { columnLabels } from "../utils/historyFormat";
 import { fetchPatientRow } from "../lib/patients";
 import { useEditSession } from "../hooks/useEditSession";
 import EditLockBanner from "./EditLockBanner";
+import VoiceStepHeader from "./VoiceStepHeader";
+import VoiceChangeList from "./VoiceChangeList";
 
 // Stored as-is: these are the canonical values the patients table holds.
 const CODE_STATUS_OPTIONS = ["Full Code", "DNR", "DNR/DNI", "Comfort Care"];
@@ -59,13 +61,30 @@ function toPayload(fields) {
   };
 }
 
+// What a column's form value reads as in the "will change" list.
+function displayValue(t, column, formFields) {
+  const field = Object.keys(FIELD_COLUMNS).find((f) => FIELD_COLUMNS[f] === column);
+  const value = formFields[field];
+  if (column === "code_status") return codeStatusLabel(t, value);
+  return typeof value === "string" ? value.trim() : value;
+}
+
 // Editing a patient locks that patient record (not its tasks) for colleagues
 // at the same facility, and every save is checked against changes made since
 // the dialog opened (useEditSession). Typed values are never discarded
 // without the nurse choosing to.
-export default function EditPatientDialog({ patient, facilityId, onRowRefreshed, onCancel, onSave }) {
+//
+// `voiceStep` + `proposal` make this dialog one step of a universal voice
+// command (VoiceQueue). `proposal(row)` returns the form values the command
+// asks for, given the row as it is now; it is laid over the fresh row when
+// the dialog opens and again whenever the row is re-read, so a proposal is
+// never silently replaced by the stored values, and an "add this allergy"
+// is always applied to the current list. Nothing is written until Confirm.
+// Without `voiceStep` the dialog behaves exactly as before.
+export default function EditPatientDialog({ patient, facilityId, onRowRefreshed, onCancel, onSave, proposal, voiceStep }) {
   const { t } = useTranslation();
-  const [fields, setFields] = useState(() => fieldsFromRow(patient));
+  const withProposal = (row) => (proposal ? { ...fieldsFromRow(row), ...proposal(row) } : fieldsFromRow(row));
+  const [fields, setFields] = useState(() => withProposal(patient));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -76,7 +95,7 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
     initialRow: patient,
     loadRow: () => fetchPatientRow(facilityId, patient.id),
     onFreshRow: (row) => onRowRefreshed?.("patient", row),
-    onBaselineReplaced: (row) => setFields(fieldsFromRow(row)),
+    onBaselineReplaced: (row) => setFields(withProposal(row)),
     hasUnsaved: (baselineRow) => unsavedColumnsOf(fields, baselineRow).length > 0,
   });
 
@@ -88,8 +107,12 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
     setSaving(true);
     setError(null);
     try {
-      await session.guard(() => onSave(patient.id, toPayload(toSave)));
-      // onSave closes the dialog on success.
+      const before = session.baseline;
+      const columns = unsavedColumnsOf(toSave, before);
+      const after = await session.guard(() => onSave(patient.id, toPayload(toSave)));
+      // onSave closes the dialog on success. As a voice step, the queue moves
+      // on and keeps both rows in memory so the change can be undone.
+      voiceStep?.onConfirmed({ before, after, columns });
     } catch (err) {
       // Refused by the lock or by a change made by someone else: the banner
       // explains, and the typed values stay in the form.
@@ -98,6 +121,7 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
         // provider's own text.
         console.error("Update patient error:", err);
         setError(errorText(err, t("errors.updatePatient")));
+        voiceStep?.onError?.(err);
       }
       setSaving(false);
     }
@@ -120,6 +144,12 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
   // Closing while unable to save, with typed values on screen: ask first
   // rather than dropping them without a word.
   const handleClose = () => {
+    // As a voice step, closing ends the queue. Nothing has been written, and
+    // the summary lists this action as not done.
+    if (voiceStep) {
+      voiceStep.onClose();
+      return;
+    }
     if (!session.canEdit && unsavedColumns.length > 0) {
       const fieldsText = columnLabels(t, "patient", unsavedColumns).join(", ");
       if (!window.confirm(t("editLock.closeUnsaved", { fields: fieldsText }))) return;
@@ -127,10 +157,19 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
     onCancel();
   };
 
+  const voiceChanges = voiceStep
+    ? unsavedColumns.map((column) => ({
+        field: columnLabels(t, "patient", [column])[0],
+        from: displayValue(t, column, fieldsFromRow(session.baseline)),
+        to: displayValue(t, column, fields),
+      }))
+    : null;
+  const nothingToChange = Boolean(voiceStep) && session.ready && unsavedColumns.length === 0;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 px-4"
-      onClick={handleClose}
+      onClick={voiceStep ? undefined : handleClose}
     >
       <div
         className="relative flex w-full max-w-lg flex-col rounded-lg bg-white shadow-xl"
@@ -148,7 +187,7 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
           <button
             onClick={handleClose}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:text-gray-700"
-            aria-label={t("patientDialog.closeAria")}
+            aria-label={voiceStep ? t("voiceQueue.closeAria") : t("patientDialog.closeAria")}
           >
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -158,6 +197,8 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
 
         {/* Body */}
         <div className="flex flex-col gap-4 overflow-y-auto px-6 pb-2" style={{ maxHeight: "70vh" }}>
+          <VoiceStepHeader step={voiceStep} />
+          {voiceStep && session.ready && <VoiceChangeList changes={voiceChanges} />}
           <EditLockBanner
             session={session}
             recordType="patient"
@@ -274,18 +315,21 @@ export default function EditPatientDialog({ patient, facilityId, onRowRefreshed,
         {/* Footer */}
         <div className="flex gap-3 border-t border-gray-200 px-6 py-4">
           <button
-            onClick={handleClose}
-            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97]"
+            onClick={voiceStep ? () => voiceStep.onSkip(nothingToChange ? "nothing_to_change" : undefined) : handleClose}
+            disabled={Boolean(voiceStep) && saving}
+            className="flex-1 rounded-lg bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t("common.cancel")}
+            {voiceStep ? (nothingToChange ? t("voiceQueue.next") : t("voiceQueue.skip")) : t("common.cancel")}
           </button>
-          <button
-            onClick={() => handleSave()}
-            disabled={saving || disabled}
-            className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? t("common.saving") : t("common.saveChanges")}
-          </button>
+          {!nothingToChange && (
+            <button
+              onClick={() => handleSave()}
+              disabled={saving || disabled}
+              className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? t("common.saving") : voiceStep ? t("voiceQueue.confirm") : t("common.saveChanges")}
+            </button>
+          )}
         </div>
       </div>
     </div>

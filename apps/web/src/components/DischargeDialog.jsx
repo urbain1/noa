@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { errorText } from "../utils/errors";
+import VoiceStepHeader from "./VoiceStepHeader";
 
 // Discharge planning for one patient. The checklist and free-text notes are
 // carried over from the demo version; what changed is where the tasks go --
@@ -11,11 +12,15 @@ import { errorText } from "../utils/errors";
 // `location_label`, `diagnosis`). The demo-era `name`/`room` fields this
 // dialog used to render don't exist on those rows, which is why it showed
 // an empty header.
-export default function DischargeDialog({ patient, onCancel, onConfirm }) {
+//
+// `voiceStep` makes this dialog one step of a universal voice command
+// (VoiceQueue), pre-filled through `initial`. Without it the dialog behaves
+// exactly as before.
+export default function DischargeDialog({ patient, onCancel, onConfirm, initial, voiceStep }) {
   const { t } = useTranslation();
   const [notifyPatient, setNotifyPatient] = useState(true);
-  const [needsNursingHome, setNeedsNursingHome] = useState(false);
-  const [notes, setNotes] = useState("");
+  const [needsNursingHome, setNeedsNursingHome] = useState(Boolean(initial?.needsNursingHome));
+  const [notes, setNotes] = useState(initial?.notes || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -33,6 +38,7 @@ export default function DischargeDialog({ patient, onCancel, onConfirm }) {
       console.error("Discharge planning error:", err);
       setError(errorText(err, t("errors.createDischargeTasks")));
       setSaving(false);
+      voiceStep?.onError?.(err);
     }
   }
 
@@ -41,12 +47,17 @@ export default function DischargeDialog({ patient, onCancel, onConfirm }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
-      onClick={saving ? undefined : onCancel}
+      onClick={saving || voiceStep ? undefined : onCancel}
     >
       <div
         className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
+        {voiceStep && (
+          <div className="mb-4">
+            <VoiceStepHeader step={voiceStep} showClose />
+          </div>
+        )}
         <h2 className="text-lg font-bold text-gray-900">
           {t("discharge.title", { patient: patient.label })}
         </h2>
@@ -99,18 +110,18 @@ export default function DischargeDialog({ patient, onCancel, onConfirm }) {
 
         <div className="mt-5 flex gap-3">
           <button
-            onClick={onCancel}
+            onClick={voiceStep ? () => voiceStep.onSkip() : onCancel}
             disabled={saving}
             className="flex-1 rounded-lg border border-gray-300 bg-gray-100 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-700 hover:text-white active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {t("common.cancel")}
+            {voiceStep ? t("voiceQueue.skip") : t("common.cancel")}
           </button>
           <button
             onClick={handleConfirm}
             disabled={saving || nothingSelected}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {saving ? t("common.saving") : t("discharge.createTasks")}
+            {saving ? t("common.saving") : voiceStep ? t("voiceQueue.confirm") : t("discharge.createTasks")}
           </button>
         </div>
       </div>
