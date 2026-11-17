@@ -4,6 +4,7 @@
 - **Frontend:** React 19 + Vite, Tailwind CSS. Deployed as a web app (Vercel). No native/Expo build for this phase. Testers use the Vercel preview of `build-mvp`, not production (see `decisions.md`, 2026-11-16).
 - **Backend:** Supabase (Postgres, Auth, Realtime, Row Level Security). No custom Express/Prisma layer, `apps/api` is not used.
 - **AI:** Claude API (Anthropic), called only from the `claude-proxy` Supabase Edge Function, which checks the caller's Supabase session. Never called from the client; no API key in the frontend bundle. The old `api/claude.js` Vercel function was removed (`decisions.md`, 2026-08-25). Prompts carried over from the demo, see `DEMO_TO_MVP_from_noa_demo.md`. The Edge Function reads the session only; it writes no rows.
+- **AI model:** the nine older actions pin `claude-sonnet-4-5-20250929`, which Anthropic retires on 2026-11-30; they need migrating before then. `parseVoiceCommand` runs on `claude-sonnet-5-5` (`decisions.md`, 2026-11-16).
 - **Voice capture:** Web Speech API, recognition language follows the nurse's UI language. Known limitation: unreliable on iOS Safari, and blocked entirely once the site is installed as a home-screen PWA. Keep the beta as a plain browser link on iOS testers' phones, don't prompt install. Revisit (Speechmatics, or native) only if this proves to be an actual blocker in testing.
 - **Languages:** English and French via react-i18next (`apps/web/src/i18n`). The language is per nurse (`nurses.preferred_language`), applied on sign-in. Every user-facing string goes through `t()`; `translations_review.csv` mirrors the two locale files in `en.json` key order.
 - **Region:** Supabase project in EU West (London, `eu-west-2`).
@@ -42,8 +43,18 @@ Opening the edit dialog for a patient or task locks that single record for colle
 - **Pending edits** are never dropped silently: values stay in the fields and the dialog lists what wasn't saved.
 - The `supabase_realtime` publication on tasks/alerts/notes (0001) is still unused: patient and task lists do not live-update.
 
+## Universal voice command
+The main-page mic (`decisions.md`, 2026-11-16; `scenarios.md` SC-18 to SC-22). One utterance, up to five actions, each confirmed in its existing dialog. The per-patient capture on a patient card is separate and unchanged.
+
+- **Parser:** Edge Function action `parseVoiceCommand`, in `supabase/functions/claude-proxy/voiceCommand.mjs`. Plain JavaScript with no Deno or Node APIs, so the Edge Function, the eval runner and the unit tests load the same file. It holds the server action registry (`ACTION_REGISTRY`: which fields each action type may carry, each with a validator), the context caps, the prompt builder, the deadline resolver and the handler. Input: transcript, language, the device's time and timezone, and a minimal context built by `utils/voiceContext.js`. Output: validated actions in spoken order, plus what was dropped past five and what was not understood. The model never sees a database id (tasks are aliased) and never picks a patient.
+- **Client:** `utils/claudeAPI.js` `parseVoiceCommand` (reports the cause of a failure), `utils/voiceRegistry.js` (client registry: which dialog a type opens, how it pre-fills, whether it can be undone; a test keeps its lists identical to the server's), `utils/voiceResolve.js` (patient through the unchanged `roomMatcher.js`, exact match only; task ownership; nurse name), `utils/voiceQueue.js` (a pure, type-agnostic reducer: pending, done, skipped, failed, not available, blocked by a skipped creation, cancelled).
+- **Screens:** `VoiceCapture` in `mode="command"` (speak or type, "what Noa understood", run again, limited mode), then `VoiceQueue`, which renders each step: `VoicePatientPicker` or `VoiceTaskPicker` when something is unresolved, then `AddPatientDialog`, `EditPatientDialog`, `AddTaskDialog`, `TaskEditDialog` (proposal mode), `AddNoteDialog`, `DischargeDialog` or `VoiceNoticeStep`, and finally `VoiceSummary`. Each dialog takes an optional `voiceStep` prop and behaves as before without it. Writes are the existing `lib/patients.js` functions, passed in from `App` with an explicit facility filter.
+- **Undo:** `utils/voiceUndo.js` plans it from the before and after rows the queue keeps in memory; `VoiceUndoSession` runs it inside `useEditSession`; `VoiceUndoControl` is the 60-second button on a summary line. `lib/taskRestore.js` (`restoreTaskSnapshot`) is the only new write and is imported by `utils/voiceUndo.js` alone.
+- **Fallback:** if the parser cannot run, the capture screen says so and offers the existing single-task path. Never silent.
+- **Eval:** `evals/voice/` (fixtures, 112 cases, `score.mjs`, `run.mjs`, `RESULTS.md`). `npm run eval:voice` from `apps/web` runs every case through the deployed handler against the real API, with `ANTHROPIC_API_KEY` from the shell environment only. `CLAUDE.md` requires a run after any change to the parser prompt.
+
 ## Tests
-Vitest + React Testing Library in `apps/web` (`npm test`). jsdom environment, one setup file (`src/test/setup.js`: jest-dom matchers, `lib/supabase` mocked so no test reaches Supabase, language reset to English), TZ fixed to UTC, tests next to the code they cover (`*.test.js(x)`). Current suites: the history line formatter, the lock state machine and stale-write detection, the edit-session hook, the History dialog. SQL is verified with `supabase/verify_audit_log.sql` against the real project. Fixtures use `Patient_Test_N` labels and invented names only.
+Vitest + React Testing Library in `apps/web` (`npm test`). jsdom environment, one setup file (`src/test/setup.js`: jest-dom matchers, `lib/supabase` mocked so no test reaches Supabase, language reset to English), TZ fixed to UTC, tests next to the code they cover (`*.test.js(x)`). Current suites: the history line formatter, the lock state machine and stale-write detection, the edit-session hook, the History dialog, and for the voice command: the parser module (validation, caps, deadlines across timezones), the eval scorer, the client call, the registry, resolver, queue and undo logic, `restoreTaskSnapshot`, the task dialog's proposal mode, the queue flow, the capture screen's limited mode, and the guarded undo. The parser's accuracy against the real model is measured separately by `npm run eval:voice`. SQL is verified with `supabase/verify_audit_log.sql` against the real project. Fixtures use `Patient_Test_N` labels and invented names only.
 
 ## Planned additions once roadmap features are designed
 - A ward-manager layer for duties and per-nurse visibility. Note `tasks.assigned_to` (0011) already exists as data only; it changes nothing about who sees a task.
@@ -63,15 +74,16 @@ noa/
   apps/web/              # React + Vite frontend
     src/components/      # one file per dialog/card
     src/hooks/           # shared hooks (operation status, edit locks)
-    src/lib/             # Supabase data access (patients, nurses, audit log)
-    src/utils/           # pure logic (matching, sorting, history lines, locks)
+    src/lib/             # Supabase data access (patients, nurses, audit log, undo's task restore)
+    src/utils/           # pure logic (matching, sorting, history lines, locks, voice queue)
     src/i18n/            # en/fr locale files
     src/test/            # Vitest setup
   supabase/
     migrations/          # 0001 to 0013, applied by hand
-    functions/           # Edge Functions, includes the Claude proxy
+    functions/           # Edge Functions: claude-proxy (index.ts + voiceCommand.mjs)
     rollback_NNNN.sql    # one per migration that needs it
     verify_audit_log.sql # SQL-editor check for 0012
+  evals/voice/           # voice-command eval: fixtures, cases, scorer, runner, results
   project.md
   ARCHITECTURE.md
   decisions.md

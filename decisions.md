@@ -2,6 +2,54 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-11-16: Universal voice command, v1 scope
+
+**Decision:** the main-page mic is now one general voice command (`project.md` had this as a future direction). The nurse speaks or types freely; Noa works out the separate actions, shows what it understood, and walks the nurse through each one in its existing dialog, pre-filled, to confirm or skip. **Nothing is written without a confirmation.** It replaces the main-page task capture. The per-patient capture on a patient card ("+ Add Task") is unchanged.
+
+**Action list (v1):** `create_patient`, `edit_patient`, `create_task`, `edit_task` (complete, reopen, priority, deadline, department, description, assign, unassign), `create_note`, `start_discharge_planning` (opens the planning dialog, discharges nobody), `open_handoff` (navigation only), and `unsupported` with a reason code. The list is a registry on both sides (`voiceCommand.mjs` `ACTION_REGISTRY`, `utils/voiceRegistry.js` `VOICE_ACTIONS`); the queue knows nothing about action types, so a new one (a real discharge outcome, temporary leave) is one entry on each side.
+
+**No deletes by voice.** A delete of anything comes back as `unsupported` and the app says "Deleting isn't available by voice. Open the item to delete it." and does nothing. The validator enforces this whatever the model returns: an unknown delete-like type, a delete flag, or an edit to a cancelled or deleted status all become `unsupported`. "Cancel the task" counts as a delete, as it already does in the task edit dialog.
+
+**Five actions per utterance.** The model returns everything it heard; the validator keeps the first five and reports the rest with their words, so the nurse can repeat them.
+
+**Patient matching stays local and unchanged.** The model never picks a patient. It reports the reference as spoken plus, when a number was said, the normalised `Patient_Test_N`, and the client resolves it with `roomMatcher.js` as it is. What is new is only what the queue does with the matcher's answer, and it is **stricter** than the old capture: it pre-selects on `exact` only. A sole partial match is listed first in the picker, never selected, because with `Patient_Test_N` labels every patient shares the words "patient" and "test": in a facility with one patient, a spoken "patient 7" is a sole partial match on `Patient_Test_1`. Anything unresolved opens a patient picker inside the step, with the option to create the patient.
+
+**Task ids are validated twice.** The model never sees a database id: the Edge Function shows tasks under short aliases (`t1`, `t2`), maps them back, and rejects any alias not in the list or belonging to another patient than the one named. The client then checks the task is one of the resolved patient's, at this facility. Anything else opens a task picker. Never a guess.
+
+**Nurses are matched on the client**, case- and accent-insensitively, on the full name or on name parts that exactly one nurse has. No fuzzy matching: a near miss leaves the assignee for the nurse to choose, with the name that was heard shown.
+
+**The model does not compute dates.** It describes the deadline that was said (a duration, or a day and a clock time or part of day) and `resolveDeadline` does the arithmetic in the nurse's own timezone, with the same named times as `taskEditParse.js` (a test asserts they agree). The older prompts are handed UTC and are an hour or more off for testers outside it.
+
+**Minimal context, capped.** Sent with the transcript: patient labels and location labels, open tasks plus tasks completed in the last 24 hours (at most 20, so "reopen" can name its task), and nurse display names. No note content, no diagnosis, no email. Caps: transcript 1000 characters (rejected above, not cut), 60 patients, 120 tasks (descriptions cut to 120 characters), 60 nurse names, 20,000 characters overall. Anything cut is reported (`context_truncated`).
+
+**Values are dropped, never coerced.** Priority is `Routine` or `Stat` (the `tasks.priority` check constraint; spoken "urgent" means Stat, as everywhere else in the app). Status is one of `Pending`, `Confirmed`, `Delayed`, `Completed`: `Cancelled` is allowed by the constraint but is what a delete would mean. `department` has no constraint; the list is the app's own eight. A patient label must match `^Patient_Test_\d+$`.
+
+**Visible fallback, never a silent one.** A regex fallback for multi-action speech is not realistic, so the fallback required by `CLAUDE.md` is the existing single-task capture: if the parser is unreachable, unknown to the deployed function, or errors, the screen shows a translated notice ("Limited mode... will create one task only") and the button becomes "Create one task", which runs the old path unchanged on the same text. Nothing happens until the nurse presses it, and the real cause is logged to the console. This is the 2026-08-27 lesson applied in advance: before the Edge Function is redeployed, every command lands here.
+
+**In a queue step, a note is saved exactly as confirmed.** The usual clean-up pass through `parseNoteInput` is skipped there, because it would store something other than what the nurse just confirmed. No follow-up suggestion popup is triggered for items created in a queue. A report the nurse confirmed opening opens when the summary is closed, since it replaces the whole screen.
+
+**A create-task form now exists.** There was none: the single-task capture writes straight after parsing. `AddTaskDialog` is that form, with the manual fields of the task edit dialog. `TaskEditDialog` gained a proposal mode for voice steps: no auto-save, an old-to-new change list, one guarded update on Confirm.
+
+**Undo comes from memory.** The audit log stores column names only, so undo cannot read from it. The queue keeps the row before and the row after each write, in memory, until the summary is closed, and offers Undo for 60 seconds per applied action. Every undo runs inside a real `useEditSession` (lock plus stale-write check) and is refused, naming who, if the record is no longer exactly what the voice action left. An edit's changed columns go back through the existing `updateTask` / `updatePatient`; a created task is deleted through the existing `deleteTask`. A created note or patient cannot be undone: no delete path exists for them and none was added.
+
+**One new write, tightly scoped: `restoreTaskSnapshot` (`lib/taskRestore.js`).** Undoing a complete or a reopen through `updateTask` would stamp `completed_at` = now and `completed_by` = whoever pressed Undo. Approved with these limits, each covered by a test: called from the undo path only (`utils/voiceUndo.js` is its only importer); writes exactly `status`, `completed_at`, `completed_by` and rejects any other column; runs inside `useEditSession`'s lock and stale-write check; filters by task id and `facility_id`, and by the status the voice action left, so a status changed in the meantime matches no row. The 0012 trigger logs it as an ordinary task update.
+
+**No migration, no RLS change, no change to `roomMatcher.js`.**
+
+**Measured, not assumed.** `evals/voice/` holds 112 synthetic utterances, half English and half French, with a scorer that keeps four safety counters apart from correctness (wrong patient, wrong task, executed delete, invented value). One third of the cases is held out and never used to change the prompt; the held-out score is the one that counts. Results are in `evals/voice/RESULTS.md`.
+
+## 2026-11-16: The voice parser runs on `claude-sonnet-5-5`. The other nine actions pin a model that retires on 2026-11-30
+
+**Fact:** every existing `claude-proxy` action pins `claude-sonnet-4-5-20250929`. Anthropic deprecated it on 2026-09-30 and retires it on **2026-11-30** (model deprecations page, checked 2026-11-16; recommended replacement `claude-sonnet-5-5`). After that date requests to it fail, and every Claude feature in the app drops to its fallback or its error message.
+
+**Decision for this task:** `parseVoiceCommand` uses `claude-sonnet-5-5` at `output_config.effort: "low"`. Tuning and measuring it on a model with two weeks to live would have produced numbers that were void on arrival. Consequences in the Edge Function: `callClaude` forwards an optional `output_config` (no other action sends one, so their request bodies are unchanged), and the new handler reads the text block by type rather than by position, since this model can return a thinking block first. No `temperature` (the model rejects non-default values). Plain JSON-only output, the house pattern; the validator is the safety boundary either way.
+
+**Not done here, and urgent:** the nine existing actions are untouched. **They need their own migration before 2026-11-30.** It is not a rename: each handler reads `message.content[0].text`, which breaks when a thinking block comes first, and each prompt should be re-checked on the new model.
+
+## 2026-11-16: "AI edit" becomes "Voice edit" on voice features
+
+**Decision:** the second tab of the task edit dialog is labelled "Voice edit" / "Modification vocale" instead of "AI Edit" / "Modification par IA". Label only: the Claude logic behind it is unchanged. The data-entry notice (`SECURITY.md`, `NoticeScreen`) is deliberately untouched and keeps saying that AI is used, as do the suggestion disclaimer and the patient review hint ("AI transcription can be wrong").
+
 ## 2026-11-16: Deployment context that every database change must respect
 
 **Facts, as of this date:**

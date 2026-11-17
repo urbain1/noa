@@ -16,6 +16,7 @@ React 19 + Vite (web, not native) + Tailwind. Supabase for auth/db/realtime. Cla
 - Patient identifiers must always use the `Patient_Test_N` convention (app-generated), never a real room, bed, or hospital ID number. See `SECURITY.md`. This also applies to the optional location label field, must be synthetic, never a real room, bed, or ward.
 - When a Claude-powered feature behaves inconsistently or "depends on phrasing," first confirm which code path is actually live (Edge Function deployment status, the real network response) before changing any extraction or prompt logic. A day was lost hardening a fallback parser when the real cause was an undeployed function. See `decisions.md`, 2026-08-27.
 - Every query touching patients, tasks, or notes must be scoped to the current user's `facility_id`. No exceptions, no debug/admin bypass. Treat a cross-facility leak the same severity as a real PHI leak.
+- Any change to the voice parser prompt (`supabase/functions/claude-proxy/voiceCommand.mjs`) must be followed by `npm run eval:voice` from `apps/web`, with the pass rate recorded in `evals/voice/RESULTS.md` (`--record "what changed"`). Change the prompt against the tuning cases only; the held-out score is the one that counts. The API key comes from the shell environment, never a `VITE_` variable, never a file. See `evals/voice/README.md`.
 
 ## Conventions
 - Components: one file per dialog/card, matching the existing structure under `apps/web/src/components/`.

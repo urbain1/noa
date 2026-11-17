@@ -74,3 +74,23 @@ Expected: B sees "[A] is currently editing this. Wait, or ask them to finish.", 
 **SC-17: Patient history view**
 A nurse opens a patient card's ⋯ menu, then History.
 Expected: the patient's changes and those of its tasks and notes, newest first, 50 at a time, in the nurse's language: "Task completed by [nurse], 16 Nov 14:02", "Task modified by [nurse] (priority, deadline)". A task or note that still exists is named by its current text; a deleted one shows a generic line. No field value ever comes from the log itself. Only the nurse's own facility's history is visible. If migration 0012 isn't applied yet, the dialog says history isn't available and the card keeps working.
+
+**SC-18: A voice command is misheard or misparsed**
+A nurse says "change the CBC for patient 3 to stat" and speech-to-text writes "patient tree", or the parser attaches the change to the wrong field.
+Expected: nothing is written before the nurse has seen it. The capture screen lists what Noa understood, one line per action, with what it did not understand and with "check this" on anything it was unsure of; the nurse can correct the text and run it again. Each action then opens in its own dialog showing the patient, the words it came from, and for an edit the fields that will change, old value to new value. A patient that does not resolve to exactly one record opens a picker and is never pre-selected. A task that is not exactly one task of that patient opens a task picker. A field that was not clearly said arrives empty. A delete is never carried out: "Deleting isn't available by voice. Open the item to delete it."
+
+**SC-19: Several actions, one depends on another that is skipped**
+"Create patient test 6 and order a BMP for the same patient, and add a note for patient 2."
+Expected: three steps in spoken order. If the nurse confirms the creation, the BMP step is bound to the new record. If the nurse skips the creation, the BMP step is skipped too and the summary says "Not done: the patient was not created"; the note for patient 2 is unaffected. Closing the queue at any point cancels what is left and the summary says how many actions were not done. More than five actions in one utterance: the first five are walked, the rest are listed with their words so the nurse can repeat them.
+
+**SC-20: A voice edit on a record a colleague is editing**
+The command changes a task that another nurse has open in the edit dialog.
+Expected: the step opens the task dialog with the usual lock banner ("[name] is currently editing this. Wait, or ask them to finish."), Confirm is disabled, and the nurse can wait, take over (after the usual confirmation), or skip. If someone changed the task after the step opened, including a tester on an older build that takes no part in locking, Confirm is refused and the banner says who changed what. Nothing is overwritten. The proposed values stay on screen.
+
+**SC-21: The voice parser cannot be reached**
+The Edge Function has not been redeployed since `parseVoiceCommand` was added, or it is down, or the model call fails.
+Expected: a visible, translated notice: "Limited mode. Noa can't read several actions right now. It will create one task only from this text." The button becomes "Create one task" and nothing happens until the nurse presses it; it then runs the previous single-task capture unchanged. The real cause ("Unknown action: parseVoiceCommand", a network error) is in the browser console. Never a silent fallback. If the parser ran but returned nothing usable, the nurse is told to correct the text and try again, with the one-task option still offered.
+
+**SC-22: Undo after a voice command**
+The summary offers Undo for 60 seconds on each applied edit and each created task.
+Expected: undoing an edit puts back exactly the fields that action changed, and undoing a complete or a reopen also puts back who had completed the task and when. Undoing a created task deletes it. If the record changed again in the meantime, the undo is refused and says who changed it; if a colleague is editing it, the undo says so and can be tried again. A created note or patient has no Undo button (no delete path exists), only a line saying to change it from the patient card. After 60 seconds, or once the summary is closed, there is nothing to undo from.
