@@ -1094,6 +1094,13 @@ function App() {
       return note;
     },
     startDischarge: (patient, options) => planDischarge(patient, options),
+    // State only: undo has just deleted this task through the guarded path
+    // (utils/voiceUndo.js), and App's copy of the roster follows.
+    forgetTask: (task) => {
+      setPatients((prev) =>
+        prev.map((p) => (p.id === task.patient_id ? { ...p, tasks: p.tasks.filter((tk) => tk.id !== task.id) } : p))
+      );
+    },
   };
 
   // The summary was closed. A report the nurse confirmed opening is opened

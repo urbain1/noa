@@ -11,7 +11,8 @@ const STATUS_STYLE = {
   [ITEM_STATUS.CANCELLED]: "bg-gray-100 text-gray-700",
 };
 
-function statusText(t, item) {
+function statusText(t, item, undone) {
+  if (undone) return t("voiceQueue.summary.undone");
   if (item.status === ITEM_STATUS.DONE && item.applied?.kind === "handoff") return t("voiceQueue.summary.opensOnClose");
   if (item.status === ITEM_STATUS.SKIPPED && (item.note === "nothing_to_change" || item.note === "already_planned")) {
     return t("voiceQueue.summary.nothingToChange");
@@ -26,7 +27,8 @@ function statusText(t, item) {
 //
 // `createdPatients`: labels of patients created from a picker along the way.
 // `renderExtra(item)`: per-line extra content (the Undo control).
-export default function VoiceSummary({ queue, patients, createdPatients = [], dropped = [], unparsed = [], hasDeferredReport, onClose, renderExtra }) {
+// `undoneIndexes`: actions undone from here; their line says so.
+export default function VoiceSummary({ queue, patients, createdPatients = [], dropped = [], unparsed = [], hasDeferredReport, onClose, renderExtra, undoneIndexes = [] }) {
   const { t } = useTranslation();
   const labelOf = (id) => patients.find((p) => p.id === id)?.label;
   const notDone = notDoneCount(queue);
@@ -53,11 +55,13 @@ export default function VoiceSummary({ queue, patients, createdPatients = [], dr
             </div>
           ))}
 
-          {queue.items.map((item) => (
-            <div key={item.index} className="rounded-lg border border-gray-200 p-3" data-status={item.status}>
+          {queue.items.map((item) => {
+            const wasUndone = undoneIndexes.includes(item.index);
+            return (
+            <div key={item.index} className="rounded-lg border border-gray-200 p-3" data-status={wasUndone ? "undone" : item.status}>
               <div className="flex items-start gap-2">
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_STYLE[item.status]}`}>
-                  {statusText(t, item)}
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${wasUndone ? STATUS_STYLE[ITEM_STATUS.SKIPPED] : STATUS_STYLE[item.status]}`}>
+                  {statusText(t, item, wasUndone)}
                 </span>
                 <span className="break-words text-sm text-gray-900">
                   {describeAction(t, item.action, { patientLabel: labelOf(item.patientId) })}
@@ -65,7 +69,8 @@ export default function VoiceSummary({ queue, patients, createdPatients = [], dr
               </div>
               {renderExtra?.(item)}
             </div>
-          ))}
+            );
+          })}
 
           {unparsed.length > 0 && (
             <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">

@@ -10,6 +10,7 @@ import VoicePatientPicker from "./VoicePatientPicker";
 import VoiceTaskPicker from "./VoiceTaskPicker";
 import VoiceNoticeStep from "./VoiceNoticeStep";
 import VoiceSummary from "./VoiceSummary";
+import VoiceUndoControl from "./VoiceUndoControl";
 import { createQueue, currentItem, queueReducer } from "../utils/voiceQueue";
 import {
   VOICE_ACTIONS,
@@ -23,6 +24,7 @@ import {
   taskProposal,
 } from "../utils/voiceRegistry";
 import { isDischargePlanned } from "../utils/discharge";
+import { stampApplied } from "../utils/voiceUndo";
 
 // The review queue of a universal voice command (decisions.md, 2026-11-16).
 //
@@ -41,12 +43,16 @@ import { isDischargePlanned } from "../utils/discharge";
 // Edits run inside the dialogs' own useEditSession (lock + stale-write
 // check), so a record a colleague is editing shows the usual banner.
 //
+// The summary offers Undo for 60 seconds per applied action. The row before
+// and the row after each write are kept here, in memory only (the audit log
+// stores column names, never values), and dropped when the summary closes.
+//
 // `api`: { createPatient, updatePatient, createTask, updateTask, addNote,
-//          startDischarge }  each resolves to the saved row(s), throws on failure
+//          startDischarge }  each resolves to the saved row(s), throws on failure;
+//        forgetTask(task)   drops a task undo just deleted from App's roster
 // `onFinished({ handoff })`: the summary was closed; `handoff` is the report
 //   the nurse confirmed opening, if any.
-// `renderSummaryExtra(item)`: per-line content for the summary (Undo).
-export default function VoiceQueue({ parsed, patients, nurses, facilityId, currentNurseId, api, onRowRefreshed, onFinished, renderSummaryExtra }) {
+export default function VoiceQueue({ parsed, patients, nurses, facilityId, currentNurseId, api, onRowRefreshed, onFinished }) {
   const { t } = useTranslation();
   const [queue, dispatch] = useReducer(queueReducer, undefined, () =>
     createQueue(buildQueueEntries(parsed.actions, patients, facilityId)),
@@ -54,6 +60,7 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
   // The item whose picker is currently showing the Add Patient form.
   const [creatingFor, setCreatingFor] = useState(null);
   const [createdPatients, setCreatedPatients] = useState([]);
+  const [undone, setUndone] = useState([]); // indexes of actions undone from the summary
 
   const item = currentItem(queue);
 
@@ -67,7 +74,20 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
         dropped={parsed.dropped}
         unparsed={parsed.unparsed}
         hasDeferredReport={Boolean(handoffItem)}
-        renderExtra={renderSummaryExtra}
+        undoneIndexes={undone}
+        renderExtra={(summaryItem) =>
+          summaryItem.status === "done" ? (
+            <VoiceUndoControl
+              applied={summaryItem.applied}
+              facilityId={facilityId}
+              nurses={nurses}
+              currentNurseId={currentNurseId}
+              onRowRestored={onRowRefreshed}
+              onTaskDeleted={api.forgetTask}
+              onUndone={() => setUndone((prev) => [...prev, summaryItem.index])}
+            />
+          ) : null
+        }
         onClose={() => onFinished({ handoff: handoffItem ? handoffItem.applied : null })}
       />
     );
@@ -84,7 +104,8 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
     onClose: () => dispatch({ type: "close" }),
     onError: (err) => dispatch({ type: "error", index, message: String(err?.message || err) }),
   };
-  const done = (applied) => dispatch({ type: "done", index, applied });
+  // `at` starts the 60 seconds during which the summary offers Undo.
+  const done = (applied) => dispatch({ type: "done", index, applied: stampApplied(applied) });
   const key = `voice-step-${index}`;
 
   const patient = item.patientId ? patients.find((p) => p.id === item.patientId) || null : null;

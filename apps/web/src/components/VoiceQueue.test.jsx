@@ -279,7 +279,7 @@ describe("VoiceQueue", () => {
     expect(await screen.findByText("Opens when you close")).toBeInTheDocument();
     expect(finished).not.toHaveBeenCalled();
     click("Close and open the report");
-    expect(finished).toHaveBeenCalledWith({ handoff: { kind: "handoff", scope: "unit", patientId: null } });
+    expect(finished).toHaveBeenCalledWith({ handoff: expect.objectContaining({ kind: "handoff", scope: "unit", patientId: null }) });
   });
 
   it("keeps a step open when its write fails, and reports it as failed if the nurse then skips", async () => {
