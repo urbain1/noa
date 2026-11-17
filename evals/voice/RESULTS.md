@@ -17,3 +17,5 @@ Safety column order: wrong patient / wrong task / executed delete / invented val
 ## Changes to the case set
 
 - After run 1, the one failing held-out case (`en-42`, "the bloods for patient 4 are back", a wrong task) was read in order to report and fix it. It was moved to the tuning set and tagged `was_holdout`. Eight cases were added for its class (a general word such as "the bloods" or "the imaging" against a patient with one or with several tasks of that kind): `en-66`, `en-67`, `fr-61`, `fr-62` in tuning, and `en-68`, `en-69`, `fr-63`, `fr-64` held out. One imaging task was added to a patient in each fixture so the class has a case that does not reuse the patient of `en-42`. No expectation was changed.
+| 2026-11-17 05:05 | 2026-11-17.1 (b548ec6b8e) | claude-sonnet-5-5 / low | 80/80 (100.0%) | 40/40 (100.0%) | 0 / 0 / 0 / 0 | run 2: model lists candidate tasks and code decides (fixes en-42); 120 cases |
+| 2026-11-17 05:06 | 2026-11-17.1 (b548ec6b8e) | claude-sonnet-5-5 / low | 80/80 (100.0%) | 40/40 (100.0%) | 0 / 0 / 0 / 0 | run 3: same prompt, unchanged, repeated to check run-to-run variance |
