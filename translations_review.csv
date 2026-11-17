@@ -27,6 +27,8 @@ status.failed,Failed — try again,Échec — réessayez
 status.extractFailed,Couldn't read that — check the fields below,Lecture impossible — vérifiez les champs ci-dessous
 status.handoffFailed,Couldn't generate the report — try again,Génération impossible — réessayez
 status.suggestionsFailed,Couldn't generate suggestions,Génération des suggestions impossible
+status.readingCommand,Reading your command...,Lecture de votre commande...
+status.undoing,Undoing...,Annulation...
 errors.loadPatients,Could not load patients. Please try reloading.,Impossible de charger les patients. Veuillez recharger la page.
 errors.loadFacilities,Could not load facilities. Please try again.,Impossible de charger les établissements. Veuillez réessayer.
 errors.saveTask,Failed to save task. Please try again.,Échec de l'enregistrement de la tâche. Veuillez réessayer.
@@ -63,6 +65,8 @@ errors.dischargeTasksUntagged,"Discharge planning tasks were created, but could 
 errors.dischargeAlreadyPlanned,This patient already has discharge planning tasks. Cancel the existing set before creating a new one.,Ce patient a déjà des tâches de préparation de la sortie. Annulez l'ensemble existant avant d'en créer un nouveau.
 errors.cancelDischargePlanning,Failed to cancel discharge planning. Please try again.,Échec de l'annulation de la préparation de la sortie. Veuillez réessayer.
 errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
+errors.descriptionRequired,Enter a description.,Saisissez une description.
+errors.createTaskDialog,Couldn't create the task. Please try again.,Impossible de créer la tâche. Veuillez réessayer.
 language.label,Language,Langue
 language.en,English,English
 language.fr,Français,Français
@@ -134,7 +138,7 @@ facility.backToList,Back to facility list,Retour à la liste des établissements
 dashboard.myPatients,My Patients,Mes patients
 dashboard.unitView,Unit View,Vue du service
 dashboard.addPatient,Add Patient,Ajouter un patient
-dashboard.voiceInputAria,Voice input,Saisie vocale
+dashboard.voiceInputAria,Voice command,Commande vocale
 dashboard.tasksView,Tasks,Tâches
 dashboard.addPatientByVoice,Add by voice,Ajouter par la voix
 dashboard.noPatients,No patients yet. Add one to get started.,Aucun patient pour le moment. Ajoutez-en un pour commencer.
@@ -204,8 +208,34 @@ voiceCapture.createTask,Create Task,Créer la tâche
 voiceCapture.titlePatient,Add Patient by Voice,Ajouter un patient par la voix
 voiceCapture.tapToRecordPatient,Tap to describe a new patient,Appuyez pour décrire un nouveau patient
 voiceCapture.examplePatient,"Try: ""Patient Test 4, 72 years old, admitted with pneumonia, Test Room B""","Essayez : « Patient Test 4, 72 ans, admis pour une pneumonie, Chambre Test B »"
-voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number. A real age, diagnosis and admission date together can identify someone on their own — change any detail you don't need for testing.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels. Un âge, un diagnostic et une date d'admission réels peuvent à eux seuls identifier une personne — modifiez tout détail dont vous n'avez pas besoin pour vos tests."
+voiceCapture.patientSyntheticHint,"Use a synthetic label such as Patient_Test_4. Never say a real name, room, bed or ID number. A real age, diagnosis and admission date together can identify someone on their own. Change any detail you don't need for testing.","Utilisez une étiquette fictive telle que Patient_Test_4. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels. Un âge, un diagnostic et une date d'admission réels peuvent à eux seuls identifier une personne. Modifiez tout détail dont vous n'avez pas besoin pour vos tests."
 voiceCapture.reviewPatient,Review Patient,Vérifier le patient
+voiceCapture.titleCommand,Voice Command,Commande vocale
+voiceCapture.tapToRecordCommand,"Tap to speak, or type below","Appuyez pour dicter, ou saisissez ci-dessous"
+voiceCapture.commandExamplesTitle,You can say several things at once. For example:,Vous pouvez dire plusieurs choses à la fois. Par exemple :
+voiceCapture.commandExample1,Create patient test 6,Créer le patient test 6
+voiceCapture.commandExample2,Change the CBC for patient test 3 to stat and assign it to me,Passer la NFS du patient test 3 en urgence et me l'assigner
+voiceCapture.commandExample3,Add a note for patient test 2 that he refused breakfast,Ajouter une note pour le patient test 2 : il a refusé le petit déjeuner
+voiceCapture.commandSyntheticHint,"Use test labels only, such as patient test 3. Never say a real name, room, bed or ID number.","Utilisez uniquement des étiquettes de test, par exemple patient test 3. Ne dites jamais de nom, de chambre, de lit ou de numéro d'identification réels."
+voiceCapture.commandPlaceholder,"Your speech will appear here. You can also type, or correct the text.",Votre dictée apparaîtra ici. Vous pouvez aussi saisir ou corriger le texte.
+voiceCapture.charCount,{{count}} / {{max}},{{count}} / {{max}}
+voiceCapture.tooLong,"This is longer than {{max}} characters. Shorten it, or send it in two parts.","Ce texte dépasse {{max}} caractères. Raccourcissez-le, ou envoyez-le en deux fois."
+voiceCapture.reviewActions,Review actions,Vérifier les actions
+voiceCapture.runAgain,Run again,Relancer
+voiceCapture.start,Start,Commencer
+voiceCapture.understoodTitle,What Noa understood,Ce que Noa a compris
+voiceCapture.understoodHint,Nothing is saved yet. You will confirm or skip each action.,Rien n'est encore enregistré. Vous confirmerez ou ignorerez chaque action.
+voiceCapture.editedHint,The text changed. Run it again to update the actions.,Le texte a changé. Relancez pour mettre à jour les actions.
+voiceCapture.nothingUnderstood,Noa did not find any action in this. Correct the text and run it again.,Noa n'a trouvé aucune action dans ce texte. Corrigez-le et relancez.
+voiceCapture.notUnderstoodTitle,Not understood:,Non compris :
+voiceCapture.droppedTitle,"Too many actions at once. These were left out, please repeat them:","Trop d'actions à la fois. Celles-ci n'ont pas été prises en compte, merci de les répéter :"
+voiceCapture.lowConfidence,check this,à vérifier
+voiceCapture.contextTruncated,Your facility has more tasks than Noa can read at once. You may be asked to pick a task by hand.,Votre établissement compte plus de tâches que Noa ne peut en lire à la fois. Il vous sera peut-être demandé de choisir une tâche à la main.
+voiceCapture.limitedTitle,Limited mode,Mode limité
+voiceCapture.limitedBody,Noa can't read several actions right now. It will create one task only from this text.,Noa ne peut pas lire plusieurs actions pour le moment. Une seule tâche sera créée à partir de ce texte.
+voiceCapture.createOneTask,Create one task,Créer une tâche
+voiceCapture.unreadable,Noa couldn't understand that. Correct the text and try again.,Noa n'a pas compris. Corrigez le texte et réessayez.
+voiceCapture.orCreateOneTask,Create one task from this text instead,Créer plutôt une seule tâche à partir de ce texte
 patientMatch.multipleFound,Multiple Patients Found,Plusieurs patients trouvés
 patientMatch.foundCount,Found {{count}} patients matching '{{query}}'.,{{count}} patients correspondent à « {{query}} ».
 patientMatch.narrowLabel,Search to narrow results:,Rechercher pour affiner les résultats :
@@ -273,7 +303,7 @@ noteDialog.saveNote,Save Note,Enregistrer la note
 taskEdit.title,Edit Task,Modifier la tâche
 taskEdit.closeAria,Close,Fermer
 taskEdit.manualMode,Manual Edit,Modification manuelle
-taskEdit.aiMode,AI Edit,Modification par IA
+taskEdit.aiMode,Voice edit,Modification vocale
 taskEdit.description,Description,Description
 taskEdit.status,Status,Statut
 taskEdit.department,Department,Service
@@ -498,3 +528,89 @@ editLock.unavailable,Live edit locking isn't available right now. Changes made b
 editLock.closeUnsaved,Your changes were not saved ({{fields}}). Close anyway?,Vos modifications n'ont pas été enregistrées ({{fields}}). Fermer quand même ?
 editLock.deleteBlockedConflict,This task changed after you opened it. Nothing was deleted. Check the changes first.,Cette tâche a été modifiée après son ouverture. Rien n'a été supprimé. Vérifiez d'abord les modifications.
 editLock.deleteBlockedLock,You no longer hold this task for editing. Nothing was deleted.,Vous n'avez plus la main sur cette tâche. Rien n'a été supprimé.
+taskDialog.addTitle,New Task,Nouvelle tâche
+taskDialog.addButton,Create Task,Créer la tâche
+voiceQueue.stepOf,"Voice command, {{index}} of {{total}}","Commande vocale, {{index}} sur {{total}}"
+voiceQueue.heard,Heard: “{{words}}”,Entendu : « {{words}} »
+voiceQueue.confirm,Confirm,Confirmer
+voiceQueue.skip,Skip,Ignorer
+voiceQueue.next,Next,Suivant
+voiceQueue.closeAria,Stop here and close the remaining actions,Arrêter ici et fermer les actions restantes
+voiceQueue.willChange,Will change,Sera modifié
+voiceQueue.changeLine,{{field}}: {{from}} → {{to}},{{field}} : {{from}} → {{to}}
+voiceQueue.noChange,Already set this way. Nothing to change.,Déjà ainsi. Rien à modifier.
+voiceQueue.emptyValue,empty,vide
+voiceQueue.assigneeHeard,"Heard “{{name}}”. No single colleague matches, choose the assignee.","Entendu « {{name}} ». Aucun collègue unique ne correspond, choisissez la personne."
+voiceQueue.duplicateLabel,A patient with this label already exists.,Un patient porte déjà cette étiquette.
+voiceQueue.choosePatientTitle,Which patient?,Quel patient ?
+voiceQueue.choosePatientHeard,Noa heard “{{words}}” and could not match exactly one patient.,Noa a entendu « {{words}} » sans pouvoir l'associer à un seul patient.
+voiceQueue.choosePatientNone,No patient was named.,Aucun patient n'a été nommé.
+voiceQueue.suggested,Possible matches,Correspondances possibles
+voiceQueue.allPatients,All patients,Tous les patients
+voiceQueue.createThisPatient,Create {{label}},Créer {{label}}
+voiceQueue.createNewPatient,Create a new patient,Créer un nouveau patient
+voiceQueue.chooseTaskTitle,Which task?,Quelle tâche ?
+voiceQueue.chooseTaskHeard,Noa heard “{{words}}” for {{patient}} and could not match exactly one task.,Noa a entendu « {{words}} » pour {{patient}} sans pouvoir l'associer à une seule tâche.
+voiceQueue.chooseTaskNoHint,Choose the task for {{patient}}.,Choisissez la tâche pour {{patient}}.
+voiceQueue.chooseTaskNone,{{patient}} has no tasks.,{{patient}} n'a aucune tâche.
+voiceQueue.dischargeAlready,{{patient}} already has discharge planning in progress. Nothing to add.,{{patient}} a déjà une préparation de sortie en cours. Rien à ajouter.
+voiceQueue.handoffTitle,Open a report,Ouvrir un rapport
+voiceQueue.handoffUnitBody,Open the shift handoff report. It opens when you close the summary.,Ouvrir la transmission de relève. Elle s'ouvrira à la fermeture du récapitulatif.
+voiceQueue.handoffPatientBody,Open the SBAR for {{patient}}. It opens when you close the summary.,Ouvrir le SBAR de {{patient}}. Il s'ouvrira à la fermeture du récapitulatif.
+voiceQueue.unsupportedTitle,Not available by voice,Non disponible à la voix
+voiceQueue.unsupported.delete,Deleting isn't available by voice. Open the item to delete it.,La suppression n'est pas disponible à la voix. Ouvrez l'élément pour le supprimer.
+voiceQueue.unsupported.patient_label_fixed,A patient's label can't be changed. Retire the label and create a new patient instead.,L'étiquette d'un patient ne peut pas être modifiée. Retirez l'étiquette et créez plutôt un nouveau patient.
+voiceQueue.unsupported.discharge_outcome,Recording that a patient has left isn't available yet. You can start discharge planning instead.,L'enregistrement de la sortie d'un patient n'est pas encore disponible. Vous pouvez lancer la préparation de la sortie.
+voiceQueue.unsupported.other,This isn't available by voice.,Ceci n'est pas disponible à la voix.
+voiceQueue.unsupported.deleteLine,Delete: not available by voice,Suppression : non disponible à la voix
+voiceQueue.unsupported.patient_label_fixedLine,Change a patient's label: not available,Modifier l'étiquette d'un patient : non disponible
+voiceQueue.unsupported.discharge_outcomeLine,Record a discharge: not available yet,Enregistrer une sortie : pas encore disponible
+voiceQueue.unsupported.otherLine,A request that isn't available by voice,Une demande non disponible à la voix
+voiceQueue.line.createPatient,Create patient {{patient}},Créer le patient {{patient}}
+voiceQueue.line.createPatientNoLabel,Create a patient,Créer un patient
+voiceQueue.line.editPatient,Update {{patient}}: {{fields}},Mettre à jour {{patient}} : {{fields}}
+voiceQueue.line.createTask,New task for {{patient}}: {{description}},Nouvelle tâche pour {{patient}} : {{description}}
+voiceQueue.line.editTask,Change “{{task}}” for {{patient}}: {{fields}},Modifier « {{task}} » pour {{patient}} : {{fields}}
+voiceQueue.line.createNote,Add a note for {{patient}},Ajouter une note pour {{patient}}
+voiceQueue.line.discharge,Start discharge planning for {{patient}},Lancer la préparation de sortie de {{patient}}
+voiceQueue.line.handoffUnit,Open the shift report,Ouvrir la transmission de relève
+voiceQueue.line.handoffPatient,Open the SBAR for {{patient}},Ouvrir le SBAR de {{patient}}
+voiceQueue.line.patientToChoose,a patient to choose,un patient à choisir
+voiceQueue.line.taskToChoose,a task to choose,une tâche à choisir
+voiceQueue.field.status,status,statut
+voiceQueue.field.priority,priority,priorité
+voiceQueue.field.department,department,service
+voiceQueue.field.description,description,description
+voiceQueue.field.deadline,deadline,échéance
+voiceQueue.field.assignee,assignee,personne assignée
+voiceQueue.field.age,age,âge
+voiceQueue.field.diagnosis,diagnosis,diagnostic
+voiceQueue.field.codeStatus,code status,statut de réanimation
+voiceQueue.field.allergies,allergies,allergies
+voiceQueue.field.admissionDate,admission date,date d'admission
+voiceQueue.field.location,location label,étiquette de localisation
+voiceQueue.summary.title,Voice command summary,Récapitulatif de la commande vocale
+voiceQueue.summary.done,Done,Fait
+voiceQueue.summary.skipped,Skipped,Ignoré
+voiceQueue.summary.failed,Failed,Échec
+voiceQueue.summary.unavailable,Not available,Non disponible
+voiceQueue.summary.blocked,Not done: the patient was not created,Non fait : le patient n'a pas été créé
+voiceQueue.summary.cancelled,Not done,Non fait
+voiceQueue.summary.nothingToChange,No change needed,Aucune modification nécessaire
+voiceQueue.summary.opensOnClose,Opens when you close,S'ouvrira à la fermeture
+voiceQueue.summary.notDone_one,{{count}} action was not done.,{{count}} action n'a pas été faite.
+voiceQueue.summary.notDone_other,{{count}} actions were not done.,{{count}} actions n'ont pas été faites.
+voiceQueue.summary.allDone,All actions were done.,Toutes les actions ont été faites.
+voiceQueue.summary.closeAndOpen,Close and open the report,Fermer et ouvrir le rapport
+voiceQueue.summary.undo,Undo ({{seconds}} s),Annuler cette action ({{seconds}} s)
+voiceQueue.summary.undone,Undone,Action annulée
+voiceQueue.summary.noUndoCreated,Can't be undone here. Change it from the patient card.,Annulation impossible ici. Modifiez-le depuis la fiche du patient.
+voiceQueue.summary.undoChangedBy,Not undone: {{name}} changed this since ({{time}}).,Non annulé : {{name}} a modifié cet élément depuis ({{time}}).
+voiceQueue.summary.undoChangedBySelf,Not undone: you changed this again since ({{time}}).,Non annulé : vous avez de nouveau modifié cet élément depuis ({{time}}).
+voiceQueue.summary.undoChangedBySomeone,Not undone: someone else changed this since.,Non annulé : quelqu'un d'autre a modifié cet élément depuis.
+voiceQueue.summary.undoDeleted,Not undone: this no longer exists.,Non annulé : cet élément n'existe plus.
+voiceQueue.summary.undoLocked,Not undone: {{name}} is editing this right now. Try again in a moment.,Non annulé : {{name}} modifie cet élément en ce moment. Réessayez dans un instant.
+voiceQueue.summary.undoLockLost,Not undone: the record could not be held for editing. Try again.,Non annulé : l'élément n'a pas pu être réservé pour modification. Réessayez.
+voiceQueue.summary.undoExpired,The time to undo has passed.,Le délai d'annulation est écoulé.
+voiceQueue.summary.undoFailed,Undo failed. Nothing was changed.,L'annulation a échoué. Rien n'a été modifié.
+voiceQueue.summary.undoPartial,Partly undone. Restored: {{restored}}. Not restored: {{missing}}.,Annulation partielle. Rétabli : {{restored}}. Non rétabli : {{missing}}.

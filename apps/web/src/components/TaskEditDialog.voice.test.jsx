@@ -73,7 +73,7 @@ describe("TaskEditDialog as a voice step (proposal mode)", () => {
     expect(screen.getByText("priority: Routine → Stat")).toBeInTheDocument();
     expect(screen.getByText("assignee: Unassigned → Nurse Amara Test")).toBeInTheDocument();
     // A voice step is a proposal to confirm: no second command box.
-    expect(screen.getByText("AI Edit").closest("div")).toHaveClass("hidden");
+    expect(screen.getByText("Voice edit").closest("div")).toHaveClass("hidden");
   });
 
   it("writes nothing when it opens and nothing when a field is changed", async () => {
@@ -190,7 +190,7 @@ describe("TaskEditDialog outside a voice step is unchanged", () => {
       </EditLockContext.Provider>
     );
     expect(screen.queryByText(/Voice command/)).not.toBeInTheDocument();
-    expect(screen.getByText("AI Edit").closest("div")).not.toHaveClass("hidden");
+    expect(screen.getByText("Voice edit").closest("div")).not.toHaveClass("hidden");
     await waitFor(() => expect(screen.getByDisplayValue("Routine")).toBeEnabled());
     fireEvent.change(screen.getByDisplayValue("Routine"), { target: { value: "Stat" } });
     await waitFor(() => expect(onManualUpdate).toHaveBeenCalledWith({ priority: "Stat" }, TASK, TASK.patient_id));
