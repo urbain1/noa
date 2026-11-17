@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "test": "vitest run",
+    "eval:voice": "node ../../evals/voice/run.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

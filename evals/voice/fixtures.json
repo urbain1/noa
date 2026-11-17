@@ -1,0 +1,57 @@
+{
+  "_comment": "Synthetic data only: Patient_Test_N labels, made-up location labels, invented nurse names. Task ids here are stand-ins for database uuids; the model never sees them (the parser shows t1, t2, ... and maps back).",
+  "A": {
+    "patients": [
+      { "id": "A-p1", "label": "Patient_Test_1", "location": "Test Room A" },
+      { "id": "A-p2", "label": "Patient_Test_2", "location": "Test Room B" },
+      { "id": "A-p3", "label": "Patient_Test_3", "location": "Bay 1" },
+      { "id": "A-p4", "label": "Patient_Test_4", "location": null },
+      { "id": "A-p5", "label": "Patient_Test_5", "location": "Bay 2" },
+      { "id": "A-p12", "label": "Patient_Test_12", "location": "Test Room D" },
+      { "id": "A-p13", "label": "Patient_Test_13", "location": null }
+    ],
+    "tasks": [
+      { "id": "A-t1", "patient_id": "A-p3", "description": "Complete Blood Count", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "A-t2", "patient_id": "A-p3", "description": "Chest X-ray", "status": "Pending", "priority": "Routine", "department": "Radiology", "assignee": "Bo Linden" },
+      { "id": "A-t3", "patient_id": "A-p2", "description": "Physical Therapy evaluation", "status": "Confirmed", "priority": "Routine", "department": "Physical Therapy", "assignee": null },
+      { "id": "A-t4", "patient_id": "A-p1", "description": "Urinalysis", "status": "Pending", "priority": "Stat", "department": "Lab", "assignee": "Amara Vale" },
+      { "id": "A-t5", "patient_id": "A-p1", "description": "Wound dressing change", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": null },
+      { "id": "A-t6", "patient_id": "A-p4", "description": "Complete Blood Count", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "A-t7", "patient_id": "A-p5", "description": "Basic Metabolic Panel", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "A-t8", "patient_id": "A-p5", "description": "Basic Metabolic Panel", "status": "Delayed", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "A-t9", "patient_id": "A-p2", "description": "Administer insulin 10 units", "status": "Completed", "priority": "Routine", "department": "Pharmacy", "assignee": "Chidi Marsh" },
+      { "id": "A-t10", "patient_id": "A-p12", "description": "MRI brain", "status": "Pending", "priority": "Routine", "department": "Radiology", "assignee": null },
+      { "id": "A-t11", "patient_id": "A-p4", "description": "Basic Metabolic Panel", "status": "Pending", "priority": "Stat", "department": "Lab", "assignee": null },
+      { "id": "A-t12", "patient_id": "A-p13", "description": "12-lead Electrocardiogram", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": "Dana Quill" },
+      { "id": "A-t13", "patient_id": "A-p1", "description": "CT abdomen", "status": "Delayed", "priority": "Routine", "department": "Radiology", "assignee": null },
+      { "id": "A-t14", "patient_id": "A-p12", "description": "Vital signs every 4 hours", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": null }
+    ],
+    "nurses": ["Amara Vale", "Bo Linden", "Chidi Marsh", "Dana Quill", "Dana Frost"]
+  },
+  "B": {
+    "patients": [
+      { "id": "B-p1", "label": "Patient_Test_1", "location": "Chambre Test A" },
+      { "id": "B-p2", "label": "Patient_Test_2", "location": "Chambre Test B" },
+      { "id": "B-p3", "label": "Patient_Test_3", "location": "Box 1" },
+      { "id": "B-p4", "label": "Patient_Test_4", "location": null },
+      { "id": "B-p5", "label": "Patient_Test_5", "location": "Box 2" },
+      { "id": "B-p8", "label": "Patient_Test_8", "location": "Chambre Test C" }
+    ],
+    "tasks": [
+      { "id": "B-t1", "patient_id": "B-p1", "description": "Numération formule sanguine", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "B-t2", "patient_id": "B-p1", "description": "Radiographie thoracique", "status": "Pending", "priority": "Routine", "department": "Radiology", "assignee": "Marc Besson" },
+      { "id": "B-t3", "patient_id": "B-p2", "description": "Bilan hépatique", "status": "Pending", "priority": "Stat", "department": "Lab", "assignee": null },
+      { "id": "B-t4", "patient_id": "B-p2", "description": "Réfection du pansement", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": "Inès Carrel" },
+      { "id": "B-t5", "patient_id": "B-p3", "description": "ECG 12 dérivations", "status": "Confirmed", "priority": "Routine", "department": "Nursing", "assignee": null },
+      { "id": "B-t6", "patient_id": "B-p3", "description": "Kinésithérapie respiratoire", "status": "Pending", "priority": "Routine", "department": "Physical Therapy", "assignee": null },
+      { "id": "B-t7", "patient_id": "B-p4", "description": "Bilan rénal", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "B-t8", "patient_id": "B-p4", "description": "Bilan hépatique", "status": "Pending", "priority": "Stat", "department": "Lab", "assignee": null },
+      { "id": "B-t9", "patient_id": "B-p5", "description": "Glycémie capillaire", "status": "Pending", "priority": "Routine", "department": "Nursing", "assignee": null },
+      { "id": "B-t10", "patient_id": "B-p5", "description": "Glycémie capillaire", "status": "Delayed", "priority": "Routine", "department": "Nursing", "assignee": null },
+      { "id": "B-t11", "patient_id": "B-p8", "description": "Scanner abdominal", "status": "Completed", "priority": "Routine", "department": "Radiology", "assignee": "Luc Perrin" },
+      { "id": "B-t12", "patient_id": "B-p8", "description": "Examen cytobactériologique des urines (ECBU)", "status": "Pending", "priority": "Routine", "department": "Lab", "assignee": null },
+      { "id": "B-t13", "patient_id": "B-p2", "description": "IRM cérébrale", "status": "Delayed", "priority": "Routine", "department": "Radiology", "assignee": null }
+    ],
+    "nurses": ["Élodie Fontaine", "Marc Besson", "Inès Carrel", "Luc Perrin", "Luc Morel"]
+  }
+}

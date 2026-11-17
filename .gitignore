@@ -31,3 +31,6 @@ dist/
 dist/
 .claude/settings.local.json
 supabase/.temp/
+
+# Voice eval: full model outputs of each run (synthetic data, regenerated every run)
+evals/voice/results/

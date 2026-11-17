@@ -9,6 +9,10 @@
 // (tuned prompts, not rewritten) — only the transport and auth check are new.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+// Universal voice command. Prompt, validator and handler live in their own
+// plain-JS module so the eval runner (evals/voice) and the unit tests run
+// the exact code that is deployed here.
+import { parseVoiceCommand } from "./voiceCommand.mjs";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -88,6 +92,9 @@ type CallClaude = (args: {
   max_tokens: number;
   system: string;
   messages: { role: string; content: string }[];
+  // Optional. Only parseVoiceCommand sets it (effort level); every other
+  // action sends exactly the request body it always has.
+  output_config?: Record<string, unknown>;
 }) => Promise<any>;
 
 // ---------------------------------------------------------------------------
@@ -1004,6 +1011,7 @@ const actionHandlers: Record<string, (payload: any, callClaude: CallClaude) => P
   generatePatientUpdate,
   parsePatientFromVoice,
   translateText,
+  parseVoiceCommand,
 };
 
 // ---------------------------------------------------------------------------
@@ -1059,7 +1067,7 @@ Deno.serve(async (req) => {
     return json({ error: `Unknown action: ${action}` }, 400);
   }
 
-  const callClaude: CallClaude = async ({ model, max_tokens, system, messages }) => {
+  const callClaude: CallClaude = async ({ model, max_tokens, system, messages, output_config }) => {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -1067,7 +1075,7 @@ Deno.serve(async (req) => {
         "x-api-key": anthropicApiKey,
         "anthropic-version": "2023-06-01",
       },
-      body: JSON.stringify({ model, max_tokens, system, messages }),
+      body: JSON.stringify({ model, max_tokens, system, messages, ...(output_config ? { output_config } : {}) }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

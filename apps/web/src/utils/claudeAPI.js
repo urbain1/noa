@@ -287,3 +287,84 @@ export async function parsePatientFromVoice(transcript) {
     return null;
   }
 }
+
+/**
+ * Universal voice command: turn one dictated utterance into up to five
+ * structured actions (Edge Function action `parseVoiceCommand`).
+ *
+ * Never a write. Each action opens a pre-filled dialog the nurse confirms.
+ *
+ * Unlike the other calls in this file, this one reports WHY it failed,
+ * because the caller behaves differently per cause and CLAUDE.md's standing
+ * lesson (decisions.md, 2026-08-27) is that an undeployed action must never
+ * look like a parsing problem:
+ *
+ *   unknown_action  the deployed Edge Function predates this action
+ *   unreachable     no answer at all (offline, function down)
+ *   server_error    the function answered with an error, or the model
+ *                   could not be called
+ *   unreadable      the parser ran but returned nothing usable
+ *   too_long        the transcript is over the 1000-character cap
+ *
+ * The first three put the capture screen in limited mode (one task, through
+ * the existing single-task path). The real cause always goes to the console.
+ *
+ * @param {string} transcript
+ * @param {object} context - from utils/voiceContext.js: patient labels and
+ *   location labels, open and recently completed tasks, nurse display names.
+ *   Nothing else is sent.
+ * @returns {Promise<{ok: true, result: object} | {ok: false, cause: string, detail?: string}>}
+ */
+export async function parseVoiceCommand(transcript, context) {
+  const fail = (cause, detail, raw) => {
+    console.error(`[claudeAPI] parseVoiceCommand failed (${cause}):`, detail, raw ?? "");
+    return { ok: false, cause, detail };
+  };
+
+  let data;
+  let error;
+  try {
+    ({ data, error } = await supabase.functions.invoke("claude-proxy", {
+      body: {
+        action: "parseVoiceCommand",
+        payload: {
+          transcript,
+          language: currentLanguage(),
+          now: new Date().toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          context,
+        },
+      },
+    }));
+  } catch (err) {
+    return fail("unreachable", err?.message || String(err), err);
+  }
+
+  if (error) {
+    // A non-2xx answer carries the function's own message in the response
+    // body, not in `error.message` (which only says "non-2xx status code").
+    let message = error.message || String(error);
+    try {
+      const body = await error.context?.json?.();
+      if (body?.error) message = body.error;
+    } catch {
+      // No readable body: keep the transport message.
+    }
+    if (/^Unknown action/i.test(message)) return fail("unknown_action", message, error);
+    return fail(error.name === "FunctionsHttpError" ? "server_error" : "unreachable", message, error);
+  }
+
+  if (data?.error) {
+    return fail(/^Unknown action/i.test(data.error) ? "unknown_action" : "server_error", data.error);
+  }
+
+  const result = data?.result;
+  if (!result || result.ok !== true) {
+    const code = result?.error;
+    if (code === "unreadable") return fail("unreadable", code);
+    if (code === "transcript_too_long") return fail("too_long", code);
+    return fail("server_error", result?.detail ? `${code}: ${result.detail}` : code || "empty response");
+  }
+
+  return { ok: true, result };
+}
