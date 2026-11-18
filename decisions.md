@@ -14,7 +14,7 @@ Newest first. Superseded decisions are kept, marked, not deleted, so the reasoni
 
 **Undo.** A voice note edit can be undone for 60 seconds, back to the previous text, through `updateNote` inside the same guarded `useEditSession` as every other undo, and is refused if the note changed since. A created note still has no Undo (no delete path, none added).
 
-**Prompt change.** Version 2026-11-18.1: `edit_note` added; "editing or correcting an existing note" removed from the `unsupported` list. Twelve eval cases were added before any run (8 tuning, 4 held out); no expectation changed. Results: see `evals/voice/RESULTS.md`.
+**Prompt change.** Version 2026-11-18.1: `edit_note` added; "editing or correcting an existing note" removed from the `unsupported` list. Twelve eval cases were added before any run (8 tuning, 4 held out); no expectation changed. Run 4 (2026-11-18, `claude-sonnet-5-5` at low effort, first run on this prompt, no revision): 88/88 tuning and 44/44 held out, every safety counter at zero. The same caveat as before applies: the cases were written in the same session as the prompt, and are typed, not real speech.
 
 **No migration, no RLS change.** The 0012 trigger already logs a note update; the History dialog shows it as a modified note (text).
 

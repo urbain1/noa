@@ -25,3 +25,4 @@ Keep this table last in the file: `--record` appends a row to the end.
 | 2026-11-17 04:53 | 2026-11-16.1 (905af69f76) | claude-sonnet-5-5 / low | 75/75 (100.0%) | 36/37 (97.3%) | 0 / 1 / 0 / 0 | run 1: first prompt, low effort |
 | 2026-11-17 05:05 | 2026-11-17.1 (b548ec6b8e) | claude-sonnet-5-5 / low | 80/80 (100.0%) | 40/40 (100.0%) | 0 / 0 / 0 / 0 | run 2: model lists candidate tasks and code decides (fixes en-42); 120 cases |
 | 2026-11-17 05:06 | 2026-11-17.1 (b548ec6b8e) | claude-sonnet-5-5 / low | 80/80 (100.0%) | 40/40 (100.0%) | 0 / 0 / 0 / 0 | run 3: same prompt, unchanged, repeated to check run-to-run variance |
+| 2026-11-18 01:00 | 2026-11-18.1 (e733910e6c) | claude-sonnet-5-5 / low | 88/88 (100.0%) | 44/44 (100.0%) | 0 / 0 / 0 / 0 | run 4: edit_note added (note editing); 12 new cases, 132 total |
