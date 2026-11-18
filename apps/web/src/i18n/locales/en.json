@@ -71,7 +71,8 @@
     "cancelDischargePlanning": "Failed to cancel discharge planning. Please try again.",
     "updateName": "Could not save your name. Please try again.",
     "descriptionRequired": "Enter a description.",
-    "createTaskDialog": "Couldn't create the task. Please try again."
+    "createTaskDialog": "Couldn't create the task. Please try again.",
+    "updateNote": "Failed to update note. Please try again."
   },
   "language": {
     "label": "Language",
@@ -186,7 +187,9 @@
     "justNow": "just now",
     "minutesAgo": "{{count}}m ago",
     "hoursAgo": "{{count}}h ago",
-    "daysAgo": "{{count}}d ago"
+    "daysAgo": "{{count}}d ago",
+    "edit": "Edit",
+    "editAria": "Edit this note"
   },
   "topMenu": {
     "generateHandoff": "Generate handoff report",
@@ -322,7 +325,10 @@
     "stopRecordingAria": "Stop recording",
     "tapToSpeak": "Tap to speak, or type below",
     "placeholder": "Your speech will appear here. Tap to write or edit before saving.",
-    "saveNote": "Save Note"
+    "saveNote": "Save Note",
+    "editTitle": "Edit note",
+    "textLabel": "Note",
+    "emptyNote": "A note can't be empty."
   },
   "taskEdit": {
     "title": "Edit Task",
@@ -657,7 +663,8 @@
       "handoffUnit": "Open the shift report",
       "handoffPatient": "Open the SBAR for {{patient}}",
       "patientToChoose": "a patient to choose",
-      "taskToChoose": "a task to choose"
+      "taskToChoose": "a task to choose",
+      "editNote": "Change a note for {{patient}}"
     },
     "field": {
       "status": "status",
@@ -699,6 +706,9 @@
       "undoExpired": "The time to undo has passed.",
       "undoFailed": "Undo failed. Nothing was changed.",
       "undoPartial": "Partly undone. Restored: {{restored}}. Not restored: {{missing}}."
-    }
+    },
+    "chooseNoteTitle": "Which note?",
+    "chooseNoteBody": "Choose the note to change for {{patient}}. Only notes you wrote are listed.",
+    "chooseNoteNone": "You have no notes for {{patient}}. Only notes you wrote can be changed."
   }
 }

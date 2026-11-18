@@ -205,6 +205,24 @@
       "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_4", "task": null, "fields": { "status": "Completed" } } ] } },
     { "id": "en-69", "split": "holdout", "tags": ["generic_term", "edit_task"],
       "transcript": "the imaging for patient 3 is done",
-      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_3", "task": "A-t2", "fields": { "status": "Completed" } } ] } }
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_3", "task": "A-t2", "fields": { "status": "Completed" } } ] } },
+    { "id": "en-70", "split": "tune", "tags": ["edit_note"],
+      "transcript": "add to my last note for patient 2 that the son has been informed",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_2", "fields": {"append": {"all": ["son"]}}}]} },
+    { "id": "en-71", "split": "tune", "tags": ["edit_note", "partial_correction"],
+      "transcript": "correct my note for patient 3, it was lunch he refused not breakfast",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_3", "fields": {}}]} },
+    { "id": "en-72", "split": "tune", "tags": ["edit_note"],
+      "transcript": "change my note for patient 4 to say patient slept well overnight",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_4", "fields": {"replace": {"all": ["slept"]}}}]} },
+    { "id": "en-73", "split": "tune", "tags": ["edit_note", "create_note", "multi"],
+      "transcript": "add a note for patient 4 that she slept well and add to my earlier note for patient 2 that the pain is better",
+      "expect": {"actions": [{"type": "create_note", "patient": "Patient_Test_4", "fields": {"text": {"all": ["slept"]}}}, {"type": "edit_note", "patient": "Patient_Test_2", "fields": {"append": {"all": ["pain"]}}}]} },
+    { "id": "en-74", "split": "holdout", "tags": ["edit_note"],
+      "transcript": "update my note on patient 5 to add that the IV was removed",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_5", "fields": {"append": {"any": ["iv", "intraven"]}}}]} },
+    { "id": "en-75", "split": "holdout", "tags": ["edit_note"],
+      "transcript": "fix my note for patient 12",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_12", "fields": {}}]} }
   ]
 }

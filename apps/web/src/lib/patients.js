@@ -47,6 +47,18 @@ export async function fetchTaskRow(facilityId, taskId) {
   return data
 }
 
+export async function fetchNoteRow(facilityId, noteId) {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('id', noteId)
+    .eq('facility_id', facilityId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function createPatient(facilityId, fields) {
   const { data, error } = await supabase
     .from('patients')
@@ -333,6 +345,28 @@ export async function addNote(facilityId, patientId, nurseId, content) {
       content,
       type: 'clinical',
     })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+// Change a note's text. Writes `content` and nothing else: the author, type,
+// patient and creation time of a note never change. Always filtered by
+// facility, on top of RLS (CLAUDE.md). Callers go through useEditSession's
+// guard (EditNoteDialog, voice undo), so a note changed or deleted by
+// someone else since it was opened is refused before this runs.
+export async function updateNote(noteId, content, facilityId) {
+  if (!noteId || !facilityId) throw new Error('updateNote needs a note id and a facility id')
+  const text = typeof content === 'string' ? content.trim() : ''
+  if (!text) throw new Error('A note cannot be empty')
+
+  const { data, error } = await supabase
+    .from('notes')
+    .update({ content: text })
+    .eq('id', noteId)
+    .eq('facility_id', facilityId)
     .select()
     .single()
 

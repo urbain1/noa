@@ -22,7 +22,8 @@ const OPEN = ITEM_STATUS.PENDING;
 
 /**
  * @param {Array<{ action: object, patientId?: string|null, taskId?: string|null,
- *   candidateIds?: string[], taskCandidateIds?: string[], dependsOn?: number|null }>} entries
+ *   noteId?: string|null, candidateIds?: string[], taskCandidateIds?: string[],
+ *   dependsOn?: number|null }>} entries
  */
 export function createQueue(entries) {
   return {
@@ -33,6 +34,7 @@ export function createQueue(entries) {
       status: OPEN,
       patientId: entry.patientId ?? null,
       taskId: entry.taskId ?? null,
+      noteId: entry.noteId ?? null,
       candidateIds: entry.candidateIds || [],
       taskCandidateIds: entry.taskCandidateIds || [],
       dependsOn: entry.dependsOn ?? null,
@@ -62,7 +64,7 @@ function blockDependents(queue, index) {
 
 /**
  * Events:
- *   { type: "bind", index, patientId?, taskId? }   a picker choice
+ *   { type: "bind", index, patientId?, taskId?, noteId? }   a picker choice
  *   { type: "done", index, applied }               confirmed and written
  *       applied.patientId, when given, is handed to dependents
  *   { type: "error", index, message }              a write failed; the step stays open
@@ -79,10 +81,15 @@ export function queueReducer(queue, event) {
       const patch = {};
       if (event.patientId !== undefined) {
         patch.patientId = event.patientId;
-        // A different patient means the task that was resolved no longer applies.
-        if (event.patientId !== item.patientId) patch.taskId = null;
+        // A different patient means the task or note that was resolved no
+        // longer applies.
+        if (event.patientId !== item.patientId) {
+          patch.taskId = null;
+          patch.noteId = null;
+        }
       }
       if (event.taskId !== undefined) patch.taskId = event.taskId;
+      if (event.noteId !== undefined) patch.noteId = event.noteId;
       return update(queue, item.index, patch);
     }
 

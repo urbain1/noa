@@ -23,6 +23,7 @@ export default function Dashboard({
   onRepageTask,
   onEscalateTask,
   onAddNote,
+  onEditNote,
   onGenerateSbar,
   onGeneratePatientUpdate,
   onLanguageChange,
@@ -138,6 +139,7 @@ export default function Dashboard({
                 onRepageTask={onRepageTask}
                 onEscalateTask={onEscalateTask}
                 onAddNote={onAddNote}
+                onEditNote={onEditNote}
                 onOpenVoiceCapture={onOpenVoiceCapture}
                 onGenerateSbar={onGenerateSbar}
                 onGeneratePatientUpdate={onGeneratePatientUpdate}

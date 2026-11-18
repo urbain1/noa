@@ -2,9 +2,9 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import VoiceQueue from "./VoiceQueue";
-import { fetchPatientRow, fetchTaskRow } from "../lib/patients";
+import { fetchNoteRow, fetchPatientRow, fetchTaskRow } from "../lib/patients";
 
-vi.mock("../lib/patients", () => ({ fetchTaskRow: vi.fn(), fetchPatientRow: vi.fn() }));
+vi.mock("../lib/patients", () => ({ fetchTaskRow: vi.fn(), fetchPatientRow: vi.fn(), fetchNoteRow: vi.fn() }));
 vi.mock("../lib/auditLog", () => ({ fetchLastChange: vi.fn(async () => null) }));
 // The note dialog imports the Claude helper; a voice step must never call it.
 vi.mock("../utils/claudeAPI", () => ({ parseNoteInput: vi.fn() }));
@@ -20,6 +20,11 @@ const NURSES = [
 const task = (id, patientId, extra = {}) => ({ id, facility_id: FACILITY, patient_id: patientId, description: "Complete Blood Count", status: "Pending", priority: "Routine", department: "Lab", deadline: null, assigned_to: null, ...extra });
 const patient = (n, extra = {}) => ({ id: `patient-${n}`, facility_id: FACILITY, label: `Patient_Test_${n}`, location_label: null, tasks: [], notes: [], allergies: null, ...extra });
 const ROSTER = [patient(2), patient(3, { tasks: [task("task-cbc", "patient-3")] })];
+const NOTES = [
+  { id: "note-mine", facility_id: FACILITY, patient_id: "patient-2", nurse_id: ME, content: "Patient refused breakfast.", type: "clinical", created_at: "2026-11-18T08:00:00Z" },
+  { id: "note-amara", facility_id: FACILITY, patient_id: "patient-2", nurse_id: "nurse-amara", content: "Daughter visited.", type: "clinical", created_at: "2026-11-18T09:00:00Z" },
+];
+const ROSTER_WITH_NOTES = [patient(2, { notes: NOTES }), ROSTER[1]];
 
 const act = (type, label, extra = {}) => ({
   type,
@@ -41,6 +46,7 @@ function makeApi() {
     createTask: vi.fn(async (patientId, fields) => task("task-new", patientId, { description: fields.description })),
     updateTask: vi.fn(async (edited, updates) => ({ ...edited, ...updates })),
     addNote: vi.fn(async (patientId, text) => ({ id: "note-new", patient_id: patientId, content: text })),
+    updateNote: vi.fn(async (noteId, content) => ({ ...NOTES.find((n) => n.id === noteId), content })),
     startDischarge: vi.fn(async (p) => [task("task-dc", p.id, { task_type: "discharge" })]),
   };
 }
@@ -80,6 +86,8 @@ beforeEach(() => {
   fetchPatientRow.mockReset();
   fetchPatientRow.mockImplementation(async (_facility, id) => ROSTER.find((p) => p.id === id) || null);
   parseNoteInput.mockReset();
+  fetchNoteRow.mockReset();
+  fetchNoteRow.mockImplementation(async (_facility, id) => NOTES.find((n) => n.id === id) || null);
 });
 
 describe("VoiceQueue", () => {
@@ -314,4 +322,39 @@ describe("VoiceQueue", () => {
     expect(screen.getByText("Voice command summary")).toBeInTheDocument();
     expect(screen.getByText("mumble")).toBeInTheDocument();
   });
+
+  it("edit_note: the nurse picks one of their own notes, sees the change, and confirms it", async () => {
+    render(<Harness initialPatients={ROSTER_WITH_NOTES} actions={[act("edit_note", "Patient_Test_2", { fields: { append: "Family called." } })]} />);
+
+    // Always a picker, nothing pre-selected, and only the nurse's own notes.
+    expect(screen.getByText("Which note?")).toBeInTheDocument();
+    expect(screen.getByText(/Only notes you wrote are listed/)).toBeInTheDocument();
+    expect(screen.queryByText("Daughter visited.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Edit note")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Patient refused breakfast."));
+
+    expect(await screen.findByText("Edit note")).toBeInTheDocument();
+    expect(await screen.findByText("text: Patient refused breakfast. → Patient refused breakfast. Family called.")).toBeInTheDocument();
+    expect(api.updateNote).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Confirm" })).toBeEnabled());
+    click("Confirm");
+    await waitFor(() => expect(api.updateNote).toHaveBeenCalledWith("note-mine", "Patient refused breakfast. Family called."));
+
+    expect(await screen.findByText("Voice command summary")).toBeInTheDocument();
+    const line = summaryLine("Change a note for Patient_Test_2");
+    expect(within(line).getByText("Done")).toBeInTheDocument();
+    expect(within(line).getByRole("button", { name: /Undo/ })).toBeInTheDocument();
+  });
+
+  it("edit_note: with no note of their own, the nurse is told so and can only skip", async () => {
+    const onlyTheirs = [patient(2, { notes: [NOTES[1]] }), ROSTER[1]];
+    render(<Harness initialPatients={onlyTheirs} actions={[act("edit_note", "Patient_Test_2", { fields: { replace: "Something else." } })]} />);
+    expect(screen.getByText("You have no notes for Patient_Test_2. Only notes you wrote can be changed.")).toBeInTheDocument();
+    expect(screen.queryByText("Daughter visited.")).not.toBeInTheDocument();
+    click("Skip");
+    expect(await screen.findByText("Voice command summary")).toBeInTheDocument();
+    expect(within(summaryLine("Change a note for Patient_Test_2")).getByText("Skipped")).toBeInTheDocument();
+    expect(api.updateNote).not.toHaveBeenCalled();
+  });
 });
+

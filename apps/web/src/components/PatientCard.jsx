@@ -39,7 +39,7 @@ function formatAdmissionDate(dateStr, locale) {
   });
 }
 
-export default function PatientCard({ patient, isFocused, onEditPatient, onOpenHistory, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient, onCancelDischargePlanning }) {
+export default function PatientCard({ patient, isFocused, onEditPatient, onOpenHistory, onCompleteTask, onEditTask, onRepageTask, onEscalateTask, onAddNote, onEditNote, onOpenVoiceCapture, onGenerateSbar, onGeneratePatientUpdate, onDischargePatient, onCancelDischargePlanning }) {
   const { t, i18n } = useTranslation();
   const [notesExpanded, setNotesExpanded] = useState(false);
   // Opened from the Tasks screen or Unit View: show the task list straight
@@ -423,6 +423,11 @@ export default function PatientCard({ patient, isFocused, onEditPatient, onOpenH
                 key={note.id}
                 note={note}
                 isNew={newNoteIds.has(note.id)}
+                // Only the author edits a note (decisions.md, 2026-11-18).
+                onEdit={onEditNote && currentNurseId && note.nurse_id === currentNurseId ? (n) => onEditNote(patient, n) : undefined}
+                lockHolder={holderOf("note", note.id)}
+                nurses={nurses}
+                currentNurseId={currentNurseId}
               />
             ))}
           </div>

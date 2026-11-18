@@ -29,7 +29,7 @@
 export const VOICE_MODEL = "claude-sonnet-5-5";
 export const VOICE_EFFORT = "low";
 export const VOICE_MAX_TOKENS = 4096;
-export const PROMPT_VERSION = "2026-11-17.1";
+export const PROMPT_VERSION = "2026-11-18.1";
 
 export const MAX_ACTIONS = 5;
 
@@ -418,6 +418,14 @@ export const ACTION_REGISTRY = {
     required: ["text"],
     fields: { text: text(1000) },
   },
+  // The model never sees notes: the nurse always picks the note in the app.
+  // Both fields are optional ("correct my note for patient 3" opens the note
+  // to edit by hand); both at once is contradictory and both are dropped.
+  edit_note: {
+    patient: "ref",
+    task: false,
+    fields: { append: text(1000), replace: text(1000) },
+  },
   start_discharge_planning: {
     patient: "ref",
     task: false,
@@ -601,8 +609,11 @@ create_task: a new order or task for a patient ("order a CBC for patient 2", "pa
 edit_task: change an existing task. Covers complete, reopen, priority, deadline, department, description, assign, unassign.
   fields: status, priority, department, description, deadline, assignee, assign_to_self, unassign.
 
-create_note: a clinical note on a patient ("add a note for patient 2 that he refused breakfast", "noter que le patient 3 a mal dormi").
+create_note: a NEW clinical note on a patient ("add a note for patient 2 that he refused breakfast", "noter que le patient 3 a mal dormi").
   fields: text (required).
+
+edit_note: change a note that already exists. Only when the words point at an existing note: "my note", "the last note", "the note I wrote", "add to the note", "correct the note", "ma note", "la dernière note", "compléter la note", "corriger la note". "Add a note" without such words is create_note. You never see the notes: the nurse picks which one in the app.
+  fields: append (text to add at the end, when the nurse asks to add to the note), replace (the complete new text, only when the nurse dictates the whole note again: "change my note for patient 2 to say ..."). A correction of part of a note ("in my note for patient 3 it was lunch, not breakfast") gets neither field: the nurse fixes it by hand. Never both.
 
 start_discharge_planning: begin planning a patient's discharge ("start discharge planning for patient 4", "préparer la sortie du patient 4"). This only starts the planning tasks. It does not discharge anyone.
   fields: needs_nursing_home (true, only if a nursing home, care home, SNF or EHPAD placement was said), notes.
@@ -689,7 +700,7 @@ Do not calculate dates. Describe what was said and the app does the arithmetic.
   Not deletes: "remove the deadline" is an edit_task with deadline clear; "unassign" is an edit_task; "remove penicillin from the allergies" is an edit_patient with allergies_remove.
 - Renaming a patient or changing a patient's label or number: "unsupported", reason "patient_label_fixed".
 - Recording that a patient has actually left, been discharged, transferred or died: "unsupported", reason "discharge_outcome". (Starting discharge PLANNING is supported.)
-- Anything else that is clearly a request to the app but not one of the action types (editing or correcting an existing note, paging someone, sending a message, escalating): "unsupported", reason "other".
+- Anything else that is clearly a request to the app but not one of the action types (paging someone, sending a message, escalating): "unsupported", reason "other".
 
 # Nothing to do
 
@@ -698,7 +709,7 @@ Do not calculate dates. Describe what was said and the app does the arithmetic.
 
 # Free text
 
-- description, text, diagnosis and notes are written in the nurse's language given below, as short professional wording.
+- description, text, append, replace, diagnosis and notes are written in the nurse's language given below, as short professional wording.
 - Expand a standard abbreviation into its plain full name ("CBC" is "Complete Blood Count", "NFS" is "Numération formule sanguine"), and add nothing that was not said: no dose, no body part, no technique, no reason.
 - A note keeps the nurse's meaning and nothing more: "he refused breakfast" becomes "Patient refused breakfast."
 - "words", "patient_spoken" and "task_spoken" are copied from the transcript, not rewritten.
@@ -729,6 +740,9 @@ Transcript: the glucose check for patient 21 is done
 
 Transcript: delete the ultrasound for patient 22 and add a note for patient test to one that she is nauseous
 {"actions":[{"type":"unsupported","words":"delete the ultrasound for patient 22","confidence":"high","patient_spoken":"patient 22","patient_label":"Patient_Test_22","task_candidates":[],"task_spoken":"the ultrasound","fields":{"reason":"delete"}},{"type":"create_note","words":"add a note for patient test to one that she is nauseous","confidence":"medium","patient_spoken":"patient test to one","patient_label":"Patient_Test_21","task_candidates":[],"task_spoken":null,"fields":{"text":"Patient is nauseous."}}],"unparsed":[]}
+
+Transcript: put on my last note for patient 20 that the wife has been called
+{"actions":[{"type":"edit_note","words":"put on my last note for patient 20 that the wife has been called","confidence":"high","patient_spoken":"patient 20","patient_label":"Patient_Test_20","task_candidates":[],"task_spoken":null,"fields":{"append":"Wife has been called."}}],"unparsed":[]}
 
 Transcript: ok where did I put my pen right so yeah
 {"actions":[],"unparsed":[]}
@@ -878,6 +892,12 @@ function validateAction(raw, input) {
   } else if (f.assignee && f.assign_to_self) {
     delete f.assignee;
     delete f.assign_to_self;
+  }
+
+  // Add to the note, or rewrite it: not both.
+  if (f.append !== undefined && f.replace !== undefined) {
+    delete f.append;
+    delete f.replace;
   }
 
   // Task: the model lists candidates, this decides. A task is accepted only

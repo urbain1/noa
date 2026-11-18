@@ -29,6 +29,8 @@ const PATIENT_LABEL_RE = /^Patient_Test_\d{1,6}$/;
  *          "scope" needs one only when fields.scope === "patient"
  *          "none"
  * task:    needs an existing task resolved (or picked) first
+ * note:    needs an existing note picked first. Always a picker: note
+ *          content never goes to the parser, so it cannot name one
  * step:    which step VoiceQueue renders
  * undo:    how the summary can undo it, or null when it cannot
  *          (no delete path exists for notes or patients)
@@ -40,6 +42,7 @@ export const VOICE_ACTIONS = {
   create_task: { patient: "ref", task: false, step: "addTask", undo: "deleteTasks" },
   edit_task: { patient: "ref", task: true, step: "editTask", undo: "restoreTask" },
   create_note: { patient: "ref", task: false, step: "addNote", undo: null },
+  edit_note: { patient: "ref", task: false, note: true, step: "editNote", undo: "restoreNote" },
   start_discharge_planning: { patient: "ref", task: false, step: "discharge", undo: "deleteTasks" },
   open_handoff: { patient: "scope", task: false, step: "handoff", undo: null, deferred: true },
   unsupported: { patient: "none", task: false, step: "unsupported", undo: null },
@@ -54,6 +57,22 @@ export function needsPatient(action) {
 
 export function needsTask(action) {
   return Boolean(VOICE_ACTIONS[action.type]?.task);
+}
+
+export function needsNote(action) {
+  return Boolean(VOICE_ACTIONS[action.type]?.note);
+}
+
+/**
+ * The notes a voice step may edit: this patient's notes written by the
+ * current nurse, newest first. Only the author edits a note (decisions.md,
+ * 2026-11-18), the same rule as the Edit control on the patient card.
+ */
+export function editableNotes(patient, currentNurseId) {
+  if (!patient || !currentNurseId) return [];
+  return (patient.notes || [])
+    .filter((n) => n?.id && n.nurse_id === currentNurseId)
+    .sort((a, b) => Date.parse(b.created_at || 0) - Date.parse(a.created_at || 0));
 }
 
 /**
@@ -85,6 +104,9 @@ export function buildQueueEntries(actions, patients, facilityId) {
     };
   });
 }
+
+// Free-text fields that must be a non-empty string to be kept.
+const TEXT_FIELDS = ["append", "replace"];
 
 const ENUM_FIELDS = {
   priority: VOICE_PRIORITIES,
@@ -133,7 +155,13 @@ export function sanitiseVoiceResult(result) {
     const fields = {};
     for (const [name, value] of Object.entries(raw.fields && typeof raw.fields === "object" ? raw.fields : {})) {
       if (ENUM_FIELDS[name] && !ENUM_FIELDS[name].includes(value)) continue;
+      if (TEXT_FIELDS.includes(name) && (typeof value !== "string" || !value.trim())) continue;
       fields[name] = value;
+    }
+    // Add to a note, or rewrite it: not both.
+    if (fields.append !== undefined && fields.replace !== undefined) {
+      delete fields.append;
+      delete fields.replace;
     }
     actions.push({
       ...base,
@@ -210,6 +238,8 @@ export function describeAction(t, action, resolved = {}) {
       return t("voiceQueue.line.editTask", { patient, task: action.task_spoken || t("voiceQueue.line.taskToChoose"), fields });
     case "create_note":
       return t("voiceQueue.line.createNote", { patient });
+    case "edit_note":
+      return t("voiceQueue.line.editNote", { patient });
     case "start_discharge_planning":
       return t("voiceQueue.line.discharge", { patient });
     case "open_handoff":
@@ -313,6 +343,22 @@ export function taskDraft(action, nurses, currentNurseId) {
     deadline: f.deadline || null,
     assigneeId: assignee.set ? assignee.nurseId : null,
     assigneeHeard: assignee.heard,
+  };
+}
+
+/**
+ * For EditNoteDialog: given the note as it is NOW, the text the action
+ * proposes. An addition goes at the end of the current text, never of a
+ * stale copy. Without either field the note opens unchanged, to be edited
+ * by hand.
+ */
+export function noteProposal(action) {
+  const f = action.fields || {};
+  return (row) => {
+    const current = String(row?.content || "").trim();
+    if (typeof f.replace === "string" && f.replace.trim()) return f.replace.trim();
+    if (typeof f.append === "string" && f.append.trim()) return current ? `${current} ${f.append.trim()}` : f.append.trim();
+    return row?.content || "";
   };
 }
 

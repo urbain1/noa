@@ -12,8 +12,11 @@ import {
   VOICE_UNSUPPORTED_REASONS,
   describeAction,
   dischargeDraft,
+  editableNotes,
+  needsNote,
   needsPatient,
   needsTask,
+  noteProposal,
   patientDraft,
   patientProposal,
   resolveAssignee,
@@ -60,6 +63,49 @@ describe("client and server registries stay in step", () => {
     expect(VOICE_ACTIONS.create_patient.undo).toBeNull();
     expect(VOICE_ACTIONS.create_task.undo).toBe("deleteTasks");
     expect(VOICE_ACTIONS.edit_task.undo).toBe("restoreTask");
+    expect(VOICE_ACTIONS.edit_note.undo).toBe("restoreNote");
+  });
+
+  it("always asks the nurse to pick the note for edit_note, and only for it", () => {
+    for (const type of Object.keys(VOICE_ACTIONS)) expect(needsNote({ type })).toBe(type === "edit_note");
+    // The server never sends notes to the model, so it has nothing to name one with.
+    expect(Object.keys(server.ACTION_REGISTRY.edit_note.fields).sort()).toEqual(["append", "replace"]);
+  });
+});
+
+describe("edit_note on the client", () => {
+  const raw = (fields) => ({ actions: [{ type: "edit_note", words: "add to my note", confidence: "high", patient: { spoken: "patient 2", label: "Patient_Test_2" }, fields }] });
+
+  it("keeps an addition or a rewrite, but not both, and not an empty one", () => {
+    expect(sanitiseVoiceResult(raw({ append: "Family called." })).actions[0].fields).toEqual({ append: "Family called." });
+    expect(sanitiseVoiceResult(raw({ append: "a", replace: "b" })).actions[0].fields).toEqual({});
+    expect(sanitiseVoiceResult(raw({ append: "  " })).actions[0].fields).toEqual({});
+    expect(sanitiseVoiceResult(raw({ replace: 42 })).actions[0].fields).toEqual({});
+  });
+
+  it("adds to the note as it is now, rewrites it, or leaves it for the nurse", () => {
+    const row = { content: "Patient refused breakfast. " };
+    expect(noteProposal({ fields: { append: "Family called." } })(row)).toBe("Patient refused breakfast. Family called.");
+    expect(noteProposal({ fields: { replace: "Patient refused lunch." } })(row)).toBe("Patient refused lunch.");
+    expect(noteProposal({ fields: {} })(row)).toBe("Patient refused breakfast. ");
+    expect(noteProposal({ fields: { append: "Family called." } })({ content: "" })).toBe("Family called.");
+  });
+
+  it("lists only the nurse's own notes, newest first", () => {
+    const patient = {
+      notes: [
+        { id: "n-old", nurse_id: "me", created_at: "2026-11-17T08:00:00Z" },
+        { id: "n-theirs", nurse_id: "amara", created_at: "2026-11-18T09:00:00Z" },
+        { id: "n-new", nurse_id: "me", created_at: "2026-11-18T08:00:00Z" },
+        { id: "n-system", nurse_id: null, created_at: "2026-11-18T10:00:00Z" },
+      ],
+    };
+    expect(editableNotes(patient, "me").map((n) => n.id)).toEqual(["n-new", "n-old"]);
+    expect(editableNotes(patient, null)).toEqual([]);
+  });
+
+  it("describes the action", () => {
+    expect(describeAction(t, { type: "edit_note", patient: { label: "Patient_Test_2" }, fields: {} })).toBe("Change a note for Patient_Test_2");
   });
 });
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useEditSession } from "../hooks/useEditSession";
 import { fetchLastChange } from "../lib/auditLog";
-import { fetchPatientRow, fetchTaskRow } from "../lib/patients";
+import { fetchNoteRow, fetchPatientRow, fetchTaskRow } from "../lib/patients";
 import { changeSince, executeUndoSteps } from "../utils/voiceUndo";
 
 // How long to wait for the lock before giving up. Longer than the lock
@@ -41,7 +41,11 @@ export default function VoiceUndoSession({ plan, facilityId, onResult }) {
   });
 
   const loadRow = useCallback(
-    () => (plan.recordType === "patient" ? fetchPatientRow(facilityId, plan.recordId) : fetchTaskRow(facilityId, plan.recordId)),
+    () => {
+      if (plan.recordType === "patient") return fetchPatientRow(facilityId, plan.recordId);
+      if (plan.recordType === "note") return fetchNoteRow(facilityId, plan.recordId);
+      return fetchTaskRow(facilityId, plan.recordId);
+    },
     [plan.recordType, plan.recordId, facilityId],
   );
 

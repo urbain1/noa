@@ -67,6 +67,7 @@ errors.cancelDischargePlanning,Failed to cancel discharge planning. Please try a
 errors.updateName,Could not save your name. Please try again.,Impossible d'enregistrer votre nom. Veuillez réessayer.
 errors.descriptionRequired,Enter a description.,Saisissez une description.
 errors.createTaskDialog,Couldn't create the task. Please try again.,Impossible de créer la tâche. Veuillez réessayer.
+errors.updateNote,Failed to update note. Please try again.,Échec de la modification de la note. Veuillez réessayer.
 language.label,Language,Langue
 language.en,English,English
 language.fr,Français,Français
@@ -182,6 +183,8 @@ noteCard.justNow,just now,à l'instant
 noteCard.minutesAgo,{{count}}m ago,il y a {{count}} min
 noteCard.hoursAgo,{{count}}h ago,il y a {{count}} h
 noteCard.daysAgo,{{count}}d ago,il y a {{count}} j
+noteCard.edit,Edit,Modifier
+noteCard.editAria,Edit this note,Modifier cette note
 topMenu.generateHandoff,Generate handoff report,Générer le compte rendu à transmettre
 topMenu.generateHandoffSubtitle,SBAR summary for shift change,Rapport SBAR pour le changement d'équipe
 topMenu.dischargePatient,Discharge a patient,Préparer la sortie d'un patient
@@ -300,6 +303,9 @@ noteDialog.stopRecordingAria,Stop recording,Arrêter l'enregistrement
 noteDialog.tapToSpeak,"Tap to speak, or type below","Appuyez pour dicter, ou saisissez ci-dessous"
 noteDialog.placeholder,Your speech will appear here. Tap to write or edit before saving.,Votre dictée apparaîtra ici. Appuyez pour écrire ou corriger avant d'enregistrer.
 noteDialog.saveNote,Save Note,Enregistrer la note
+noteDialog.editTitle,Edit note,Modifier la note
+noteDialog.textLabel,Note,Note
+noteDialog.emptyNote,A note can't be empty.,Une note ne peut pas être vide.
 taskEdit.title,Edit Task,Modifier la tâche
 taskEdit.closeAria,Close,Fermer
 taskEdit.manualMode,Manual Edit,Modification manuelle
@@ -547,6 +553,7 @@ voiceQueue.choosePatientHeard,Noa heard “{{words}}” and could not match exac
 voiceQueue.choosePatientNone,No patient was named.,Aucun patient n'a été nommé.
 voiceQueue.suggested,Possible matches,Correspondances possibles
 voiceQueue.allPatients,All patients,Tous les patients
+voiceQueue.otherTasks,Other tasks,Autres tâches
 voiceQueue.createThisPatient,Create {{label}},Créer {{label}}
 voiceQueue.createNewPatient,Create a new patient,Créer un nouveau patient
 voiceQueue.chooseTaskTitle,Which task?,Quelle tâche ?
@@ -577,6 +584,7 @@ voiceQueue.line.handoffUnit,Open the shift report,Ouvrir la transmission de rel�
 voiceQueue.line.handoffPatient,Open the SBAR for {{patient}},Ouvrir le SBAR de {{patient}}
 voiceQueue.line.patientToChoose,a patient to choose,un patient à choisir
 voiceQueue.line.taskToChoose,a task to choose,une tâche à choisir
+voiceQueue.line.editNote,Change a note for {{patient}},Modifier une note pour {{patient}}
 voiceQueue.field.status,status,statut
 voiceQueue.field.priority,priority,priorité
 voiceQueue.field.department,department,service
@@ -614,3 +622,6 @@ voiceQueue.summary.undoLockLost,Not undone: the record could not be held for edi
 voiceQueue.summary.undoExpired,The time to undo has passed.,Le délai d'annulation est écoulé.
 voiceQueue.summary.undoFailed,Undo failed. Nothing was changed.,L'annulation a échoué. Rien n'a été modifié.
 voiceQueue.summary.undoPartial,Partly undone. Restored: {{restored}}. Not restored: {{missing}}.,Annulation partielle. Rétabli : {{restored}}. Non rétabli : {{missing}}.
+voiceQueue.chooseNoteTitle,Which note?,Quelle note ?
+voiceQueue.chooseNoteBody,Choose the note to change for {{patient}}. Only notes you wrote are listed.,Choisissez la note à modifier pour {{patient}}. Seules les notes que vous avez écrites sont listées.
+voiceQueue.chooseNoteNone,You have no notes for {{patient}}. Only notes you wrote can be changed.,Vous n'avez aucune note pour {{patient}}. Seules les notes que vous avez écrites peuvent être modifiées.

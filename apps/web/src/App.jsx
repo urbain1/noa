@@ -6,6 +6,7 @@ import DischargeDialog from "./components/DischargeDialog";
 import HandoffSummary from "./components/HandoffSummary";
 import PatientUpdateSummary from "./components/PatientUpdateSummary";
 import AddNoteDialog from "./components/AddNoteDialog";
+import EditNoteDialog from "./components/EditNoteDialog";
 import SuggestionModal from "./components/SuggestionModal";
 import AddPatientDialog from "./components/AddPatientDialog";
 import OperationStatus from "./components/OperationStatus";
@@ -23,7 +24,7 @@ import PatientHistoryDialog from "./components/PatientHistoryDialog";
 import VoiceQueue from "./components/VoiceQueue";
 import { supabase } from "./lib/supabase";
 import { fetchFacilityNurses } from "./lib/nurses";
-import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, deleteTask, addNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
+import { fetchPatients, createPatient, updatePatient, completeTask, updateTask, deleteTask, addNote, updateNote, createTask, repageTask, escalateTask, assignTask, createDischargeTasks, cancelDischargeTasks } from "./lib/patients";
 import { generateHandoffSummary, generateSuggestions, generatePatientUpdate, parseTaskEditCommand } from "./utils/claudeAPI";
 import { parseTaskEditFallback } from "./utils/taskEditParse";
 import { needsAttention } from "./utils/taskOverdue";
@@ -166,6 +167,7 @@ function App() {
     setShowProfile(false);
     setHistoryPatientId(null);
     setVoiceRun(null);
+    setNoteToEdit(null);
     // Don't leave the next person on this device in the previous nurse's language.
     applyLanguage(DEFAULT_LANGUAGE);
   };
@@ -229,6 +231,8 @@ function App() {
   // from the moment it was opened would show stale attribution/assignee
   // data after the dialog's own writes land.
   const [taskToEditId, setTaskToEditId] = useState(null);
+  // `{ patientId, noteId }`: the note follows `patients` live, like the task.
+  const [noteToEdit, setNoteToEdit] = useState(null);
   // A delete that a command has been read as, waiting on the nurse's
   // explicit second confirmation. `{ task, command }` or null. Nothing is
   // destroyed until TaskDeleteConfirmDialog's own button is pressed.
@@ -276,6 +280,12 @@ function App() {
       setPatients((prev) =>
         prev.map((p) =>
           p.id === row.patient_id ? { ...p, tasks: p.tasks.map((tk) => (tk.id === row.id ? row : tk)) } : p
+        )
+      );
+    } else if (recordType === "note") {
+      setPatients((prev) =>
+        prev.map((p) =>
+          p.id === row.patient_id ? { ...p, notes: (p.notes || []).map((n) => (n.id === row.id ? row : n)) } : p
         )
       );
     }
@@ -342,6 +352,13 @@ function App() {
     }
     return null;
   }, [patients, taskToEditId]);
+
+  const noteBeingEdited = useMemo(() => {
+    if (!noteToEdit) return null;
+    const patient = patients.find((p) => p.id === noteToEdit.patientId);
+    const note = patient?.notes?.find((n) => n.id === noteToEdit.noteId);
+    return note ? { patient, note } : null;
+  }, [patients, noteToEdit]);
 
   const delayedTasks = useMemo(() => {
     const delayed = [];
@@ -978,6 +995,15 @@ function App() {
     setShowAddNote(patientId);
   };
 
+  // Returns the saved row: the dialog's stale-write check uses it as its new
+  // baseline. Throws on failure so the dialog keeps the text and says so.
+  const handleEditNoteSave = async (noteId, content) => {
+    const updated = await updateNote(noteId, content, nurseProfile.facility_id);
+    handleRowRefreshed("note", updated);
+    setNoteToEdit(null);
+    return updated;
+  };
+
   const handleAddNoteSave = async (noteData) => {
     if (showAddNote === null) return;
     const patientId = showAddNote;
@@ -1092,6 +1118,11 @@ function App() {
       const note = await addNote(nurseProfile.facility_id, patientId, session.user.id, text);
       setPatients((prev) => prev.map((p) => (p.id === patientId ? { ...p, notes: [note, ...p.notes] } : p)));
       return note;
+    },
+    updateNote: async (noteId, content) => {
+      const updated = await updateNote(noteId, content, nurseProfile.facility_id);
+      handleRowRefreshed("note", updated);
+      return updated;
     },
     startDischarge: (patient, options) => planDischarge(patient, options),
     // State only: undo has just deleted this task through the guarded path
@@ -1342,6 +1373,16 @@ function App() {
           onConfirm={handleDischargeConfirm}
         />
       )}
+      {noteBeingEdited && (
+        <EditNoteDialog
+          note={noteBeingEdited.note}
+          patientLabel={noteBeingEdited.patient.label}
+          facilityId={nurseProfile.facility_id}
+          onRowRefreshed={handleRowRefreshed}
+          onCancel={() => setNoteToEdit(null)}
+          onSave={handleEditNoteSave}
+        />
+      )}
       {showAddNote !== null && (
         <AddNoteDialog
           patientName={(patients.find((p) => p.id === showAddNote)?.label) || "Patient"}
@@ -1485,6 +1526,7 @@ function App() {
         onCompleteTask={handleCompleteTask}
         onEditTask={handleEditTaskClick}
         onAddNote={handleAddNoteClick}
+        onEditNote={(patient, note) => setNoteToEdit({ patientId: patient.id, noteId: note.id })}
         onGenerateSbar={handleGeneratePatientHandoff}
         onGeneratePatientUpdate={handleGeneratePatientUpdate}
       />

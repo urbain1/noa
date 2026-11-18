@@ -13,11 +13,12 @@
 //
 // What can be undone:
 //   an edit           the columns that action changed, put back
+//                     (a note edit: its previous text, through updateNote)
 //   a created task    deleted, through the existing delete path
 // What cannot: a created note or patient. No delete path exists for them and
 // none is added here.
 
-import { deleteTask, updatePatient, updateTask } from "../lib/patients";
+import { deleteTask, updateNote, updatePatient, updateTask } from "../lib/patients";
 import { restoreTaskSnapshot } from "../lib/taskRestore";
 import { findConflict } from "./editLock";
 
@@ -106,6 +107,19 @@ export function planUndo(applied) {
     ];
   }
 
+  if (applied.kind === "editNote") {
+    const { before, after } = applied;
+    if (!before?.content || !after?.id) return [];
+    return [
+      {
+        recordType: "note",
+        recordId: after.id,
+        expected: after,
+        steps: [{ type: "updateNote", columns: ["content"], content: before.content }],
+      },
+    ];
+  }
+
   if (applied.kind === "createTasks") {
     return (applied.tasks || [])
       .filter((task) => task?.id)
@@ -158,6 +172,8 @@ export async function executeUndoSteps(plan, facilityId) {
         row = await restoreTaskSnapshot({ facilityId, taskId: plan.recordId, expectedStatus: step.expectedStatus, restore: step.restore });
       } else if (step.type === "updateTask") {
         row = await updateTask(plan.recordId, step.updates, null, facilityId);
+      } else if (step.type === "updateNote") {
+        row = await updateNote(plan.recordId, step.content, facilityId);
       } else if (step.type === "updatePatient") {
         row = await updatePatient(plan.recordId, step.payload, facilityId);
       } else if (step.type === "deleteTask") {

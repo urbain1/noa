@@ -5,9 +5,11 @@ import EditPatientDialog from "./EditPatientDialog";
 import AddTaskDialog from "./AddTaskDialog";
 import TaskEditDialog from "./TaskEditDialog";
 import AddNoteDialog from "./AddNoteDialog";
+import EditNoteDialog from "./EditNoteDialog";
 import DischargeDialog from "./DischargeDialog";
 import VoicePatientPicker from "./VoicePatientPicker";
 import VoiceTaskPicker from "./VoiceTaskPicker";
+import VoiceNotePicker from "./VoiceNotePicker";
 import VoiceNoticeStep from "./VoiceNoticeStep";
 import VoiceSummary from "./VoiceSummary";
 import VoiceUndoControl from "./VoiceUndoControl";
@@ -16,8 +18,11 @@ import {
   VOICE_ACTIONS,
   buildQueueEntries,
   dischargeDraft,
+  editableNotes,
+  needsNote,
   needsPatient,
   needsTask,
+  noteProposal,
   patientDraft,
   patientProposal,
   taskDraft,
@@ -40,6 +45,8 @@ import { stampApplied } from "../utils/voiceUndo";
 //     option to create the patient.
 //   - the task: an id the server validated AND that belongs to the resolved
 //     patient at this facility. Otherwise the task picker. Never a guess.
+//   - the note: always the note picker. Note content never reaches the
+//     parser, so it cannot name one. Only the nurse's own notes are listed.
 // Edits run inside the dialogs' own useEditSession (lock + stale-write
 // check), so a record a colleague is editing shows the usual banner.
 //
@@ -48,7 +55,7 @@ import { stampApplied } from "../utils/voiceUndo";
 // stores column names, never values), and dropped when the summary closes.
 //
 // `api`: { createPatient, updatePatient, createTask, updateTask, addNote,
-//          startDischarge }  each resolves to the saved row(s), throws on failure;
+//          updateNote, startDischarge }  each resolves to the saved row(s), throws on failure;
 //        forgetTask(task)   drops a task undo just deleted from App's roster
 // `onFinished({ handoff })`: the summary was closed; `handoff` is the report
 //   the nurse confirmed opening, if any.
@@ -159,6 +166,22 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
     );
   }
 
+  // --- Or the note --------------------------------------------------------
+  const ownNotes = needsNote(action) ? editableNotes(patient, currentNurseId) : [];
+  const note = item.noteId ? ownNotes.find((n) => n.id === item.noteId) || null : null;
+  if (needsNote(action) && !note) {
+    return (
+      <VoiceNotePicker
+        key={`${key}-note`}
+        step={step}
+        patient={patient}
+        notes={ownNotes}
+        onPick={(picked) => dispatch({ type: "bind", index, noteId: picked.id })}
+        onSkip={step.onSkip}
+      />
+    );
+  }
+
   // --- Then the step's own dialog -----------------------------------------
   switch (spec?.step) {
     case "addPatient":
@@ -250,6 +273,24 @@ export default function VoiceQueue({ parsed, patients, nurses, facilityId, curre
             const row = await api.addNote(patient.id, text);
             done({ kind: "createNote", patientId: patient.id, noteId: row.id });
           }}
+        />
+      );
+
+    case "editNote":
+      return (
+        <EditNoteDialog
+          key={key}
+          note={note}
+          patientLabel={patient.label}
+          facilityId={facilityId}
+          onRowRefreshed={onRowRefreshed}
+          proposal={noteProposal(action)}
+          voiceStep={{
+            ...step,
+            onConfirmed: ({ before, after, columns }) => done({ kind: "editNote", patientId: patient.id, noteId: note.id, before, after, columns }),
+          }}
+          onCancel={step.onClose}
+          onSave={(noteId, content) => api.updateNote(noteId, content)}
         />
       );
 

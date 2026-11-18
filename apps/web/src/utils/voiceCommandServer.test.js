@@ -556,3 +556,47 @@ describe("parseVoiceCommand", () => {
     expect(out).toMatchObject({ ok: true, actions: [], dropped: [], unparsed: [] });
   });
 });
+
+describe("validation: edit_note", () => {
+  const note = (fields, extra = {}) =>
+    action({ type: "edit_note", words: "add to my note for patient 3", task_id: null, task_spoken: null, fields, ...extra });
+
+  it("keeps an addition or a rewrite", () => {
+    const out = validateVoiceCommandOutput({ actions: [note({ append: "Family called." })] }, input());
+    expect(out.actions[0]).toMatchObject({ type: "edit_note", patient: { label: "Patient_Test_3" }, fields: { append: "Family called." } });
+    expect(validateVoiceCommandOutput({ actions: [note({ replace: "Patient refused lunch." })] }, input()).actions[0].fields).toEqual({ replace: "Patient refused lunch." });
+  });
+
+  it("drops both when the model gives both", () => {
+    const out = validateVoiceCommandOutput({ actions: [note({ append: "a", replace: "b" })] }, input());
+    expect(out.actions[0].fields).toEqual({});
+  });
+
+  it("keeps an edit with no text, for the nurse to change by hand", () => {
+    const out = validateVoiceCommandOutput({ actions: [note({})] }, input());
+    expect(out.actions).toHaveLength(1);
+    expect(out.unparsed).toEqual([]);
+  });
+
+  it("never carries a note id, a task, or a field it does not declare", () => {
+    const out = validateVoiceCommandOutput(
+      { actions: [note({ append: "x", note_id: "uuid-n1", content: "y" }, { task_id: "t1", task_candidates: ["t1"], note_id: "uuid-n1" })] },
+      input(),
+    );
+    expect(out.actions[0].fields).toEqual({ append: "x" });
+    expect(out.actions[0].task_id).toBeNull();
+    expect(out.actions[0].task_candidates).toEqual([]);
+    expect(out.actions[0]).not.toHaveProperty("note_id");
+  });
+
+  it("still turns a note delete into 'not available'", () => {
+    const out = validateVoiceCommandOutput({ actions: [note({}, { type: "delete_note" })] }, input());
+    expect(out.actions[0]).toMatchObject({ type: "unsupported", reason: "delete" });
+  });
+
+  it("is described in the prompt", () => {
+    const { system } = buildVoiceCommandPrompt(input());
+    expect(system).toContain("edit_note");
+    expect(system).not.toMatch(/editing or correcting an existing note/);
+  });
+});

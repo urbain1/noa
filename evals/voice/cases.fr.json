@@ -205,6 +205,24 @@
       "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_4", "task": null, "fields": { "status": "Completed" } } ] } },
     { "id": "fr-64", "split": "holdout", "tags": ["generic_term", "edit_task"],
       "transcript": "l'imagerie du patient 1 est faite",
-      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_1", "task": "B-t2", "fields": { "status": "Completed" } } ] } }
+      "expect": { "actions": [ { "type": "edit_task", "patient": "Patient_Test_1", "task": "B-t2", "fields": { "status": "Completed" } } ] } },
+    { "id": "fr-65", "split": "tune", "tags": ["edit_note"],
+      "transcript": "compléter ma dernière note du patient 2 : le fils a été prévenu",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_2", "fields": {"append": {"all": ["fils"]}}}]} },
+    { "id": "fr-66", "split": "tune", "tags": ["edit_note", "partial_correction"],
+      "transcript": "corriger ma note du patient 1, c'est le déjeuner qu'il a refusé, pas le petit déjeuner",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_1", "fields": {}}]} },
+    { "id": "fr-67", "split": "tune", "tags": ["edit_note"],
+      "transcript": "remplacer ma note du patient 3 par : le patient a bien dormi cette nuit",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_3", "fields": {"replace": {"all": ["dormi"]}}}]} },
+    { "id": "fr-68", "split": "tune", "tags": ["edit_note", "create_note", "multi"],
+      "transcript": "ajouter une note pour le patient 4 qu'elle a bien dormi et compléter ma note précédente du patient 2 : la douleur a diminué",
+      "expect": {"actions": [{"type": "create_note", "patient": "Patient_Test_4", "fields": {"text": {"all": ["dormi"]}}}, {"type": "edit_note", "patient": "Patient_Test_2", "fields": {"append": {"all": ["douleur"]}}}]} },
+    { "id": "fr-69", "split": "holdout", "tags": ["edit_note"],
+      "transcript": "ajoute à ma note sur le patient 5 que la perfusion a été retirée",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_5", "fields": {"append": {"all": ["perfusion"]}}}]} },
+    { "id": "fr-70", "split": "holdout", "tags": ["edit_note"],
+      "transcript": "modifier ma note du patient 8",
+      "expect": {"actions": [{"type": "edit_note", "patient": "Patient_Test_8", "fields": {}}]} }
   ]
 }

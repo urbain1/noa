@@ -71,7 +71,8 @@
     "cancelDischargePlanning": "Échec de l'annulation de la préparation de la sortie. Veuillez réessayer.",
     "updateName": "Impossible d'enregistrer votre nom. Veuillez réessayer.",
     "descriptionRequired": "Saisissez une description.",
-    "createTaskDialog": "Impossible de créer la tâche. Veuillez réessayer."
+    "createTaskDialog": "Impossible de créer la tâche. Veuillez réessayer.",
+    "updateNote": "Échec de la modification de la note. Veuillez réessayer."
   },
   "language": {
     "label": "Langue",
@@ -186,7 +187,9 @@
     "justNow": "à l'instant",
     "minutesAgo": "il y a {{count}} min",
     "hoursAgo": "il y a {{count}} h",
-    "daysAgo": "il y a {{count}} j"
+    "daysAgo": "il y a {{count}} j",
+    "edit": "Modifier",
+    "editAria": "Modifier cette note"
   },
   "topMenu": {
     "generateHandoff": "Générer le compte rendu à transmettre",
@@ -322,7 +325,10 @@
     "stopRecordingAria": "Arrêter l'enregistrement",
     "tapToSpeak": "Appuyez pour dicter, ou saisissez ci-dessous",
     "placeholder": "Votre dictée apparaîtra ici. Appuyez pour écrire ou corriger avant d'enregistrer.",
-    "saveNote": "Enregistrer la note"
+    "saveNote": "Enregistrer la note",
+    "editTitle": "Modifier la note",
+    "textLabel": "Note",
+    "emptyNote": "Une note ne peut pas être vide."
   },
   "taskEdit": {
     "title": "Modifier la tâche",
@@ -657,7 +663,8 @@
       "handoffUnit": "Ouvrir la transmission de relève",
       "handoffPatient": "Ouvrir le SBAR de {{patient}}",
       "patientToChoose": "un patient à choisir",
-      "taskToChoose": "une tâche à choisir"
+      "taskToChoose": "une tâche à choisir",
+      "editNote": "Modifier une note pour {{patient}}"
     },
     "field": {
       "status": "statut",
@@ -699,6 +706,9 @@
       "undoExpired": "Le délai d'annulation est écoulé.",
       "undoFailed": "L'annulation a échoué. Rien n'a été modifié.",
       "undoPartial": "Annulation partielle. Rétabli : {{restored}}. Non rétabli : {{missing}}."
-    }
+    },
+    "chooseNoteTitle": "Quelle note ?",
+    "chooseNoteBody": "Choisissez la note à modifier pour {{patient}}. Seules les notes que vous avez écrites sont listées.",
+    "chooseNoteNone": "Vous n'avez aucune note pour {{patient}}. Seules les notes que vous avez écrites peuvent être modifiées."
   }
 }

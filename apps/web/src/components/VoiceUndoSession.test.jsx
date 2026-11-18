@@ -4,11 +4,11 @@ import VoiceUndoSession from "./VoiceUndoSession";
 import { EditLockContext } from "../hooks/editLockContext";
 import { createLockStore, lockKey } from "../utils/editLock";
 import { planUndo } from "../utils/voiceUndo";
-import { deleteTask, fetchPatientRow, fetchTaskRow, updatePatient, updateTask } from "../lib/patients";
+import { deleteTask, fetchNoteRow, fetchPatientRow, fetchTaskRow, updateNote, updatePatient, updateTask } from "../lib/patients";
 import { fetchLastChange } from "../lib/auditLog";
 import { restoreTaskSnapshot } from "../lib/taskRestore";
 
-vi.mock("../lib/patients", () => ({ deleteTask: vi.fn(), fetchPatientRow: vi.fn(), fetchTaskRow: vi.fn(), updatePatient: vi.fn(), updateTask: vi.fn() }));
+vi.mock("../lib/patients", () => ({ deleteTask: vi.fn(), fetchNoteRow: vi.fn(), fetchPatientRow: vi.fn(), fetchTaskRow: vi.fn(), updateNote: vi.fn(), updatePatient: vi.fn(), updateTask: vi.fn() }));
 vi.mock("../lib/auditLog", () => ({ fetchLastChange: vi.fn() }));
 vi.mock("../lib/taskRestore", () => ({ restoreTaskSnapshot: vi.fn() }));
 
@@ -204,5 +204,36 @@ describe("VoiceUndoSession: every refusal writes nothing", () => {
     store.set({ status: "disconnected" });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(onResult).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("VoiceUndoSession: a note edit", () => {
+  const before = { id: "note-1", facility_id: FACILITY, patient_id: "patient-2", nurse_id: ME, content: "Patient refused breakfast." };
+  const after = { ...before, content: "Patient refused breakfast. Family called." };
+  const notePlan = () => planUndo({ kind: "editNote", before, after, columns: ["content"] })[0];
+
+  it("puts the previous text back through the guard, reading the note by facility", async () => {
+    fetchNoteRow.mockResolvedValue(after);
+    updateNote.mockResolvedValue(before);
+    const { onResult } = runUndo(notePlan());
+    expect(await result(onResult)).toEqual({ ok: true, row: before });
+    expect(fetchNoteRow).toHaveBeenCalledWith(FACILITY, "note-1");
+    expect(updateNote).toHaveBeenCalledWith("note-1", "Patient refused breakfast.", FACILITY);
+  });
+
+  it("refuses when the note changed since, and says who", async () => {
+    fetchNoteRow.mockResolvedValue({ ...after, content: "Rewritten by hand." });
+    fetchLastChange.mockResolvedValue({ nurse_id: ME, created_at: "2026-11-18T09:10:00Z" });
+    const { onResult } = runUndo(notePlan());
+    expect(await result(onResult)).toEqual({ ok: false, reason: "changed", columns: ["content"], byNurseId: ME, at: "2026-11-18T09:10:00Z" });
+    expect(updateNote).not.toHaveBeenCalled();
+  });
+
+  it("refuses when a colleague holds the note's lock", async () => {
+    fetchNoteRow.mockResolvedValue(after);
+    const locks = new Map([[lockKey("note", "note-1"), [{ key: "tab-other", nurseId: "nurse-bo", recordType: "note", recordId: "note-1", since: 1, gen: 0 }]]]);
+    const { onResult } = runUndo(notePlan(), { status: "joined", locks });
+    expect(await result(onResult)).toEqual({ ok: false, reason: "locked", byNurseId: "nurse-bo" });
+    expect(updateNote).not.toHaveBeenCalled();
   });
 });

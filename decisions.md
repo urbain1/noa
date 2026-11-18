@@ -2,6 +2,22 @@
 
 Newest first. Superseded decisions are kept, marked, not deleted, so the reasoning stays visible.
 
+## 2026-11-18: Notes can be edited, by their author, and by voice (`edit_note`)
+
+**Decision:** a nurse can change the text of a note, from the patient card (an Edit control on the note) or by voice (`edit_note`, part 5 of the universal voice task). Only `content` changes; the author, patient, type and creation time of a note never do. `EditNoteDialog` is rewritten for this (the old file was an unwired demo with hardcoded English and no lock), with `fetchNoteRow` and `updateNote` in `lib/patients.js`, both filtered by `facility_id`.
+
+**Same protection as patients and tasks.** The dialog runs `useEditSession` with record type `note`, which the lock code already accepted: the note is locked for colleagues while open, the card shows "[name] is currently editing this", and every save is refused if the note changed or was deleted since the dialog opened, saying who. This supersedes "Notes have no edit UI today, so none is locked" in the 2026-11-16 edit-locking entry.
+
+**Only the author edits a note, in the UI.** A note is a clinical statement signed by the nurse who wrote it, so the Edit control appears only on the current nurse's own notes, and the voice note picker lists only those. **This is a UI rule, not a security boundary:** `notes_facility_scope` lets any nurse at the facility update any note there, and no RLS change was made. Open for the product owner to confirm or relax; relaxing it is one condition in `PatientCard` and one in `editableNotes` (`utils/voiceRegistry.js`).
+
+**By voice, the model never sees a note.** The context sent to the parser is unchanged: no note content. The model reports only that the nurse wants to change a note of patient N, plus `append` (text to add at the end) or `replace` (the whole note dictated again). A correction of part of a note ("it was lunch, not breakfast") gets neither, and the nurse fixes it by hand in the dialog. Both at once is contradictory and both are dropped. The note is always chosen in a picker, never pre-selected, not even the newest. The dialog then shows the change old to new, and nothing is written before Confirm. An addition is laid over the note as it is when the dialog opens, not over a stale copy.
+
+**Undo.** A voice note edit can be undone for 60 seconds, back to the previous text, through `updateNote` inside the same guarded `useEditSession` as every other undo, and is refused if the note changed since. A created note still has no Undo (no delete path, none added).
+
+**Prompt change.** Version 2026-11-18.1: `edit_note` added; "editing or correcting an existing note" removed from the `unsupported` list. Twelve eval cases were added before any run (8 tuning, 4 held out); no expectation changed. Results: see `evals/voice/RESULTS.md`.
+
+**No migration, no RLS change.** The 0012 trigger already logs a note update; the History dialog shows it as a modified note (text).
+
 ## 2026-11-16: Universal voice command, v1 scope
 
 **Decision:** the main-page mic is now one general voice command (`project.md` had this as a future direction). The nurse speaks or types freely; Noa works out the separate actions, shows what it understood, and walks the nurse through each one in its existing dialog, pre-filled, to confirm or skip. **Nothing is written without a confirmation.** It replaces the main-page task capture. The per-patient capture on a patient card ("+ Add Task") is unchanged.

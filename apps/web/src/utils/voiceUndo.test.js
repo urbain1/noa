@@ -3,10 +3,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { UNDO_WINDOW_MS, canUndo, changeSince, executeUndoSteps, planUndo, stampApplied, undoSecondsLeft } from "./voiceUndo";
-import { deleteTask, updatePatient, updateTask } from "../lib/patients";
+import { deleteTask, updateNote, updatePatient, updateTask } from "../lib/patients";
 import { restoreTaskSnapshot } from "../lib/taskRestore";
 
-vi.mock("../lib/patients", () => ({ deleteTask: vi.fn(), updatePatient: vi.fn(), updateTask: vi.fn() }));
+vi.mock("../lib/patients", () => ({ deleteTask: vi.fn(), updateNote: vi.fn(), updatePatient: vi.fn(), updateTask: vi.fn() }));
 vi.mock("../lib/taskRestore", () => ({ restoreTaskSnapshot: vi.fn() }));
 
 // Synthetic fixtures only.
@@ -168,5 +168,24 @@ describe("restoreTaskSnapshot is reachable from the undo path only", () => {
       .filter((file) => /taskRestore|restoreTaskSnapshot/.test(readFileSync(file, "utf8")))
       .map((file) => file.slice(join(src, "x").length - 1));
     expect(mentions.sort()).toEqual(["lib/taskRestore.js", "utils/voiceUndo.js"]);
+  });
+});
+
+describe("undoing a note edit", () => {
+  const before = { id: "note-1", facility_id: FACILITY, patient_id: "patient-2", nurse_id: "nurse-me", content: "Patient refused breakfast." };
+  const after = { ...before, content: "Patient refused breakfast. Family called." };
+
+  it("puts the previous text back, and nothing else", () => {
+    const [plan] = planUndo({ kind: "editNote", noteId: "note-1", before, after, columns: ["content"] });
+    expect(plan).toEqual({ recordType: "note", recordId: "note-1", expected: after, steps: [{ type: "updateNote", columns: ["content"], content: "Patient refused breakfast." }] });
+    expect(canUndo({ kind: "editNote", before, after })).toBe(true);
+    expect(canUndo({ kind: "editNote", before: null, after })).toBe(false);
+  });
+
+  it("writes through updateNote, scoped to the facility", async () => {
+    updateNote.mockResolvedValue(before);
+    const [plan] = planUndo({ kind: "editNote", before, after, columns: ["content"] });
+    await expect(executeUndoSteps(plan, FACILITY)).resolves.toEqual(before);
+    expect(updateNote).toHaveBeenCalledWith("note-1", "Patient refused breakfast.", FACILITY);
   });
 });
